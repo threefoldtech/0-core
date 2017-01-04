@@ -3,6 +3,8 @@ import uuid
 import json
 import textwrap
 import shlex
+import typchk
+
 
 class Timeout(Exception):
     pass
@@ -112,6 +114,10 @@ class InfoManager:
 
 
 class ProcessManager:
+    _process_chk = typchk.Checker({
+        'id': int,
+    })
+
     def __init__(self, client):
         self._client = client
 
@@ -121,7 +127,9 @@ class ProcessManager:
 
         :param id: optional ID for the process to list
         """
-        return self._client.json('process.list', {'id': id})
+        args = {'id': id}
+        self._process_chk.check(args)
+        return self._client.json('process.list', args)
 
     def kill(self, id):
         """
@@ -132,10 +140,24 @@ class ProcessManager:
 
         :param id: process id to kill
         """
-        return self._client.json('process.kill', {'id': id})
+        args = {'id': id}
+        self._process_chk.check(args)
+        return self._client.json('process.kill', args)
 
 
 class BaseClient:
+    _system_chk = typchk.Checker({
+        'name': str,
+        'args': [str],
+        'dir': str,
+        'stdin': str,
+        'env': typchk.Or(typchk.Map(str, str), typchk.IsNone()),
+    })
+
+    _bash_chk = typchk.Checker({
+        'stdin': str,
+    })
+
     def __init__(self):
         self._info = InfoManager(self)
         self._process = ProcessManager(self)
@@ -197,25 +219,38 @@ class BaseClient:
         if len(parts) == 0:
             raise ValueError('invalid command')
 
-        response = self.raw(command='core.system', arguments={
+        args = {
             'name': parts[0],
             'args': parts[1:],
             'dir': dir,
             'stdin': stdin,
             'env': env,
-        })
+        }
+
+        self._system_chk.check(args)
+        response = self.raw(command='core.system', arguments=args)
 
         return response
 
     def bash(self, command):
-        response = self.raw(command='bash', arguments={
+        args = {
             'stdin': command,
-        })
+        }
+        self._bash_chk.check(args)
+        response = self.raw(command='bash', arguments=args)
 
         return response
 
 
 class ContainerClient(BaseClient):
+    _raw_chk = typchk.Checker({
+        'container': int,
+        'command': {
+            'command': str,
+            'arguments': typchk.Any(),
+        }
+    })
+
     def __init__(self, client, container):
         super().__init__()
 
@@ -223,13 +258,18 @@ class ContainerClient(BaseClient):
         self._container = container
 
     def raw(self, command, arguments):
-        response = self._client.raw('corex.dispatch', {
+        args = {
             'container': self._container,
             'command': {
                 'command': command,
                 'arguments': arguments,
             },
-        })
+        }
+
+        #check input
+        self._raw_chk.check(args)
+
+        response = self._client.raw('corex.dispatch', args)
 
         result = response.get()
         if result.state != 'SUCCESS':
@@ -240,11 +280,40 @@ class ContainerClient(BaseClient):
 
 
 class ContainerManager:
+    _create_chk = typchk.Checker({
+        'root': str,
+        'mount': typchk.Or(
+            typchk.Map(str, str),
+            typchk.IsNone()
+        ),
+        'network': {
+            'zerotier': typchk.Or(
+                str,
+                typchk.IsNone()
+            ),
+            'bridge': typchk.Or(
+                [typchk.Length([str], 2)],
+                typchk.IsNone()
+            ),  # list of tuples each of length 2 or None
+        },
+        'port': typchk.Or(
+            typchk.Map(int, int),
+            typchk.IsNone()
+        ),
+        'hostname': typchk.Or(
+            str,
+            typchk.IsNone()
+        ),
+    })
+
+    _terminate_chk = typchk.Checker({
+        'container': int
+    })
+
     def __init__(self, client):
         self._client = client
 
     def create(self, root_url, mount=None, zerotier=None, bridge=None, port=None, hostname=None):
-
         """
         Creater a new container with the given root plist, mount points and
         zerotier id, and connected to the given bridges
@@ -272,7 +341,9 @@ class ContainerManager:
                          if None it will automatically be set to core-x,
                          x beeing the ID of the container
         """
-        response = self._client.raw('corex.create', {
+
+
+        args = {
             'root': root_url,
             'mount': mount,
             'network': {
@@ -281,7 +352,12 @@ class ContainerManager:
             },
             'port': port,
             'hostname': hostname,
-        })
+        }
+
+        #validate input
+        self._create_chk.check(args)
+
+        response = self._client.raw('corex.create', args)
 
         result = response.get()
         if result.state != 'SUCCESS':
@@ -299,9 +375,11 @@ class ContainerManager:
         return json.loads(result.data)
 
     def terminate(self, container):
-        response = self._client.raw('corex.terminate', {
+        args = {
             'container': container,
-        })
+        }
+        self._terminate_chk.check(args)
+        response = self._client.raw('corex.terminate', args)
 
         result = response.get()
         if result.state != 'SUCCESS':
@@ -312,6 +390,20 @@ class ContainerManager:
 
 
 class BridgeManager:
+    _bridge_create_chk = typchk.Checker({
+        'name': str,
+        'hwaddr': str,
+        'network': {
+            'mode': typchk.Or(typchk.Enum('static', 'dnsmasq'), typchk.IsNone()),
+            'nat': bool,
+            'settings': typchk.Map(str, str),
+        }
+    })
+
+    _bridge_delete_chk = typchk.Checker({
+        'name': str,
+    })
+
     def __init__(self, client):
         self._client = client
 
@@ -336,7 +428,7 @@ class BridgeManager:
                             part of the provided cidr.
                             if nat is true, SNAT rules will be automatically added in the firewall.
         """
-        response = self._client.raw('bridge.create', {
+        args = {
             'name': name,
             'hwaddr': hwaddr,
             'network': {
@@ -344,7 +436,11 @@ class BridgeManager:
                 'nat': nat,
                 'settings': settings,
             }
-        })
+        }
+
+        self._bridge_create_chk.check(args)
+
+        response = self._client.raw('bridge.create', args)
 
         result = response.get()
         if result.state != 'SUCCESS':
@@ -362,9 +458,13 @@ class BridgeManager:
         return json.loads(result.data)
 
     def delete(self, bridge):
-        response = self._client.raw('bridge.delete', {
+        args = {
             'name': bridge,
-        })
+        }
+
+        self._bridge_delete_chk.check(args)
+
+        response = self._client.raw('bridge.delete', args)
 
         result = response.get()
         if result.state != 'SUCCESS':
@@ -372,6 +472,33 @@ class BridgeManager:
 
 
 class DiskManager:
+    _mktable_chk = typchk.Checker({
+        'disk': str,
+        'table_type': typchk.Enum('aix', 'amiga', 'bsd', 'dvh', 'gpt', 'mac', 'msdos', 'pc98', 'sun', 'loop')
+    })
+
+    _mkpart_chk = typchk.Checker({
+        'disk': str,
+        'start': typchk.Or(int, str),
+        'end': typchk.Or(int, str),
+        'part_type': typchk.Enum('primary', 'logical', 'extended'),
+    })
+
+    _rmpart_chk = typchk.Checker({
+        'disk': str,
+        'number': int,
+    })
+
+    _mount_chk = typchk.Checker({
+        'options': str,
+        'source': str,
+        'target': str,
+    })
+
+    _umount_chk = typchk.Checker({
+        'source': str,
+    })
+
     def __init__(self, client):
         self._client = client
 
@@ -401,11 +528,14 @@ class DiskManager:
         :param disk: Full device path like /dev/sda
         :param table_type: Partition table type as accepted by parted
         """
-
-        response = self._client.raw('disk.mktable', {
+        args = {
             'disk': disk,
             'table_type': table_type,
-        })
+        }
+
+        self._mktable_chk.check(args)
+
+        response = self._client.raw('disk.mktable', args)
 
         result = response.get()
 
@@ -420,13 +550,16 @@ class DiskManager:
         :param end: partition end as accepted by parted mkpart
         :param part_type: partition type as accepted by parted mkpart
         """
-
-        response = self._client.raw('disk.mkpart', {
+        args = {
             'disk': disk,
             'start': start,
             'end': end,
             'part_type': part_type,
-        })
+        }
+
+        self._mkpart_chk.check(args)
+
+        response = self._client.raw('disk.mkpart', args)
 
         result = response.get()
 
@@ -439,10 +572,14 @@ class DiskManager:
         :param disk: Full device path like /dev/sda
         :param number: Partition number (starting from 1)
         """
-        response = self._client.raw('disk.rmpart', {
+        args = {
             'disk': disk,
             'number': number,
-        })
+        }
+
+        self._rmpart_chk.check(args)
+
+        response = self._client.raw('disk.rmpart', args)
 
         result = response.get()
 
@@ -460,11 +597,14 @@ class DiskManager:
         if len(options) == 0:
             options = ['auto']
 
-        response = self._client.raw('disk.mount', {
+        args = {
             'options': ','.join(options),
             'source': source,
             'target': target,
-        })
+        }
+
+        self._mount_chk.check(args)
+        response = self._client.raw('disk.mount', args)
 
         result = response.get()
 
@@ -477,9 +617,12 @@ class DiskManager:
         :param source: Full partition path like /dev/sda1
         """
 
-        response = self._client.raw('disk.umount', {
+        args = {
             'source': source,
-        })
+        }
+        self._umount_chk.check(args)
+
+        response = self._client.raw('disk.umount', args)
 
         result = response.get()
 
@@ -488,6 +631,17 @@ class DiskManager:
 
 
 class BtrfsManager:
+    _create_chk = typchk.Checker({
+        'label': str,
+        'metadata': typchk.Enum("raid0", "raid1", "raid5", "raid6", "raid10", "dup", "single", ""),
+        'data': typchk.Enum("raid0", "raid1", "raid5", "raid6", "raid10", "dup", "single", ""),
+        'devices': [str],
+    })
+
+    _subvol_chk = typchk.Checker({
+        'path': str,
+    })
+
     def __init__(self, client):
         self._client = client
 
@@ -513,12 +667,16 @@ class BtrfsManager:
         :metadata_profile: raid0, raid1, raid5, raid6, raid10, dup or single
         :data_profile: same as metadata profile
         """
-        result = self._client.raw('btrfs.create', {
+        args = {
             'label': label,
             'metadata': metadata_profile,
             'data': data_profile,
             'devices': devices
-        }).get()
+        }
+
+        self._create_chk.check(args)
+
+        result = self._client.raw('btrfs.create', args).get()
 
         if result.state != 'SUCCESS':
             raise RuntimeError('failed to create btrfs FS %s' % result.data)
@@ -528,9 +686,11 @@ class BtrfsManager:
         Create a btrfs subvolume in the specified path
         :param path: path to create
         """
-        result = self._client.raw('btrfs.subvol_create', {
+        args = {
             'path': path
-        }).get()
+        }
+        self._subvol_chk.check(args)
+        result = self._client.raw('btrfs.subvol_create', args).get()
 
         if result.state != 'SUCCESS':
             raise RuntimeError('failed to create btrfs subvolume %s' % result.data)
@@ -557,27 +717,39 @@ class BtrfsManager:
         Delete a btrfs subvolume in the specified path
         :param path: path to delete
         """
-        result = self._client.raw('btrfs.subvol_delete', {
+        args = {
             'path': path
-        }).get()
+        }
+
+        self._subvol_chk.check(args)
+
+        result = self._client.raw('btrfs.subvol_delete', args).get()
 
         if result.state != 'SUCCESS':
             raise RuntimeError('failed to list btrfs subvolume %s' % result.data)
 
 
 class ZerotierManager:
+    _network_chk = typchk.Checker({
+        'network': str,
+    })
+
     def __init__(self, client):
         self._client = client
 
     def join(self, network):
-        response = self._client.raw('zerotier.join', {'network': network})
+        args = {'network': network}
+        self._network_chk.check(args)
+        response = self._client.raw('zerotier.join', args)
         result = response.get()
 
         if result.state != 'SUCCESS':
             raise RuntimeError('failed to join zerotier network: %s', result.stderr)
 
     def leave(self, network):
-        response = self._client.raw('zerotier.leave', {'network': network})
+        args = {'network': network}
+        self._network_chk.check(args)
+        response = self._client.raw('zerotier.leave', args)
         result = response.get()
 
         if result.state != 'SUCCESS':
