@@ -30,34 +30,20 @@
 			"Rev": "b9aab3c6a04eef14c56384b4ad065e7b73438862"
 		},
 		{
-			"ImportPath": "github.com/g8os/fs/config",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
+			"ImportPath": "github.com/g8os/g8ufs",
+			"Rev": "a45f2a4038adf77eb7bf3978248f016d69ddf7e4"
 		},
 		{
-			"ImportPath": "github.com/g8os/fs/crypto",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
+			"ImportPath": "github.com/g8os/g8ufs/meta",
+			"Rev": "a45f2a4038adf77eb7bf3978248f016d69ddf7e4"
 		},
 		{
-			"ImportPath": "github.com/g8os/fs/files",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
+			"ImportPath": "github.com/g8os/g8ufs/rofs",
+			"Rev": "a45f2a4038adf77eb7bf3978248f016d69ddf7e4"
 		},
 		{
-			"ImportPath": "github.com/g8os/fs/meta",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/storage",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/utils",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
+			"ImportPath": "github.com/g8os/g8ufs/storage",
+			"Rev": "a45f2a4038adf77eb7bf3978248f016d69ddf7e4"
 		},
 		{
 			"ImportPath": "github.com/garyburd/redigo/internal",
@@ -92,11 +78,6 @@
 		{
 			"ImportPath": "github.com/hanwen/go-fuse/splice",
 			"Rev": "ed841342e5daf4711f24106b93c1035864a8914b"
-		},
-		{
-			"ImportPath": "github.com/mattn/go-sqlite3",
-			"Comment": "v1.1.0-11-gb808f01",
-			"Rev": "b808f01f660667b1510acf216aa2b9fe7f555ddb"
 		},
 		{
 			"ImportPath": "github.com/naoina/go-stringutil",
@@ -178,58 +159,12 @@
 			"Rev": "adb0f53af689dd38f1443eba79489feaacf0b22e"
 		},
 		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "4971afdc2f162e82d185353533d3cf16188a9f4e"
+		},
+		{
 			"ImportPath": "golang.org/x/sys/unix",
 			"Rev": "833a04a10549a95dc34458c195cbad61bbb6cb4d"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/naoina/toml",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/op/go-logging",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/naoina/go-stringutil",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/naoina/toml/ast",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/dsnet/compress/brotli",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/hanwen/go-fuse/fuse",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/hanwen/go-fuse/fuse/nodefs",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/hanwen/go-fuse/fuse/pathfs",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/BurntSushi/toml",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/hanwen/go-fuse/splice",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/vendor/github.com/davecgh/go-spew/spew",
@@ -240,10 +175,6 @@
 			"ImportPath": "github.com/stretchr/testify/vendor/github.com/pmezard/go-difflib/difflib",
 			"Comment": "v1.1.4-4-g976c720",
 			"Rev": "976c720a22c8eb4eb6a0b4348ad85ad12491a506"
-		},
-		{
-			"ImportPath": "golang.org/x/net/context",
-			"Rev": "6cdc0daab091c43fc46193327e0047b4f883c613"
 		}
 	]
 }
