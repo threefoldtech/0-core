@@ -116,7 +116,7 @@ class InfoManager:
 
 class ProcessManager:
     _process_chk = typchk.Checker({
-        'id': int,
+        'id': str,
     })
 
     def __init__(self, client):
