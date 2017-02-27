@@ -26,11 +26,11 @@ const (
 type monitor struct{}
 
 func init() {
-	var m monitor
+	m := (*monitor)(nil)
 	pm.CmdMap["monitor"] = process.NewInternalProcessFactory(m.monitor)
 }
 
-func (m monitor) monitor(cmd *core.Command) (interface{}, error) {
+func (m *monitor) monitor(cmd *core.Command) (interface{}, error) {
 	var args struct {
 		Domain string `json:"domain"`
 	}
