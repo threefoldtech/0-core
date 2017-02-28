@@ -19,6 +19,7 @@ Note that, the rest of the disk extension implementation is done in conf/disk.to
 
 var (
 	freeSpaceRegex = regexp.MustCompile(`(?m:^\s*(\d+)B\s+(\d+)B\s+(\d+)B\s+Free Space$)`)
+	partTableRegex = regexp.MustCompile(`Partition Table: (\w+)`)
 )
 
 type diskMgr struct{}
@@ -44,6 +45,7 @@ type DiskInfoResult struct {
 	End       uint64          `json:"end"`
 	Size      uint64          `json:"size"`
 	BlockSize uint64          `json:"blocksize"`
+	Table     string          `json:"table"`
 	Free      []DiskFreeBlock `json:"free"`
 }
 
@@ -92,7 +94,7 @@ func (d *diskMgr) blockSize(dev string) (uint64, error) {
 	return bs, nil
 }
 
-func (d *diskMgr) getFreeBlocks(disk string) ([]DiskFreeBlock, error) {
+func (d *diskMgr) getTableInfo(disk string) (string, []DiskFreeBlock, error) {
 	blocks := make([]DiskFreeBlock, 0)
 	runner, err := pm.GetManager().RunCmd(&core.Command{
 		ID:      uuid.New(),
@@ -104,18 +106,24 @@ func (d *diskMgr) getFreeBlocks(disk string) ([]DiskFreeBlock, error) {
 	})
 
 	if err != nil {
-		return blocks, err
+		return "", blocks, err
 	}
 
 	result := runner.Wait()
 	if result.State != core.StateSuccess {
-		return blocks, fmt.Errorf("failed to run parted: %v", result.Streams)
+		return "", blocks, fmt.Errorf("failed to run parted: %v", result.Streams)
 	}
 
 	stdout := ""
 
 	if len(result.Streams) > 1 {
 		stdout = result.Streams[0]
+	}
+
+	table := ""
+	tableMatch := partTableRegex.FindStringSubmatch(stdout)
+	if len(tableMatch) == 2 {
+		table = tableMatch[1]
 	}
 
 	matches := freeSpaceRegex.FindAllStringSubmatch(stdout, -1)
@@ -131,7 +139,7 @@ func (d *diskMgr) getFreeBlocks(disk string) ([]DiskFreeBlock, error) {
 		})
 	}
 
-	return blocks, nil
+	return table, blocks, nil
 }
 
 func (d *diskMgr) diskInfo(disk string) (*DiskInfoResult, error) {
@@ -151,11 +159,11 @@ func (d *diskMgr) diskInfo(disk string) (*DiskInfoResult, error) {
 
 	info.BlockSize = bs
 	//get free blocks.
-	blocks, err := d.getFreeBlocks(disk)
+	table, blocks, err := d.getTableInfo(disk)
 	if err != nil {
 		return nil, err
 	}
-
+	info.Table = table
 	info.Free = blocks
 
 	return &info, nil
