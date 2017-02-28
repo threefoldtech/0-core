@@ -135,7 +135,7 @@ func (c *container) onpid(pid int) {
 }
 
 func (c *container) onexit(state bool) {
-	log.Debugf("Container %s exited with state %v", c.id, state)
+	log.Debugf("Container %v exited with state %v", c.id, state)
 	c.cleanup()
 }
 

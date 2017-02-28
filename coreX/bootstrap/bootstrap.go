@@ -3,10 +3,13 @@ package bootstrap
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"syscall"
 
+	"github.com/g8os/core0/base/pm"
+	"github.com/g8os/core0/base/pm/core"
+	"github.com/g8os/core0/base/pm/process"
 	"github.com/op/go-logging"
+	"github.com/pborman/uuid"
 )
 
 var (
@@ -63,6 +66,22 @@ func updateHostname(hostname string) error {
 	fmt.Fprint(fHosts, "127.0.0.1    localhost.localdomain localhost\n")
 
 	// call hostname command
-	cmd := exec.Command("hostname", hostname)
-	return cmd.Run()
+	runner, err := pm.GetManager().RunCmd(&core.Command{
+		ID:      uuid.New(),
+		Command: process.CommandSystem,
+		Arguments: core.MustArguments(process.SystemCommandArguments{
+			Name: "hostname",
+			Args: []string{hostname},
+		}),
+	})
+
+	if err != nil {
+		return err
+	}
+	result := runner.Wait()
+	if result.State != core.StateSuccess {
+		return fmt.Errorf("failed to set hostname: %v", result.Streams)
+	}
+
+	return nil
 }

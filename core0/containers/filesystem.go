@@ -9,17 +9,16 @@ import (
 	"github.com/g8os/core0/base/pm"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/process"
+	"github.com/g8os/core0/base/pm/stream"
 	"github.com/g8os/core0/base/settings"
 	"github.com/g8os/g8ufs"
-	"github.com/g8os/g8ufs/meta"
-	"github.com/g8os/g8ufs/storage"
 	"github.com/pborman/uuid"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path"
+	"sync"
 	"syscall"
 )
 
@@ -215,48 +214,41 @@ func (c *container) mountPList(src string, target string) error {
 		return err
 	}
 
-	store, err := meta.NewRocksMeta("", db)
-	if err != nil {
-		return err
+	storageUrl := settings.Settings.Globals.Get("fuse_storage", "ardb://home.maxux.net:26379")
+	cmd := &core.Command{
+		ID:      uuid.New(),
+		Command: process.CommandSystem,
+		Arguments: core.MustArguments(process.SystemCommandArguments{
+			Name: "g8ufs",
+			Args: []string{"-reset", "-backend", backend, "-meta", db, "-storage-url", storageUrl, target},
+		}),
 	}
 
-	u, err := url.Parse(settings.Settings.Globals.Get("fuse_storage", "ardb://home.maxux.net:26379"))
-	if err != nil {
-		return err
-	}
+	var o sync.Once
+	var wg sync.WaitGroup
+	wg.Add(1)
 
-	storage, err := storage.NewARDBStorage(u)
-	if err != nil {
-		return err
-	}
-
-	fs, err := g8ufs.Mount(&g8ufs.Options{
-		Backend:   backend,
-		Target:    target,
-		Storage:   storage,
-		MetaStore: store,
-		Reset:     true,
-		Exec:      c.exec,
+	pm.GetManager().RunCmd(cmd, &pm.MatchHook{
+		Match: "mount starts",
+		Action: func(_ *stream.Message) {
+			o.Do(wg.Done)
+		},
+	}, &pm.ExitHook{
+		Action: func(s bool) {
+			log.Debugf("mount point '%s' exited with '%v'", target, s)
+			o.Do(func() {
+				if !s {
+					err = fmt.Errorf("upnormal exit of filesystem mount at '%s'", target)
+				}
+				wg.Done()
+			})
+		},
 	})
 
-	if err != nil {
-		return err
-	}
+	//wait for either of the hooks (ready or exit)
+	wg.Wait()
 
-	go func(fs *g8ufs.G8ufs) {
-		err := fs.Wait()
-		if err != nil {
-			switch e := err.(type) {
-			case *exec.ExitError:
-				log.Errorf("unionfs exited with err: %s", e)
-				log.Debugf("%s", string(e.Stderr))
-			default:
-				log.Errorf("unionfs exited with err: %s", e)
-			}
-		}
-	}(fs)
-
-	return nil
+	return err
 }
 
 func (c *container) hash(src string) string {
@@ -277,13 +269,13 @@ func (c *container) mount() error {
 	os.RemoveAll(root)
 
 	if err := c.mountPList(c.args.Root, root); err != nil {
-		return err
+		return fmt.Errorf("mount-root-plist(%s)", err)
 	}
 
 	for src, dst := range c.args.Mount {
 		target := path.Join(root, dst)
 		if err := os.MkdirAll(target, 0755); err != nil {
-			return err
+			return fmt.Errorf("mkdirAll(%s)", err)
 		}
 		//src can either be a location on HD, or another plist
 		u, err := url.Parse(src)
@@ -293,12 +285,12 @@ func (c *container) mount() error {
 
 		if u.Scheme == "" {
 			if err := syscall.Mount(src, target, "", syscall.MS_BIND, ""); err != nil {
-				return err
+				return fmt.Errorf("mount-bind(%s)", err)
 			}
 		} else {
 			//assume a plist
 			if err := c.mountPList(src, target); err != nil {
-				return err
+				return fmt.Errorf("mount-bind-plist(%s)", err)
 			}
 		}
 	}

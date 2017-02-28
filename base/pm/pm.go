@@ -10,6 +10,8 @@ import (
 	"github.com/op/go-logging"
 	psutil "github.com/shirou/gopsutil/process"
 	"io/ioutil"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
@@ -211,31 +213,40 @@ func (pm *PM) processCmds() {
 }
 
 func (pm *PM) processWait() {
-	for {
-		var status syscall.WaitStatus
-		var rusage syscall.Rusage
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, syscall.SIGCHLD)
+	for range c {
+		//we wait for sigchld
+		for {
+			//once we get a signal, we consume ALL the died children
+			//since signal.Notify will not wait on channel writes
+			//we create a buffer of 2 and on each signal we loop until wait gives an error
+			var status syscall.WaitStatus
+			var rusage syscall.Rusage
 
-		log.Info("Waiting for children")
-		pid, err := syscall.Wait4(-1, &status, 0, &rusage)
-		if err != nil {
-			log.Errorf("Wait error: %s", err)
-			continue
+			log.Info("Waiting for children")
+			pid, err := syscall.Wait4(-1, &status, 0, &rusage)
+			if err != nil {
+				log.Debugf("wait error: %s", err)
+				break
+			}
+
+			//Avoid reading the process state before the Register call is complete.
+			pm.pidsMux.Lock()
+			ch, ok := pm.pids[pid]
+			pm.pidsMux.Unlock()
+
+			if ok {
+				go func(ch chan syscall.WaitStatus, status syscall.WaitStatus) {
+					ch <- status
+					close(ch)
+					pm.pidsMux.Lock()
+					defer pm.pidsMux.Unlock()
+					delete(pm.pids, pid)
+				}(ch, status)
+			}
 		}
 
-		//Avoid reading the process state before the Register call is complete.
-		pm.pidsMux.Lock()
-		ch, ok := pm.pids[pid]
-		pm.pidsMux.Unlock()
-
-		if ok {
-			go func(ch chan syscall.WaitStatus, status syscall.WaitStatus) {
-				ch <- status
-				close(ch)
-				pm.pidsMux.Lock()
-				defer pm.pidsMux.Unlock()
-				delete(pm.pids, pid)
-			}(ch, status)
-		}
 	}
 }
 
