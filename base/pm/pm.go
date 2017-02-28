@@ -10,6 +10,8 @@ import (
 	"github.com/op/go-logging"
 	psutil "github.com/shirou/gopsutil/process"
 	"io/ioutil"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
@@ -211,12 +213,14 @@ func (pm *PM) processCmds() {
 }
 
 func (pm *PM) processWait() {
-	for {
+	c := make(chan os.Signal, settings.Settings.Main.MaxJobs*2)
+	signal.Notify(c, syscall.SIGCHLD)
+	for range c {
 		var status syscall.WaitStatus
 		var rusage syscall.Rusage
 
-		log.Info("Waiting for childrent")
-		pid, err := syscall.Wait4(-1, &status, 0, &rusage)
+		log.Info("Waiting for children")
+		pid, err := syscall.Wait4(-1, &status, syscall.WNOHANG, &rusage)
 		if err != nil {
 			log.Errorf("Wait error: %s", err)
 			continue

@@ -40,11 +40,13 @@ func (c *container) Start() error {
 
 	if err := c.mount(); err != nil {
 		c.cleanup()
+		log.Errorf("error in container mount: %s", err)
 		return err
 	}
 
 	if err := c.preStart(); err != nil {
 		c.cleanup()
+		log.Errorf("error in container prestart: %s", err)
 		return err
 	}
 	//
@@ -81,6 +83,8 @@ func (c *container) Start() error {
 
 	_, err := mgr.NewRunner(extCmd, process.NewContainerProcess, onpid, onexit)
 	if err != nil {
+		c.cleanup()
+		log.Errorf("error in container runner: %s", err)
 		return err
 	}
 
