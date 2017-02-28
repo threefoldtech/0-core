@@ -80,7 +80,7 @@ func (g Globals) Get(key string, def ...string) string {
 type AppSettings struct {
 	Main struct {
 		MaxJobs  int
-		Include  string
+		Include  []string
 		Network  string
 		LogLevel string
 	}

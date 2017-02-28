@@ -2,7 +2,7 @@
 
 [main]
 max_jobs = 200
-include = "/root/conf"
+include = ["/root/conf"]
 # network = "./network.toml"
 
 [sink.main]
