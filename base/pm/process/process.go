@@ -21,7 +21,7 @@ type PIDTable interface {
 	//Register atomic registration of PID. MUST grantee that that no wait4 will happen
 	//on any of the child process until the register operation is done.
 	Register(g GetPID) error
-	WaitPID(pid int) *syscall.WaitStatus
+	WaitPID(pid int) syscall.WaitStatus
 }
 
 //ProcessStats holds process cpu and memory usage

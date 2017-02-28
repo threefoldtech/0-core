@@ -10,8 +10,6 @@ import (
 	"github.com/op/go-logging"
 	psutil "github.com/shirou/gopsutil/process"
 	"io/ioutil"
-	"os"
-	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
@@ -57,7 +55,7 @@ type PM struct {
 	statsFlushHandlers  []StatsHandler
 	queueMgr            *cmdQueueManager
 
-	pids    map[int]chan *syscall.WaitStatus
+	pids    map[int]chan syscall.WaitStatus
 	pidsMux sync.Mutex
 }
 
@@ -73,7 +71,7 @@ func InitProcessManager(maxJobs int) *PM {
 		routeResultHandlers: make(map[core.Route][]ResultHandler),
 		queueMgr:            newCmdQueueManager(),
 
-		pids: make(map[int]chan *syscall.WaitStatus),
+		pids: make(map[int]chan syscall.WaitStatus),
 	}
 
 	log.Infof("Process manager intialization completed")
@@ -213,13 +211,12 @@ func (pm *PM) processCmds() {
 }
 
 func (pm *PM) processWait() {
-	ch := make(chan os.Signal)
-	signal.Notify(ch, syscall.SIGCHLD)
-	for _ = range ch {
+	for {
 		var status syscall.WaitStatus
 		var rusage syscall.Rusage
 
-		pid, err := syscall.Wait4(-1, &status, syscall.WNOHANG, &rusage)
+		log.Info("Waiting for childrent")
+		pid, err := syscall.Wait4(-1, &status, 0, &rusage)
 		if err != nil {
 			log.Errorf("Wait error: %s", err)
 			continue
@@ -231,13 +228,13 @@ func (pm *PM) processWait() {
 		pm.pidsMux.Unlock()
 
 		if ok {
-			go func() {
-				ch <- &status
+			go func(ch chan syscall.WaitStatus, status syscall.WaitStatus) {
+				ch <- status
 				close(ch)
 				pm.pidsMux.Lock()
 				defer pm.pidsMux.Unlock()
 				delete(pm.pids, pid)
-			}()
+			}(ch, status)
 		}
 	}
 }
@@ -250,13 +247,13 @@ func (pm *PM) Register(g process.GetPID) error {
 		return err
 	}
 
-	ch := make(chan *syscall.WaitStatus)
+	ch := make(chan syscall.WaitStatus)
 	pm.pids[pid] = ch
 
 	return nil
 }
 
-func (pm *PM) WaitPID(pid int) *syscall.WaitStatus {
+func (pm *PM) WaitPID(pid int) syscall.WaitStatus {
 	return <-pm.pids[pid]
 }
 

@@ -275,6 +275,6 @@ func (runner *runnerImpl) Register(g process.GetPID) error {
 	})
 }
 
-func (runner *runnerImpl) WaitPID(pid int) *syscall.WaitStatus {
+func (runner *runnerImpl) WaitPID(pid int) syscall.WaitStatus {
 	return runner.manager.WaitPID(pid)
 }
