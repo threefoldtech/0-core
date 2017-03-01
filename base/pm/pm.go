@@ -224,7 +224,7 @@ func (pm *PM) processWait() {
 			var status syscall.WaitStatus
 			var rusage syscall.Rusage
 
-			log.Info("Waiting for children")
+			log.Debug("Waiting for children")
 			pid, err := syscall.Wait4(-1, &status, 0, &rusage)
 			if err != nil {
 				log.Debugf("wait error: %s", err)
