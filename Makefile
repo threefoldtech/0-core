@@ -15,7 +15,8 @@ core0: $(OUTPUT)
 coreX: $(OUTPUT)
 	cd coreX && go build -ldflags $(ldflags) -o ../$(OUTPUT)/$@
 
-.PHONEY: core0 coreX
 
 $(OUTPUT):
 	mkdir -p $(OUTPUT)
+
+.PHONEY: $(OUTPUT) core0 coreX
