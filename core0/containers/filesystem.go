@@ -11,7 +11,6 @@ import (
 	"github.com/g8os/core0/base/pm/process"
 	"github.com/g8os/core0/base/pm/stream"
 	"github.com/g8os/core0/base/settings"
-	"github.com/g8os/g8ufs"
 	"github.com/pborman/uuid"
 	"io"
 	"net/http"
@@ -180,21 +179,6 @@ func (c *container) getMetaDB(src string) (string, error) {
 	}
 
 	return db, nil
-}
-
-func (c *container) exec(name string, arg ...string) g8ufs.Starter {
-	return &starterWrapper{
-		cmd: &core.Command{
-			ID:      uuid.New(),
-			Command: process.CommandSystem,
-			Arguments: core.MustArguments(
-				process.SystemCommandArguments{
-					Name: name,
-					Args: arg,
-				},
-			),
-		},
-	}
 }
 
 func (c *container) mountPList(src string, target string) error {
