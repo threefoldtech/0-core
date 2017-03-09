@@ -11,7 +11,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"io/ioutil"
 	"net/url"
-	"os"
+	//"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -149,7 +149,7 @@ func (m *kvmManager) create(cmd *core.Command) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(tmp.Name())
+	//defer os.Remove(tmp.Name())
 	defer tmp.Close()
 
 	if _, err := tmp.Write(data); err != nil {

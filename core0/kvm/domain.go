@@ -150,7 +150,7 @@ type InterfaceDeviceSourceBridge struct {
 }
 
 type InterfaceDeviceModel struct {
-	Type string `xml:"type"`
+	Type string `xml:"type,attr"`
 }
 
 type InterfaceDevice struct {
