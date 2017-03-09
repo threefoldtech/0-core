@@ -10,6 +10,7 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/vishvananda/netlink"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -44,6 +45,46 @@ type CreateParams struct {
 	Bridge string `json:"bridge"`
 }
 
+func (m *kvmManager) mkNBDDisk(u *url.URL) DiskDevice {
+	return DiskDevice{
+		Type:   DiskTypeNetwork,
+		Device: DiskDeviceTypeDisk,
+		Target: DiskTarget{
+			Dev: "vda",
+			Bus: "virtio",
+		},
+		Source: DiskSourceNetwork{
+			Protocol: "nbd",
+			Name:     u.Query().Get("name"),
+			Host: DiskSourceNetworkHost{
+				Transport: "unix",
+				Socket:    u.Path,
+			},
+		},
+	}
+}
+
+func (m *kvmManager) mkDisk(img string) DiskDevice {
+	u, err := url.Parse(img)
+
+	if err == nil && u.Scheme == "nbd" {
+		return m.mkNBDDisk(u)
+	}
+
+	//default fall back to image disk
+	return DiskDevice{
+		Type:   DiskTypeFile,
+		Device: DiskDeviceTypeDisk,
+		Target: DiskTarget{
+			Dev: "hda",
+			Bus: "ide",
+		},
+		Source: DiskSourceFile{
+			File: img,
+		},
+	}
+}
+
 func (m *kvmManager) create(cmd *core.Command) (interface{}, error) {
 	var params CreateParams
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
@@ -68,17 +109,7 @@ func (m *kvmManager) create(cmd *core.Command) (interface{}, error) {
 		Devices: Devices{
 			Emulator: "/usr/bin/qemu-system-x86_64",
 			Devices: []Device{
-				DiskDevice{
-					Type:   DiskTypeFile,
-					Device: DiskDeviceTypeDisk,
-					Target: DiskTarget{
-						Dev: "hda",
-						Bus: "ide",
-					},
-					Source: DiskSourceFile{
-						File: params.Image,
-					},
-				},
+				m.mkDisk(params.Image),
 				GraphicsDevice{
 					Type:   GraphicsDeviceTypeVNC,
 					Port:   -1,
@@ -102,6 +133,9 @@ func (m *kvmManager) create(cmd *core.Command) (interface{}, error) {
 			Type: InterfaceDeviceTypeBridge,
 			Source: InterfaceDeviceSourceBridge{
 				Bridge: params.Bridge,
+			},
+			Model: InterfaceDeviceModel{
+				Type: "virtio",
 			},
 		})
 	}

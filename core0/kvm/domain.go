@@ -94,6 +94,17 @@ type DiskSourceBlock struct {
 	Dev string `xml:"dev,attr"`
 }
 
+type DiskSourceNetworkHost struct {
+	Transport string `xml:"transport,attr"`
+	Socket    string `xml:"socket,attr"`
+}
+
+type DiskSourceNetwork struct {
+	Protocol string                `xml:"protocol,attr"`
+	Host     DiskSourceNetworkHost `xml:"host"`
+	Name     string                `xml:"name,attr,omitempty"`
+}
+
 type DiskTarget struct {
 	Dev string `xml:"dev,attr"`
 	Bus string `xml:"bus,attr"`
@@ -138,8 +149,13 @@ type InterfaceDeviceSourceBridge struct {
 	Bridge string `xml:"bridge,attr"`
 }
 
+type InterfaceDeviceModel struct {
+	Type string `xml:"type"`
+}
+
 type InterfaceDevice struct {
 	XMLName xml.Name              `xml:"interface"`
 	Type    InterfaceDeviceType   `xml:"type,attr"`
 	Source  InterfaceDeviceSource `xml:"source"`
+	Model   InterfaceDeviceModel  `xml:"model"`
 }
