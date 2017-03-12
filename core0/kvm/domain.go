@@ -96,7 +96,9 @@ type DiskSourceBlock struct {
 
 type DiskSourceNetworkHost struct {
 	Transport string `xml:"transport,attr"`
-	Socket    string `xml:"socket,attr"`
+	Socket    string `xml:"socket,attr,omitempty"`
+	Port      string `xml:"port,attr,omitempty"`
+	Name      string `xml:"name,attr,omitempty"`
 }
 
 type DiskSourceNetwork struct {

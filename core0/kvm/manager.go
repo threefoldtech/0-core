@@ -46,28 +46,53 @@ type CreateParams struct {
 }
 
 func (m *kvmManager) mkNBDDisk(u *url.URL) DiskDevice {
-	return DiskDevice{
-		Type:   DiskTypeNetwork,
-		Device: DiskDeviceTypeDisk,
-		Target: DiskTarget{
-			Dev: "vda",
-			Bus: "virtio",
-		},
-		Source: DiskSourceNetwork{
-			Protocol: "nbd",
-			Name:     u.Query().Get("name"),
-			Host: DiskSourceNetworkHost{
-				Transport: "unix",
-				Socket:    u.Path,
+	switch u.Scheme {
+	case "nbd":
+		fallthrough
+	case "nbd+tcp":
+		return DiskDevice{
+			Type:   DiskTypeNetwork,
+			Device: DiskDeviceTypeDisk,
+			Target: DiskTarget{
+				Dev: "vda",
+				Bus: "virtio",
 			},
-		},
+			Source: DiskSourceNetwork{
+				Protocol: "nbd",
+				Name:     u.Path,
+				Host: DiskSourceNetworkHost{
+					Transport: "tcp",
+					Port:      u.Port(),
+					Name:      u.Hostname(),
+				},
+			},
+		}
+	case "nbd+unix":
+		return DiskDevice{
+			Type:   DiskTypeNetwork,
+			Device: DiskDeviceTypeDisk,
+			Target: DiskTarget{
+				Dev: "vda",
+				Bus: "virtio",
+			},
+			Source: DiskSourceNetwork{
+				Protocol: "nbd",
+				Name:     u.Path,
+				Host: DiskSourceNetworkHost{
+					Transport: "unix",
+					Socket:    u.Query().Get("socket"),
+				},
+			},
+		}
+	default:
+		panic(fmt.Errorf("invalid nbd url: %s", u))
 	}
 }
 
 func (m *kvmManager) mkDisk(img string) DiskDevice {
 	u, err := url.Parse(img)
 
-	if err == nil && u.Scheme == "nbd" {
+	if err == nil && strings.Index(u.Scheme, "nbd") == 0 {
 		return m.mkNBDDisk(u)
 	}
 
