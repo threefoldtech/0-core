@@ -50,6 +50,10 @@ func (m *kvmManager) mkNBDDisk(u *url.URL) DiskDevice {
 	case "nbd":
 		fallthrough
 	case "nbd+tcp":
+		port := u.Port()
+		if port == "" {
+			port = "10809"
+		}
 		return DiskDevice{
 			Type:   DiskTypeNetwork,
 			Device: DiskDeviceTypeDisk,
@@ -62,7 +66,7 @@ func (m *kvmManager) mkNBDDisk(u *url.URL) DiskDevice {
 				Name:     u.Path,
 				Host: DiskSourceNetworkHost{
 					Transport: "tcp",
-					Port:      u.Port(),
+					Port:      port,
 					Name:      u.Hostname(),
 				},
 			},
