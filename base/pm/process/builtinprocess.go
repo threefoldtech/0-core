@@ -2,6 +2,7 @@ package process
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/stream"
 )
@@ -48,7 +49,19 @@ func (process *internalProcess) Run() (<-chan *stream.Message, error) {
 	channel := make(chan *stream.Message)
 
 	go func(channel chan *stream.Message) {
-		defer close(channel)
+		defer func() {
+			if err := recover(); err != nil {
+				m, _ := json.Marshal(fmt.Sprintf("%v", err))
+				channel <- &stream.Message{
+					Level:   stream.LevelResultJSON,
+					Message: string(m),
+				}
+				channel <- stream.MessageExitError
+			}
+
+			close(channel)
+		}()
+
 		value, err := process.runnable(process.cmd)
 		msg := stream.Message{
 			Level: stream.LevelResultJSON,

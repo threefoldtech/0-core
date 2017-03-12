@@ -1,6 +1,7 @@
 package pm
 
 import (
+	"fmt"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/process"
 	"github.com/g8os/core0/base/pm/stream"
@@ -86,15 +87,9 @@ func (runner *runnerImpl) timeout() <-chan time.Time {
 	return timeout
 }
 
-func (runner *runnerImpl) run() *core.JobResult {
-	runner.process = runner.factory(runner, runner.command)
-
-	process := runner.process
-
+func (runner *runnerImpl) run() (jobresult *core.JobResult) {
 	starttime := time.Now()
-
-	channel, err := process.Run()
-	jobresult := core.NewBasicJobResult(runner.command)
+	jobresult = core.NewBasicJobResult(runner.command)
 	jobresult.State = core.StateError
 
 	defer func() {
@@ -102,7 +97,18 @@ func (runner *runnerImpl) run() *core.JobResult {
 		endtime := time.Now()
 
 		jobresult.Time = endtime.Sub(starttime).Nanoseconds() / int64(time.Millisecond)
+
+		if err := recover(); err != nil {
+			jobresult.State = core.StateError
+			jobresult.Critical = fmt.Sprintf("PANIC(%v)", err)
+		}
 	}()
+
+	runner.process = runner.factory(runner, runner.command)
+
+	process := runner.process
+
+	channel, err := process.Run()
 
 	if err != nil {
 		//this basically means process couldn't spawn
