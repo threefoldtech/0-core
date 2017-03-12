@@ -276,8 +276,13 @@ func (m *containerManager) create(cmd *core.Command) (interface{}, error) {
 	return id, nil
 }
 
+type ContainerInfo struct {
+	process.ProcessStats
+	Root string `json:"root"`
+}
+
 func (m *containerManager) list(cmd *core.Command) (interface{}, error) {
-	containers := make(map[uint64]*process.ProcessStats)
+	containers := make(map[uint64]ContainerInfo)
 
 	for name, runner := range pm.GetManager().Runners() {
 		var id uint64
@@ -285,15 +290,18 @@ func (m *containerManager) list(cmd *core.Command) (interface{}, error) {
 			continue
 		}
 		ps := runner.Process()
-		var state *process.ProcessStats
+		var state process.ProcessStats
 		if ps != nil {
 			if stater, ok := ps.(process.Stater); ok {
-				state = stater.Stats()
+				state = *(stater.Stats())
 				state.Cmd = nil
 			}
 		}
 
-		containers[id] = state
+		containers[id] = ContainerInfo{
+			ProcessStats: state,
+			Root:         path.Join(ContainerBaseRootDir, fmt.Sprintf("container-%d", id)),
+		}
 	}
 
 	return containers, nil
