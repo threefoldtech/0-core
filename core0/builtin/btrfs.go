@@ -248,7 +248,7 @@ func btrfsParseList(output string) ([]btrfsFS, error) {
 
 	all := strings.Split(output, "\n")
 	if len(all) < 3 {
-		return fss, errBtrfsNoFS
+		return fss, nil
 	}
 
 	var fsLines []string
