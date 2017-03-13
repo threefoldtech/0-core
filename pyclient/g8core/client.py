@@ -7,6 +7,8 @@ import base64
 from g8core import typchk
 
 
+DefaultTimeout = 10 # seconds
+
 class Timeout(Exception):
     pass
 
@@ -85,7 +87,9 @@ class Response:
         self._client = client
         self._queue = 'result:{}'.format(id)
 
-    def get(self, timeout=10):
+    def get(self, timeout=None):
+        if timeout is None:
+            timeout = self._client.timeout
         r = self._client._redis
         v = r.brpoplpush(self._queue, self._queue, timeout)
         if v is None:
@@ -246,7 +250,9 @@ class BaseClient:
         'stdin': str,
     })
 
-    def __init__(self):
+    def __init__(self, timeout=None):
+        if timeout is None:
+            self.timeout = DefaultTimeout
         self._info = InfoManager(self)
         self._process = ProcessManager(self)
         self._filesystem = FilesystemManager(self)
@@ -345,7 +351,7 @@ class ContainerClient(BaseClient):
     })
 
     def __init__(self, client, container):
-        super().__init__()
+        super().__init__(client.timeout)
 
         self._client = client
         self._container = container
@@ -946,8 +952,8 @@ class Experimental:
         return self._kvm
 
 class Client(BaseClient):
-    def __init__(self, host, port=6379, password="", db=0):
-        super().__init__()
+    def __init__(self, host, port=6379, password="", db=0, timeout=None):
+        super().__init__(timeout=timeout)
 
         self._redis = redis.Redis(host=host, port=port, password=password, db=db)
         self._container_manager = ContainerManager(self)
