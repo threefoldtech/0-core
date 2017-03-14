@@ -14,7 +14,7 @@ type SystemCommandArguments struct {
 	Dir   string            `json:"dir"`
 	Args  []string          `json:"args"`
 	Env   map[string]string `json:"env"`
-	StdIn []byte            `json:"stdin"`
+	StdIn string            `json:"stdin"`
 }
 
 type systemProcessImpl struct {
@@ -229,7 +229,7 @@ func (process *systemProcessImpl) Run() (<-chan *stream.Message, error) {
 
 	if len(process.args.StdIn) != 0 {
 		//write data to command stdin.
-		_, err = stdin.Write(process.args.StdIn)
+		_, err = stdin.Write([]byte(process.args.StdIn))
 		if err != nil {
 			log.Errorf("Failed to write to process stdin: %s", err)
 		}

@@ -29,9 +29,9 @@ func NewExtensionProcessFactory(exe string, dir string, args []string, env map[s
 		if stdin, ok := input["stdin"]; ok {
 			switch in := stdin.(type) {
 			case string:
-				sysargs.StdIn = []byte(in)
-			case []byte:
 				sysargs.StdIn = in
+			case []byte:
+				sysargs.StdIn = string(in)
 			default:
 				log.Errorf("invalid stdin to extesion command, expecting string, or bytes")
 			}
