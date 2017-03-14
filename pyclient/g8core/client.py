@@ -248,6 +248,7 @@ class BaseClient:
 
     _bash_chk = typchk.Checker({
         'stdin': str,
+        'script': str,
     })
 
     def __init__(self, timeout=None):
@@ -331,9 +332,10 @@ class BaseClient:
 
         return response
 
-    def bash(self, command):
+    def bash(self, script, stdin=''):
         args = {
-            'stdin': command,
+            'script': script,
+            'stdin': stdin,
         }
         self._bash_chk.check(args)
         response = self.raw(command='bash', arguments=args)
