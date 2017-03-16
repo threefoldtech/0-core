@@ -4,17 +4,18 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"github.com/g8os/core0/base/pm"
-	"github.com/g8os/core0/base/pm/core"
-	"github.com/g8os/core0/base/pm/process"
-	"github.com/pborman/uuid"
-	"github.com/vishvananda/netlink"
 	"io/ioutil"
 	"net/url"
 	//"os"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/g8os/core0/base/pm"
+	"github.com/g8os/core0/base/pm/core"
+	"github.com/g8os/core0/base/pm/process"
+	"github.com/pborman/uuid"
+	"github.com/vishvananda/netlink"
 )
 
 type kvmManager struct{}
@@ -141,6 +142,32 @@ func (m *kvmManager) create(cmd *core.Command) (interface{}, error) {
 			Emulator: "/usr/bin/qemu-system-x86_64",
 			Devices: []Device{
 				m.mkDisk(params.Image),
+				SerialDevice{
+					Type: SerialDeviceTypePTY,
+					Source: SerialSource{
+						Path: "/dev/pts/1",
+					},
+					Target: SerialTarget{
+						Port: 0,
+					},
+					Alias: SerialAlias{
+						Name: "serial0",
+					},
+				},
+				ConsoleDevice{
+					Type: SerialDeviceTypePTY,
+					TTY:  "/dev/pts/1",
+					Source: SerialSource{
+						Path: "/dev/pts/1",
+					},
+					Target: ConsoleTarget{
+						Port: 0,
+						Type: "serial",
+					},
+					Alias: SerialAlias{
+						Name: "serial0",
+					},
+				},
 				GraphicsDevice{
 					Type:   GraphicsDeviceTypeVNC,
 					Port:   -1,
