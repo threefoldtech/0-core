@@ -46,6 +46,8 @@ type CreateParams struct {
 }
 
 func (m *kvmManager) mkNBDDisk(u *url.URL) DiskDevice {
+	name := strings.Trim(u.Path, "/")
+
 	switch u.Scheme {
 	case "nbd":
 		fallthrough
@@ -63,7 +65,7 @@ func (m *kvmManager) mkNBDDisk(u *url.URL) DiskDevice {
 			},
 			Source: DiskSourceNetwork{
 				Protocol: "nbd",
-				Name:     u.Path,
+				Name:     name,
 				Host: DiskSourceNetworkHost{
 					Transport: "tcp",
 					Port:      port,
@@ -81,7 +83,7 @@ func (m *kvmManager) mkNBDDisk(u *url.URL) DiskDevice {
 			},
 			Source: DiskSourceNetwork{
 				Protocol: "nbd",
-				Name:     u.Path,
+				Name:     name,
 				Host: DiskSourceNetworkHost{
 					Transport: "unix",
 					Socket:    u.Query().Get("socket"),
