@@ -51,8 +51,6 @@ func (poll *sinkImpl) handler(cmd *core.Command, result *core.JobResult) {
 }
 
 func (poll *sinkImpl) run() {
-	lastError := time.Now()
-
 	poll.mgr.AddRouteResultHandler(core.Route(poll.key), poll.handler)
 
 	for {
@@ -60,11 +58,6 @@ func (poll *sinkImpl) run() {
 		err := poll.client.GetNext(&command)
 		if err != nil {
 			log.Errorf("Failed to get next command from %s: %s", poll.client, err)
-			if time.Now().Sub(lastError) < ReconnectSleepTime {
-				time.Sleep(ReconnectSleepTime)
-			}
-			lastError = time.Now()
-
 			continue
 		}
 
