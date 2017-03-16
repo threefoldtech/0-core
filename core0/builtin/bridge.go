@@ -204,7 +204,7 @@ func bridgeNetworking(bridge *netlink.Bridge, network *BridgeNetwork) error {
 			Command: "bash",
 			Arguments: core.MustArguments(
 				map[string]string{
-					"stdin": fmt.Sprintf(nftSetupScript, addr.IPNet.String()),
+					"script": fmt.Sprintf(nftSetupScript, addr.IPNet.String()),
 				},
 			),
 		}
