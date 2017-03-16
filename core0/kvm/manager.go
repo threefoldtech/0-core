@@ -39,14 +39,14 @@ func init() {
 }
 
 type CreateParams struct {
-	Name   string `json:"name"`
-	CPU    int    `json:"cpu"`
-	Memory int    `json:"memory"`
-	Image  string `json:"image"`
-	Bridge string `json:"bridge"`
+	Name   string   `json:"name"`
+	CPU    int      `json:"cpu"`
+	Memory int      `json:"memory"`
+	Images []string `json:"images"`
+	Bridge string   `json:"bridge"`
 }
 
-func (m *kvmManager) mkNBDDisk(u *url.URL) DiskDevice {
+func (m *kvmManager) mkNBDDisk(u *url.URL, target string) DiskDevice {
 	name := strings.Trim(u.Path, "/")
 
 	switch u.Scheme {
@@ -61,7 +61,7 @@ func (m *kvmManager) mkNBDDisk(u *url.URL) DiskDevice {
 			Type:   DiskTypeNetwork,
 			Device: DiskDeviceTypeDisk,
 			Target: DiskTarget{
-				Dev: "vda",
+				Dev: target,
 				Bus: "virtio",
 			},
 			Source: DiskSourceNetwork{
@@ -79,7 +79,7 @@ func (m *kvmManager) mkNBDDisk(u *url.URL) DiskDevice {
 			Type:   DiskTypeNetwork,
 			Device: DiskDeviceTypeDisk,
 			Target: DiskTarget{
-				Dev: "vda",
+				Dev: target,
 				Bus: "virtio",
 			},
 			Source: DiskSourceNetwork{
@@ -96,11 +96,11 @@ func (m *kvmManager) mkNBDDisk(u *url.URL) DiskDevice {
 	}
 }
 
-func (m *kvmManager) mkDisk(img string) DiskDevice {
+func (m *kvmManager) mkDisk(img string, target string) DiskDevice {
 	u, err := url.Parse(img)
 
 	if err == nil && strings.Index(u.Scheme, "nbd") == 0 {
-		return m.mkNBDDisk(u)
+		return m.mkNBDDisk(u, target)
 	}
 
 	//default fall back to image disk
@@ -108,7 +108,7 @@ func (m *kvmManager) mkDisk(img string) DiskDevice {
 		Type:   DiskTypeFile,
 		Device: DiskDeviceTypeDisk,
 		Target: DiskTarget{
-			Dev: "hda",
+			Dev: target,
 			Bus: "ide",
 		},
 		Source: DiskSourceFile{
@@ -141,7 +141,6 @@ func (m *kvmManager) create(cmd *core.Command) (interface{}, error) {
 		Devices: Devices{
 			Emulator: "/usr/bin/qemu-system-x86_64",
 			Devices: []Device{
-				m.mkDisk(params.Image),
 				SerialDevice{
 					Type: SerialDeviceTypePTY,
 					Source: SerialSource{
@@ -196,6 +195,10 @@ func (m *kvmManager) create(cmd *core.Command) (interface{}, error) {
 				Type: "virtio",
 			},
 		})
+	}
+	for idx, image := range params.Images {
+		target := "vd" + string(97+idx)
+		domain.Devices.Devices = append(domain.Devices.Devices, m.mkDisk(image, target))
 	}
 
 	data, err := xml.MarshalIndent(domain, "", "  ")
