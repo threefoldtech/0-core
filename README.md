@@ -16,6 +16,8 @@ The following steps will create a docker container that have core0 as the init p
 u can send commands to core0 using the pyclient
 
 First we need to prepare the base docker image to host core0
+Copy the following content to a `DockerFile` some where on your system
+
 ```dockerfile
 FROM ubuntu:16.04
 RUN apt-get update && \
@@ -24,32 +26,32 @@ RUN apt-get update && \
     apt-get install -y iproute2 && \
     apt-get install -y nftables && \
     apt-get install -y dnsmasq && \
+    apt-get install -y libvirt-bin && \
     apt-get install -y redis-server
 ```
 
-Make sure that you build both core0 and coreX as following
-```bash
-go get github.com/g8os/core0/core
-go get github.com/g8os/core0/corex
-```
+Make sure this repo is cloned under your correct GOPATH (should be under $GOPATH/src/github.com/g8os/core0). Then move to that location the do a `make`
 
 The do
 ```
-cd $GOPATH/src/github.com/g8os/core0
-# then start the docker container
 docker run --privileged -d \
-    --name core0 \
-    -v `pwd`/core0/core0:/usr/sbin/core0 \
-    -v `pwd`/coreX/coreX:/usr/sbin/coreX \
+    --name core-jo \
+    -v `pwd`/bin/core0:/usr/sbin/core0 \
+    -v `pwd`/bin/coreX:/usr/sbin/coreX \
     -v `pwd`/core0/g8os.dev.toml:/root/core.toml \
     -v `pwd`/core0/conf:/root/conf \
-    corebase \
+    -p 6379:6379 \
+    core \
     core0 -c /root/core.toml
 ```
 
 > Note: You might ask why we do this instead of copying those files directly to the image
 > the point is, now it's very easy for development, each time u rebuild the binary or change the config
 > u can just do `docker restart core0` without rebuilding the whole image.
+
+
+> NOTE: if u are intending to use `containers` feature of core0, make sure u either copy the `g8ufs` binary to the container, or bind it (with `-v`) like core0 and coreX binaries
+
 
 To follow the container logs do
 ```bash
