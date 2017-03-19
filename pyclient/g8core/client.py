@@ -7,7 +7,8 @@ import base64
 from g8core import typchk
 
 
-DefaultTimeout = 10 # seconds
+DefaultTimeout = 10  # seconds
+
 
 class Timeout(Exception):
     pass
@@ -909,7 +910,7 @@ class ZerotierManager:
 class KvmManager:
     _create_chk = typchk.Checker({
         'name': str,
-        'image': str,
+        'images': [str],
         'cpu': int,
         'memory': int,
         'bridge': typchk.Or(str, typchk.IsNone()),
@@ -920,12 +921,12 @@ class KvmManager:
     })
 
     def __init__(self, client):
-        self._client =  client
+        self._client = client
 
-    def create(self, name, image, cpu=2, memory=512, bridge=None):
+    def create(self, name, images, cpu=2, memory=512, bridge=None):
         args = {
             'name': name,
-            'image': image,
+            'images': images,
             'cpu': cpu,
             'memory': memory,
             'bridge': bridge,
@@ -945,6 +946,7 @@ class KvmManager:
     def list(self):
         return self._client.json('kvm.list', {})
 
+
 class Experimental:
     def __init__(self, client):
         self._kvm = KvmManager(client)
@@ -952,6 +954,7 @@ class Experimental:
     @property
     def kvm(self):
         return self._kvm
+
 
 class Client(BaseClient):
     def __init__(self, host, port=6379, password="", db=0, timeout=None):

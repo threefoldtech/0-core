@@ -161,3 +161,46 @@ type InterfaceDevice struct {
 	Source  InterfaceDeviceSource `xml:"source"`
 	Model   InterfaceDeviceModel  `xml:"model"`
 }
+
+type SerialDeviceType string
+
+const (
+	SerialDeviceTypePTY SerialDeviceType = "pty"
+)
+
+type SerialSource struct {
+	XMLName xml.Name `xml:"source"`
+	Path    string   `xml:"path,attr"`
+}
+
+type SerialTarget struct {
+	XMLName xml.Name `xml:"target"`
+	Port    int      `xml:"port,attr"`
+}
+
+type SerialAlias struct {
+	XMLName xml.Name `xml:"alias"`
+	Name    string   `xml:"name,attr"`
+}
+
+type ConsoleTarget struct {
+	XMLName xml.Name `xml:"target"`
+	Port    int      `xml:"port,attr"`
+	Type    string   `xml:"type,attr"`
+}
+
+type SerialDevice struct {
+	XMLName xml.Name         `xml:"serial"`
+	Type    SerialDeviceType `xml:"type,attr"`
+	Source  SerialSource     `xml:"source"`
+	Target  SerialTarget     `xml:"target"`
+	Alias   SerialAlias      `xml:"alias"`
+}
+type ConsoleDevice struct {
+	XMLName xml.Name         `xml:"console"`
+	Type    SerialDeviceType `xml:"type,attr"`
+	TTY     string           `xml:"tty,attr"`
+	Source  SerialSource     `xml:"source"`
+	Target  ConsoleTarget    `xml:"target"`
+	Alias   SerialAlias      `xml:"alias"`
+}
