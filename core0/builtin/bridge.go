@@ -155,8 +155,9 @@ func bridgeDnsMasqNetworking(bridge *netlink.Bridge, network *BridgeNetwork) (*n
 		Command: process.CommandSystem,
 		Arguments: core.MustArguments(
 			process.SystemCommandArguments{
-				Name: "dnsmasq",
-				Args: args,
+				Name:     "dnsmasq",
+				Args:     args,
+				NoOutput: true,
 			},
 		),
 	}

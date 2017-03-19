@@ -96,17 +96,7 @@ func (process *containerProcessImpl) Run() (<-chan *stream.Message, error) {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%v=%v", k, v))
 	}
 
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, err
-	}
-
-	err = process.table.Register(func() (int, error) {
+	err := process.table.Register(func() (int, error) {
 		err := cmd.Start()
 		if err != nil {
 			return 0, err
@@ -126,30 +116,11 @@ func (process *containerProcessImpl) Run() (<-chan *stream.Message, error) {
 	psProcess, _ := psutils.NewProcess(int32(process.pid))
 	process.process = psProcess
 
-	msgInterceptor := func(msg *stream.Message) {
-		if msg.Level == stream.LevelExitState {
-			//the level exit state is for internal use only, shouldn't
-			//be sent by the app itself, if found, we change the level to err.
-			msg.Level = stream.LevelStderr
-		}
-
-		channel <- msg
-	}
-
-	// start consuming outputs.
-	outConsumer := stream.NewConsumer(stdout, 1)
-	outConsumer.Consume(msgInterceptor)
-
-	errConsumer := stream.NewConsumer(stderr, 2)
-	errConsumer.Consume(msgInterceptor)
-
 	go func(channel chan *stream.Message) {
 		//make sure all outputs are closed before waiting for the process
 		//to exit.
 		defer close(channel)
 
-		<-outConsumer.Signal()
-		<-errConsumer.Signal()
 		state := process.table.WaitPID(process.pid)
 
 		log.Infof("Process %s exited with state: %d", process.cmd, state.ExitStatus())

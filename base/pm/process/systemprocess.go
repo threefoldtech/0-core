@@ -6,6 +6,7 @@ import (
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/stream"
 	psutils "github.com/shirou/gopsutil/process"
+	"io"
 	"os/exec"
 )
 
@@ -15,6 +16,9 @@ type SystemCommandArguments struct {
 	Args  []string          `json:"args"`
 	Env   map[string]string `json:"env"`
 	StdIn string            `json:"stdin"`
+
+	//Only internal commands can sent the NoOutput flag.
+	NoOutput bool `json:"-"`
 }
 
 type systemProcessImpl struct {
@@ -107,30 +111,6 @@ func (process *systemProcessImpl) Stats() *ProcessStats {
 	return &stats
 }
 
-//func (process *systemProcessImpl) getExtraEnv() []string {
-//	env := make([]string, 0, 10)
-//	agentHome, _ := os.Getwd()
-//	env = append(env,
-//		fmt.Sprintf("HOME=%s", os.Getenv("HOME")),
-//		fmt.Sprintf("AGENT_HOME=%s", agentHome),
-//		fmt.Sprintf("AGENT_GID=%d", process.cmd.Gid),
-//		fmt.Sprintf("AGENT_NID=%d", process.cmd.Nid))
-//
-//	ctrl := process.cmd.Args.GetController()
-//	if ctrl == nil {
-//		return env
-//	}
-//
-//	env = append(env,
-//		fmt.Sprintf("AGENT_CONTROLLER_URL=%s", ctrl.URL),
-//		fmt.Sprintf("AGENT_CONTROLLER_NAME=%s", process.cmd.Args.GetTag()),
-//		fmt.Sprintf("AGENT_CONTROLLER_CA=%s", joinCertPath(agentHome, ctrl.Security.CertificateAuthority)),
-//		fmt.Sprintf("AGENT_CONTROLLER_CLIENT_CERT=%s", joinCertPath(agentHome, ctrl.Security.ClientCertificate)),
-//		fmt.Sprintf("AGENT_CONTROLLER_CLIENT_CERT_KEY=%s", joinCertPath(agentHome, ctrl.Security.ClientCertificateKey)))
-//
-//	return env
-//}
-
 func (process *systemProcessImpl) processInternalMessage(msg *stream.Message) {
 	if msg.Level == stream.LevelInternalMonitorPid {
 		childPid := 0
@@ -169,22 +149,31 @@ func (process *systemProcessImpl) Run() (<-chan *stream.Message, error) {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%v=%v", k, v))
 	}
 
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
+	//preparing pipes for process communication
+	var stdout, stderr io.ReadCloser
+	var stdin io.WriteCloser
+	var err error
+	if !process.args.NoOutput {
+		stdout, err = cmd.StdoutPipe()
+		if err != nil {
+			return nil, err
+		}
+
+		stderr, err = cmd.StderrPipe()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, err
+	if len(process.args.StdIn) != 0 {
+		stdin, err = cmd.StdinPipe()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, err
-	}
 	log.Debugf("system: %s %s %s", cmd.Env, cmd.Path, cmd.Args)
-	//starttime := time.Duration(time.Now().UnixNano()) / time.Millisecond // start time in msec
+
 	err = process.table.Register(func() (int, error) {
 		err := cmd.Start()
 		if err != nil {
@@ -205,27 +194,32 @@ func (process *systemProcessImpl) Run() (<-chan *stream.Message, error) {
 	psProcess, _ := psutils.NewProcess(int32(process.pid))
 	process.process = psProcess
 
-	msgInterceptor := func(msg *stream.Message) {
-		if msg.Level == stream.LevelExitState {
-			//the level exit state is for internal use only, shouldn't
-			//be sent by the app itself, if found, we change the level to err.
-			msg.Level = stream.LevelStderr
+	//preparing streams consumers
+	var outConsumer, errConsumer stream.Consumer
+
+	if !process.args.NoOutput {
+		msgInterceptor := func(msg *stream.Message) {
+			if msg.Level == stream.LevelExitState {
+				//the level exit state is for internal use only, shouldn't
+				//be sent by the app itself, if found, we change the level to err.
+				msg.Level = stream.LevelStderr
+			}
+
+			if msg.Level > stream.LevelInternal {
+				process.processInternalMessage(msg)
+				return
+			}
+
+			channel <- msg
 		}
 
-		if msg.Level > stream.LevelInternal {
-			process.processInternalMessage(msg)
-			return
-		}
+		// start consuming outputs.
+		outConsumer = stream.NewConsumer(stdout, 1)
+		outConsumer.Consume(msgInterceptor)
 
-		channel <- msg
+		errConsumer = stream.NewConsumer(stderr, 2)
+		errConsumer.Consume(msgInterceptor)
 	}
-
-	// start consuming outputs.
-	outConsumer := stream.NewConsumer(stdout, 1)
-	outConsumer.Consume(msgInterceptor)
-
-	errConsumer := stream.NewConsumer(stderr, 2)
-	errConsumer.Consume(msgInterceptor)
 
 	if len(process.args.StdIn) != 0 {
 		//write data to command stdin.
@@ -233,17 +227,22 @@ func (process *systemProcessImpl) Run() (<-chan *stream.Message, error) {
 		if err != nil {
 			log.Errorf("Failed to write to process stdin: %s", err)
 		}
-	}
 
-	stdin.Close()
+		stdin.Close()
+	}
 
 	go func(channel chan *stream.Message) {
 		//make sure all outputs are closed before waiting for the process
 		//to exit.
 		defer close(channel)
 
-		<-outConsumer.Signal()
-		<-errConsumer.Signal()
+		if !process.args.NoOutput {
+			<-outConsumer.Signal()
+			<-errConsumer.Signal()
+			stdout.Close()
+			stderr.Close()
+		}
+
 		state := process.table.WaitPID(process.pid)
 
 		log.Infof("Process %s exited with state: %d", process.cmd, state.ExitStatus())
