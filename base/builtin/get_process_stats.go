@@ -46,14 +46,21 @@ func getProcessStats(cmd *core.Command) (interface{}, error) {
 	}
 
 	for _, runner := range runners {
-		ps := runner.Process()
-		if ps == nil {
-			continue
+		s := &process.ProcessStats{
+			Cmd: runner.Command(),
 		}
 
+		ps := runner.Process()
+
 		if stater, ok := ps.(process.Stater); ok {
-			stats = append(stats, stater.Stats())
+			psStat := stater.Stats()
+			s.CPU = psStat.CPU
+			s.RSS = psStat.RSS
+			s.VMS = psStat.VMS
+			s.Swap = psStat.Swap
 		}
+
+		stats = append(stats, s)
 	}
 
 	return stats, nil
