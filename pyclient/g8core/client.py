@@ -939,7 +939,7 @@ class KvmManager:
         args = {
             'name': name,
         }
-        self._create_chk.check(args)
+        self._destroy_chk.check(args)
 
         self._client.sync('kvm.destroy', args)
 
