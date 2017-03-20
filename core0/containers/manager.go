@@ -73,6 +73,7 @@ type ContainerCreateArguments struct {
 	Network  Network           `json:"network"`  // network setup
 	Port     map[int]int       `json:"port"`     //port forwards
 	Hostname string            `json:"hostname"` //hostname
+	Storage  string            `json:"storage"`  //ardb storage needed for g8ufs mounts.
 }
 
 type ContainerDispatchArguments struct {

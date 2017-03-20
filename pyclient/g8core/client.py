@@ -406,6 +406,7 @@ class ContainerManager:
             str,
             typchk.IsNone()
         ),
+        'storage': typchk.Or(str, typchk.IsNone()),
     })
 
     _terminate_chk = typchk.Checker({
@@ -415,7 +416,7 @@ class ContainerManager:
     def __init__(self, client):
         self._client = client
 
-    def create(self, root_url, mount=None, zerotier=None, bridge=None, port=None, hostname=None):
+    def create(self, root_url, mount=None, zerotier=None, bridge=None, port=None, hostname=None, storage=None):
         """
         Creater a new container with the given root plist, mount points and
         zerotier id, and connected to the given bridges
@@ -442,6 +443,8 @@ class ContainerManager:
         :param hostname: Specific hostname you want to give to the container.
                          if None it will automatically be set to core-x,
                          x beeing the ID of the container
+        :param storage: A Url to the ardb storage to use to mount the root plist (or any other mount that requires g8fs)
+                        if not provided, the default one from core0 configuration will be used.
         """
 
 
@@ -454,6 +457,7 @@ class ContainerManager:
             },
             'port': port,
             'hostname': hostname,
+            'storage': storage,
         }
 
         #validate input

@@ -198,7 +198,11 @@ func (c *container) mountPList(src string, target string) error {
 		return err
 	}
 
-	storageUrl := settings.Settings.Globals.Get("fuse_storage", "ardb://home.maxux.net:26379")
+	storageUrl := c.args.Storage
+	if storageUrl == "" {
+		storageUrl = settings.Settings.Globals.Get("fuse_storage", "ardb://home.maxux.net:26379")
+	}
+
 	cmd := &core.Command{
 		ID:      uuid.New(),
 		Command: process.CommandSystem,
