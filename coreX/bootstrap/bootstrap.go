@@ -30,6 +30,11 @@ func (b *Bootstrap) setupLO() error {
 		return err
 	}
 
+	addr, _ = netlink.ParseAddr("::1/128")
+	if err := netlink.AddrAdd(link, addr); err != nil {
+		return err
+	}
+
 	return netlink.LinkSetUp(link)
 }
 
