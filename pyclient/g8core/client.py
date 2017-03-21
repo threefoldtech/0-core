@@ -917,7 +917,11 @@ class KvmManager:
         'images': [str],
         'cpu': int,
         'memory': int,
-        'bridge': typchk.Or(str, typchk.IsNone()),
+        'bridge': typchk.Or([str], typchk.IsNone()),
+        'port': typchk.Or(
+            typchk.Map(int, int),
+            typchk.IsNone()
+        ),
     })
 
     _destroy_chk = typchk.Checker({
@@ -927,13 +931,27 @@ class KvmManager:
     def __init__(self, client):
         self._client = client
 
-    def create(self, name, images, cpu=2, memory=512, bridge=None):
+    def create(self, name, images, cpu=2, memory=512, port=None, bridge=None):
+        """
+
+        :param name: Name of the kvm domain
+        :param images: array of images to attach to the machine, where the first image is the boot device
+        :param cpu: number of vcpu cores
+        :param memory: memory in MiB
+        :param port: A dict of host_port: container_port pairs
+                       Example:
+                        `port={8080: 80, 7000:7000}`
+        :param bridge: array of extra bridges to connect the domain with. the bridges must exist on the host
+                       By default, vm is automatically added to a default bridge.
+        :return:
+        """
         args = {
             'name': name,
             'images': images,
             'cpu': cpu,
             'memory': memory,
             'bridge': bridge,
+            'port': port,
         }
         self._create_chk.check(args)
 
