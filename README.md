@@ -30,6 +30,16 @@ RUN apt-get update && \
     apt-get install -y redis-server
 ```
 
+```bash
+mkdir ~/build
+cd ~/build
+# write the content above to a Dockerfile in the build director
+docker build -t core .
+```
+
+When the build is complete you should have the `core` image ready to be used in the following steps.
+
+### Starting a container with core0
 Make sure this repo is cloned under your correct GOPATH (should be under $GOPATH/src/github.com/g8os/core0). Then move to that location the do a `make`
 
 The do
