@@ -285,7 +285,7 @@ func (m *kvmManager) mkDomain(seq uint16, params *CreateParams) (*Domain, error)
 		Source: InterfaceDeviceSourceBridge{
 			Bridge: DefaultBridgeName,
 		},
-		Mac: InterfaceDeviceMac{
+		Mac: &InterfaceDeviceMac{
 			Address: m.macAddr(seq),
 		},
 		Model: InterfaceDeviceModel{

@@ -164,7 +164,7 @@ type InterfaceDevice struct {
 	Type    InterfaceDeviceType   `xml:"type,attr"`
 	Source  InterfaceDeviceSource `xml:"source"`
 	Model   InterfaceDeviceModel  `xml:"model"`
-	Mac     InterfaceDeviceMac    `xml:"mac"`
+	Mac     *InterfaceDeviceMac   `xml:"mac,omitempty"`
 }
 
 type SerialDeviceType string
