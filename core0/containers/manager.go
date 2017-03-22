@@ -68,12 +68,13 @@ type Network struct {
 }
 
 type ContainerCreateArguments struct {
-	Root     string            `json:"root"`     //Root plist
-	Mount    map[string]string `json:"mount"`    //data disk mounts.
-	Network  Network           `json:"network"`  // network setup
-	Port     map[int]int       `json:"port"`     //port forwards
-	Hostname string            `json:"hostname"` //hostname
-	Storage  string            `json:"storage"`  //ardb storage needed for g8ufs mounts.
+	Root        string            `json:"root"`         //Root plist
+	Mount       map[string]string `json:"mount"`        //data disk mounts.
+	HostNetwork bool              `json:"host_network"` //share host networking stack
+	Network     Network           `json:"network"`      //network setup (only respected if HostNetwork is false)
+	Port        map[int]int       `json:"port"`         //port forwards
+	Hostname    string            `json:"hostname"`     //hostname
+	Storage     string            `json:"storage"`      //ardb storage needed for g8ufs mounts.
 }
 
 type ContainerDispatchArguments struct {

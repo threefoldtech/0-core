@@ -388,6 +388,7 @@ class ContainerManager:
             typchk.Map(str, str),
             typchk.IsNone()
         ),
+        'host_network': bool,
         'network': {
             'zerotier': typchk.Or(
                 str,
@@ -416,7 +417,7 @@ class ContainerManager:
     def __init__(self, client):
         self._client = client
 
-    def create(self, root_url, mount=None, zerotier=None, bridge=None, port=None, hostname=None, storage=None):
+    def create(self, root_url, mount=None, host_network=False, zerotier=None, bridge=None, port=None, hostname=None, storage=None):
         """
         Creater a new container with the given root plist, mount points and
         zerotier id, and connected to the given bridges
@@ -424,6 +425,9 @@ class ContainerManager:
         :param mount: a dict with {host_source: container_target} mount points.
                       where host_source directory must exists.
                       host_source can be a url to a plist to mount.
+        :param host_network: Specify if the container should share the same network stack as the host.
+                             if True, container creation ignores both zerotier, bridge and ports arguments below. Not
+                             giving errors if provided.
         :param zerotier: An optional zerotier netowrk ID to join
         :param bridge: A list of tuples as ('bridge_name': 'network_setup')
                        where :network_setup: can be one of the following
@@ -451,6 +455,7 @@ class ContainerManager:
         args = {
             'root': root_url,
             'mount': mount,
+            'host_network': host_network,
             'network': {
                 'zerotier': zerotier,
                 'bridge': bridge,

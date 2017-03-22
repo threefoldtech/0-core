@@ -11,11 +11,12 @@ import (
 )
 
 type ContainerCommandArguments struct {
-	Name   string            `json:"name"`
-	Dir    string            `json:"dir"`
-	Args   []string          `json:"args"`
-	Env    map[string]string `json:"env"`
-	Chroot string            `json:"chroot"`
+	Name        string            `json:"name"`
+	Dir         string            `json:"dir"`
+	Args        []string          `json:"args"`
+	Env         map[string]string `json:"env"`
+	HostNetwork bool              `json:"host_network"`
+	Chroot      string            `json:"chroot"`
 }
 
 type containerProcessImpl struct {
@@ -86,9 +87,15 @@ func (process *containerProcessImpl) Run() (<-chan *stream.Message, error) {
 		process.args.Args...)
 	cmd.Dir = process.args.Dir
 
+	var flags uintptr = syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS
+
+	if !process.args.HostNetwork {
+		flags |= syscall.CLONE_NEWNET
+	}
+
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Chroot:     process.args.Chroot,
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWNET,
+		Cloneflags: flags,
 		Setpgid:    true,
 	}
 

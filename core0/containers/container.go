@@ -2,7 +2,6 @@ package containers
 
 import (
 	"fmt"
-	"github.com/g8os/core0/base/logger"
 	"github.com/g8os/core0/base/pm"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/process"
@@ -49,17 +48,17 @@ func (c *container) Start() error {
 		log.Errorf("error in container prestart: %s", err)
 		return err
 	}
-	//
+
 	mgr := pm.GetManager()
 	extCmd := &core.Command{
-		ID:        coreID,
-		Route:     c.route,
-		LogLevels: logger.Disabled,
+		ID:    coreID,
+		Route: c.route,
 		Arguments: core.MustArguments(
 			process.ContainerCommandArguments{
-				Name:   "/coreX",
-				Chroot: c.root(),
-				Dir:    "/",
+				Name:        "/coreX",
+				Chroot:      c.root(),
+				Dir:         "/",
+				HostNetwork: c.args.HostNetwork,
 				Args: []string{
 					"-core-id", fmt.Sprintf("%d", c.id),
 					"-redis-socket", "/redis.socket",
@@ -144,21 +143,23 @@ func (c *container) cleanup() {
 
 	//TODO: remove port forwards
 
-	c.unPortForward()
-	//remove bridge links
-	for _, bridge := range c.args.Network.Bridge {
-		c.unbridge(bridge)
-	}
-
-	pm.GetManager().Kill(fmt.Sprintf("net-%v", c.id))
-
-	if c.pid > 0 {
-		targetNs := fmt.Sprintf("/run/netns/%v", c.id)
-
-		if err := syscall.Unmount(targetNs, 0); err != nil {
-			log.Errorf("Failed to unmount %s: %s", targetNs, err)
+	if !c.args.HostNetwork {
+		c.unPortForward()
+		//remove bridge links
+		for _, bridge := range c.args.Network.Bridge {
+			c.unbridge(bridge)
 		}
-		os.RemoveAll(targetNs)
+
+		pm.GetManager().Kill(fmt.Sprintf("net-%v", c.id))
+
+		if c.pid > 0 {
+			targetNs := fmt.Sprintf("/run/netns/%v", c.id)
+
+			if err := syscall.Unmount(targetNs, 0); err != nil {
+				log.Errorf("Failed to unmount %s: %s", targetNs, err)
+			}
+			os.RemoveAll(targetNs)
+		}
 	}
 
 	for _, guest := range c.args.Mount {
@@ -465,6 +466,11 @@ func (c *container) setPortForwards() error {
 	return nil
 }
 func (c *container) postStart() error {
+	if c.args.HostNetwork {
+		return nil
+	}
+
+	//only setup networking if host-network is false
 	if err := c.namespace(); err != nil {
 		return err
 	}

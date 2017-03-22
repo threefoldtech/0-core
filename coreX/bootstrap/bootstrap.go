@@ -19,23 +19,30 @@ func NewBootstrap() *Bootstrap {
 	return &Bootstrap{}
 }
 
-func (b *Bootstrap) setupLO() error {
+func (b *Bootstrap) setupLO() {
+	//we don't crash on lo device setup because this will fail anyway if the container runs
+	//with host_networking.
+	//plus setting up the lo device should not stop the container from starting if it failed anyway
+
 	link, err := netlink.LinkByName("lo")
 	if err != nil {
-		return err
+		log.Warning("failed to get lo device")
+		return
 	}
 
 	addr, _ := netlink.ParseAddr("127.0.0.1/8")
 	if err := netlink.AddrAdd(link, addr); err != nil {
-		return err
+		log.Warning("failed to setup lo address: %s", err)
 	}
 
 	addr, _ = netlink.ParseAddr("::1/128")
 	if err := netlink.AddrAdd(link, addr); err != nil {
-		return err
+		log.Warning("failed to setup lo address: %s", err)
 	}
 
-	return netlink.LinkSetUp(link)
+	if err := netlink.LinkSetUp(link); err != nil {
+		log.Warning("failed to bring lo interface up: %s", err)
+	}
 }
 
 func (o *Bootstrap) setupFS() error {
@@ -62,9 +69,7 @@ func (o *Bootstrap) setupFS() error {
 //Bootstrap registers extensions and startup system services.
 func (b *Bootstrap) Bootstrap(hostname string) error {
 	log.Debugf("setting up lo device")
-	if err := b.setupLO(); err != nil {
-		return err
-	}
+	b.setupLO()
 
 	log.Debugf("setting up mounts")
 	if err := b.setupFS(); err != nil {
