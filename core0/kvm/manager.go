@@ -262,6 +262,20 @@ func (m *kvmManager) mkDomain(seq uint16, params *CreateParams) (*Domain, error)
 		},
 	}
 
+	//attach to default bridge.
+	domain.Devices.Devices = append(domain.Devices.Devices, InterfaceDevice{
+		Type: InterfaceDeviceTypeBridge,
+		Source: InterfaceDeviceSourceBridge{
+			Bridge: DefaultBridgeName,
+		},
+		Mac: &InterfaceDeviceMac{
+			Address: m.macAddr(seq),
+		},
+		Model: InterfaceDeviceModel{
+			Type: "virtio",
+		},
+	})
+
 	for _, bridge := range params.Bridge {
 		_, err := netlink.LinkByName(bridge)
 		if err != nil {
@@ -278,20 +292,6 @@ func (m *kvmManager) mkDomain(seq uint16, params *CreateParams) (*Domain, error)
 			},
 		})
 	}
-
-	//attach to default bridge.
-	domain.Devices.Devices = append(domain.Devices.Devices, InterfaceDevice{
-		Type: InterfaceDeviceTypeBridge,
-		Source: InterfaceDeviceSourceBridge{
-			Bridge: DefaultBridgeName,
-		},
-		Mac: &InterfaceDeviceMac{
-			Address: m.macAddr(seq),
-		},
-		Model: InterfaceDeviceModel{
-			Type: "virtio",
-		},
-	})
 
 	for idx, image := range params.Images {
 		target := "vd" + string(97+idx)
