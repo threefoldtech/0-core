@@ -61,7 +61,7 @@ type Domain struct {
 	Name    string     `xml:"name"`
 	UUID    string     `xml:"uuid"`
 	Memory  Memory     `xml:"memory"`
-	VCPU    int        `xml:"vcpu`
+	VCPU    int        `xml:"vcpu"`
 	OS      OS         `xml:"os"`
 	Devices Devices    `xml:"devices"`
 }
