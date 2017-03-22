@@ -394,7 +394,7 @@ class ContainerManager:
                 typchk.IsNone()
             ),
             'bridge': typchk.Or(
-                [typchk.Length([str], 2)],
+                [typchk.Length((str,), 2)],
                 typchk.IsNone()
             ),  # list of tuples each of length 2 or None
         },

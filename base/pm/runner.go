@@ -57,12 +57,6 @@ NewRunner creates a new runner object that is bind to this PM instance.
         with SUCCESS exit code.
 */
 func NewRunner(manager *PM, command *core.Command, factory process.ProcessFactory, hooks ...RunnerHook) Runner {
-	statsInterval := command.StatsInterval
-
-	if statsInterval < 30 {
-		statsInterval = 30
-	}
-
 	runner := &runnerImpl{
 		manager: manager,
 		command: command,

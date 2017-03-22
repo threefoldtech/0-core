@@ -230,9 +230,13 @@ class Checker:
         if primitive(atyp) and atyp != typ:
             raise t.reason('invalid type, expecting {}'.format(typ))
 
-        if isinstance(typ, (list, tuple)):
+        if isinstance(typ, list):
             if atyp != list:
                 raise t.reason('expecting a list')
+            self._check_list(typ[0], object, t)
+        if isinstance(typ, tuple):
+            if atyp != tuple:
+                raise t.reason('expecting a tuple')
             self._check_list(typ[0], object, t)
         elif isinstance(typ, dict):
             if atyp != dict:
