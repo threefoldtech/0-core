@@ -306,23 +306,15 @@ func (c *container) bridge(index int, bridge ContainerBridgeSettings) error {
 		//start a dhcpc inside the container.
 		dhcpc := &core.Command{
 			ID:      uuid.New(),
-			Command: cmdContainerDispatch,
+			Command: process.CommandSystem,
 			Arguments: core.MustArguments(
-				ContainerDispatchArguments{
-					Container: c.id,
-					Command: core.Command{
-						ID:      "dhcpc",
-						Command: process.CommandSystem,
-						Arguments: core.MustArguments(
-							process.SystemCommandArguments{
-								Name: "udhcpc",
-								Args: []string{
-									"-f",
-									"-i", dev,
-									"-s", "/usr/share/udhcp/simple.script",
-								},
-							},
-						),
+				process.SystemCommandArguments{
+					Name: "ip",
+					Args: []string{
+						"netns",
+						"exec",
+						fmt.Sprintf("%v", c.id),
+						"udhcpc", "-q", "-i", dev, "-s", "/usr/share/udhcp/simple.script",
 					},
 				},
 			),
@@ -342,7 +334,11 @@ func (c *container) bridge(index int, bridge ContainerBridgeSettings) error {
 				Arguments: core.MustArguments(
 					process.SystemCommandArguments{
 						Name: "ip",
-						Args: []string{"netns", "exec", fmt.Sprintf("%v", c.id), "ip", "link", "set", "dev", dev, "up"},
+						Args: []string{
+							"netns",
+							"exec",
+							fmt.Sprintf("%v", c.id),
+							"ip", "link", "set", "dev", dev, "up"},
 					},
 				),
 			}
