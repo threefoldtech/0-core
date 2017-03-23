@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"fmt"
 	"github.com/op/go-logging"
+	"github.com/shirou/gopsutil/process"
 	"github.com/vishvananda/netlink"
 	"os"
 	"syscall"
@@ -82,6 +83,36 @@ func (b *Bootstrap) Bootstrap(hostname string) error {
 	}
 
 	return nil
+}
+
+func (b *Bootstrap) UnBootstrap() {
+	//clean up behind (kill all processes)
+	pids, _ := process.Pids()
+	//kill all children.
+	for _, pid := range pids {
+		if pid == 1 {
+			continue
+		}
+		log.Infof("stopping PID: %d", pid)
+		ps, err := process.NewProcess(pid)
+
+		if err != nil {
+			log.Errorf("failed to kill pid (%d): %s", pid, err)
+			continue
+		}
+
+		if err := ps.Kill(); err != nil {
+			log.Errorf("failed to kill pid (%d): %s", pid, err)
+			continue
+		}
+	}
+
+	for _, mnt := range []string{"/dev/pts", "/dev", "proc"} {
+		log.Infof("Unmounting: %s", mnt)
+		if err := syscall.Unmount(mnt, syscall.MNT_DETACH); err != nil {
+			log.Errorf("failed to unmount %s", err)
+		}
+	}
 }
 
 func updateHostname(hostname string) error {
