@@ -63,11 +63,17 @@ func KVMSubsystem() error {
 	return nil
 }
 
+type Media struct {
+	URL  string         `json:"url"`
+	Type DiskDeviceType `json:"type"`
+	Bus  string         `json:"bus"`
+}
+
 type CreateParams struct {
 	Name   string      `json:"name"`
 	CPU    int         `json:"cpu"`
 	Memory int         `json:"memory"`
-	Images []string    `json:"images"`
+	Media  []Media     `json:"media"`
 	Bridge []string    `json:"bridge"`
 	Port   map[int]int `json:"port"`
 }
@@ -104,8 +110,9 @@ func (m *kvmManager) setupDefaultGateway() error {
 	return nil
 }
 
-func (m *kvmManager) mkNBDDisk(u *url.URL, target string) DiskDevice {
+func (m *kvmManager) mkNBDDisk(idx int, u *url.URL) DiskDevice {
 	name := strings.Trim(u.Path, "/")
+	target := "vd" + string(97+idx)
 
 	switch u.Scheme {
 	case "nbd":
@@ -116,11 +123,9 @@ func (m *kvmManager) mkNBDDisk(u *url.URL, target string) DiskDevice {
 			port = "10809"
 		}
 		return DiskDevice{
-			Type:   DiskTypeNetwork,
-			Device: DiskDeviceTypeDisk,
+			Type: DiskTypeNetwork,
 			Target: DiskTarget{
 				Dev: target,
-				Bus: "virtio",
 			},
 			Source: DiskSourceNetwork{
 				Protocol: "nbd",
@@ -134,11 +139,9 @@ func (m *kvmManager) mkNBDDisk(u *url.URL, target string) DiskDevice {
 		}
 	case "nbd+unix":
 		return DiskDevice{
-			Type:   DiskTypeNetwork,
-			Device: DiskDeviceTypeDisk,
+			Type: DiskTypeNetwork,
 			Target: DiskTarget{
 				Dev: target,
-				Bus: "virtio",
 			},
 			Source: DiskSourceNetwork{
 				Protocol: "nbd",
@@ -154,25 +157,46 @@ func (m *kvmManager) mkNBDDisk(u *url.URL, target string) DiskDevice {
 	}
 }
 
-func (m *kvmManager) mkDisk(img string, target string) DiskDevice {
-	u, err := url.Parse(img)
-
-	if err == nil && strings.Index(u.Scheme, "nbd") == 0 {
-		return m.mkNBDDisk(u, target)
-	}
-
-	//default fall back to image disk
+func (m *kvmManager) mkFileDisk(idx int, u *url.URL) DiskDevice {
+	target := "vd" + string(97+idx)
 	return DiskDevice{
-		Type:   DiskTypeFile,
-		Device: DiskDeviceTypeDisk,
+		Type: DiskTypeFile,
 		Target: DiskTarget{
 			Dev: target,
-			Bus: "ide",
 		},
 		Source: DiskSourceFile{
-			File: img,
+			File: u.String(),
 		},
 	}
+}
+
+func (m *kvmManager) mkDisk(idx int, media Media) DiskDevice {
+	u, err := url.Parse(media.URL)
+
+	var disk DiskDevice
+	if err == nil && strings.Index(u.Scheme, "nbd") == 0 {
+		disk = m.mkNBDDisk(idx, u)
+	} else {
+		disk = m.mkFileDisk(idx, u)
+	}
+
+	disk.Device = DiskDeviceTypeDisk
+	if media.Type != DiskDeviceType("") {
+		disk.Device = media.Type
+	}
+
+	disk.Target.Bus = "virtio"
+	if media.Bus != "" {
+		disk.Target.Bus = media.Bus
+	}
+
+	//hack for cdrom, because it doesn't work well with virtio
+	if media.Type == DiskDeviceTypeCDROM {
+		disk.Target.Dev = "hd" + string(97+idx)
+		disk.Target.Bus = "ide"
+	}
+
+	return disk
 }
 
 func (m *kvmManager) getNextSequence() uint16 {
@@ -293,9 +317,8 @@ func (m *kvmManager) mkDomain(seq uint16, params *CreateParams) (*Domain, error)
 		})
 	}
 
-	for idx, image := range params.Images {
-		target := "vd" + string(97+idx)
-		domain.Devices.Devices = append(domain.Devices.Devices, m.mkDisk(image, target))
+	for idx, media := range params.Media {
+		domain.Devices.Devices = append(domain.Devices.Devices, m.mkDisk(idx, media))
 	}
 
 	return &domain, nil
