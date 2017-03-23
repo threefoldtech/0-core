@@ -45,7 +45,7 @@ func (process *containerProcessImpl) Command() *core.Command {
 func (process *containerProcessImpl) Kill() {
 	//should force system process to exit.
 	if process.process != nil {
-		process.process.Kill()
+		process.process.Terminate()
 	}
 }
 

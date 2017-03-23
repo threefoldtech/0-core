@@ -7,6 +7,7 @@ import (
 	"github.com/g8os/core0/base/pm/process"
 	"github.com/pborman/uuid"
 	"github.com/vishvananda/netlink"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -90,6 +91,14 @@ func (c *container) Start() error {
 	return nil
 }
 
+func (c *container) preStartHostNetworking() error {
+	os.MkdirAll(path.Join(c.root(), "etc"), 0755)
+	p := path.Join(c.root(), "etc", "resolv.conf")
+	os.Remove(p)
+	ioutil.WriteFile(p, []byte{}, 0644) //touch the file.
+	return syscall.Mount("/etc/resolv.conf", p, "", syscall.MS_BIND, "")
+}
+
 func (c *container) preStart() error {
 	//mount up redis socket, coreX binary, etc...
 	root := c.root()
@@ -120,6 +129,10 @@ func (c *container) preStart() error {
 
 	if err := syscall.Mount(coreXSrc, coreXTarget, "", syscall.MS_BIND, ""); err != nil {
 		return err
+	}
+
+	if c.args.HostNetwork {
+		return c.preStartHostNetworking()
 	}
 
 	return nil
@@ -465,11 +478,8 @@ func (c *container) setPortForwards() error {
 
 	return nil
 }
-func (c *container) postStart() error {
-	if c.args.HostNetwork {
-		return nil
-	}
 
+func (c *container) postStartIsolatedNetworking() error {
 	//only setup networking if host-network is false
 	if err := c.namespace(); err != nil {
 		return err
@@ -514,4 +524,12 @@ func (c *container) postStart() error {
 	}
 
 	return nil
+}
+
+func (c *container) postStart() error {
+	if c.args.HostNetwork {
+		return nil
+	}
+
+	return c.postStartIsolatedNetworking()
 }
