@@ -13,10 +13,13 @@ import (
 	"github.com/g8os/core0/base/settings"
 	"github.com/pborman/uuid"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"sort"
+	"strings"
 	"sync"
 	"syscall"
 )
@@ -281,6 +284,38 @@ func (c *container) mount() error {
 			if err := c.mountPList(src, target); err != nil {
 				return fmt.Errorf("mount-bind-plist(%s)", err)
 			}
+		}
+	}
+
+	return nil
+}
+
+func (c *container) unMountAll() error {
+	mnts, err := ioutil.ReadFile("/proc/mounts")
+	if err != nil {
+		return err
+	}
+	root := c.root()
+	var targets []string
+	for _, line := range strings.Split(string(mnts), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		target := fields[1]
+		if target == root || strings.HasPrefix(target, root+"/") {
+			targets = append(targets, target)
+		}
+	}
+
+	sort.Slice(targets, func(i, j int) bool {
+		return strings.Count(targets[i], "/") > strings.Count(targets[j], "/")
+	})
+
+	for _, target := range targets {
+		log.Debugf("unmounting '%s'", target)
+		if err := syscall.Unmount(target, syscall.MNT_DETACH); err != nil {
+			log.Errorf("failed to un-mount '%s': %s", target, err)
 		}
 	}
 

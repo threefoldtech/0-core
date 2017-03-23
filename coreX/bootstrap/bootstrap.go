@@ -27,22 +27,22 @@ func (b *Bootstrap) setupLO() {
 
 	link, err := netlink.LinkByName("lo")
 	if err != nil {
-		log.Warning("failed to get lo device")
+		log.Warningf("failed to get lo device")
 		return
 	}
 
 	addr, _ := netlink.ParseAddr("127.0.0.1/8")
 	if err := netlink.AddrAdd(link, addr); err != nil {
-		log.Warning("failed to setup lo address: %s", err)
+		log.Warningf("failed to setup lo address: %s", err)
 	}
 
 	addr, _ = netlink.ParseAddr("::1/128")
 	if err := netlink.AddrAdd(link, addr); err != nil {
-		log.Warning("failed to setup lo address: %s", err)
+		log.Warningf("failed to setup lo address: %s", err)
 	}
 
 	if err := netlink.LinkSetUp(link); err != nil {
-		log.Warning("failed to bring lo interface up: %s", err)
+		log.Warningf("failed to bring lo interface up: %s", err)
 	}
 }
 

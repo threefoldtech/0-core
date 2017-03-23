@@ -152,9 +152,7 @@ func (c *container) onexit(state bool) {
 }
 
 func (c *container) cleanup() {
-	root := c.root()
-
-	//TODO: remove port forwards
+	log.Debugf("cleaning up container-%d", c.id)
 
 	if !c.args.HostNetwork {
 		c.unPortForward()
@@ -175,26 +173,8 @@ func (c *container) cleanup() {
 		}
 	}
 
-	for _, guest := range c.args.Mount {
-		target := path.Join(root, guest)
-		if err := syscall.Unmount(target, syscall.MNT_DETACH); err != nil {
-			log.Errorf("Failed to unmount %s: %s", target, err)
-		}
-	}
-
-	redisSocketTarget := path.Join(root, "redis.socket")
-	coreXTarget := path.Join(root, coreXBinaryName)
-
-	if err := syscall.Unmount(redisSocketTarget, syscall.MNT_DETACH); err != nil {
-		log.Errorf("Failed to unmount %s: %s", redisSocketTarget, err)
-	}
-
-	if err := syscall.Unmount(coreXTarget, syscall.MNT_DETACH); err != nil {
-		log.Errorf("Failed to unmount %s: %s", coreXTarget, err)
-	}
-
-	if err := syscall.Unmount(root, syscall.MNT_DETACH); err != nil {
-		log.Errorf("Failed to unmount %s: %s", root, err)
+	if err := c.unMountAll(); err != nil {
+		log.Errorf("unmounting container-%d was not clean", err)
 	}
 }
 
