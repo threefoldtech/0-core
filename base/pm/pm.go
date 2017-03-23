@@ -324,6 +324,7 @@ func (pm *PM) RunSlice(slice settings.StartupSlice) {
 			ID:              startup.Key(),
 			Command:         startup.Name,
 			RecurringPeriod: startup.RecurringPeriod,
+			MaxRestart:      startup.MaxRestart,
 			Arguments:       core.MustArguments(startup.Args),
 		}
 

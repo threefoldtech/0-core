@@ -11,6 +11,7 @@ type Startup struct {
 	RunningDelay    int
 	RunningMatch    string
 	RecurringPeriod int
+	MaxRestart      int
 	Name            string
 	Args            map[string]interface{}
 
