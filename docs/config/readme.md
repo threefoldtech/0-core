@@ -141,7 +141,7 @@ A service can define a list of dependencies where the service will only run `aft
 has `ran` successfully. A service is considered `running` according to certain configurable criteria.  
 
 ### Structure of startup service
-```
+```toml
 [startup."service id"]
 name = "command.name"
 after = ["dep-1", "dep-2"]
