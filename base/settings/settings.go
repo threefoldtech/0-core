@@ -94,6 +94,7 @@ type AppSettings struct {
 	Logging map[string]Logger
 
 	Stats struct {
+		//Interval is deprecated
 		Interval int
 		Redis    struct {
 			Enabled       bool
