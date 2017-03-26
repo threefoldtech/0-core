@@ -203,3 +203,6 @@ stdin = "data to pass to executable over stdin"
 ```
 
 Bash for example requires only `script` argument also accepts `stdin`
+
+> Startup `args` section also supports the `{variable}` name substitution. But it substitute the keys
+with values passed to the kernel cmdline.
