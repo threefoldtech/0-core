@@ -115,6 +115,8 @@ func (c *container) getMetaDBTar(src string) (io.ReadCloser, error) {
 	switch ext {
 	case ".tgz":
 		fallthrough
+	case ".flist":
+		fallthrough
 	case ".gz":
 		if r, err := gzip.NewReader(reader); err != nil {
 			closer.Close()
