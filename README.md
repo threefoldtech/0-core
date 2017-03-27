@@ -44,8 +44,8 @@ Make sure this repo is cloned under your correct GOPATH (should be under $GOPATH
 
 ```
 cd $GOPATH/src/github.com/g8os/core0
-go get github.com/g8os/core0/core
-go get github.com/g8os/core0/corex
+go get github.com/g8os/core0/core0
+go get github.com/g8os/core0/coreX
 make
 ```
 
