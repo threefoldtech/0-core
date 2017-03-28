@@ -169,6 +169,21 @@ class FilesystemManager:
         self._client = client
 
     def open(self, file, mode='r', perm=0o0644):
+        """
+        Opens a file on the node
+
+        :param file: file path to open
+        :param mode: open mode
+        :param perm: file permission in octet form
+
+        mode:
+          'r' read only
+          'w' write only
+          '+' read/write
+          'x' create if not exist
+          'a' append
+        :return: a file descriptor
+        """
         args = {
             'file': file,
             'mode': mode,
@@ -178,6 +193,12 @@ class FilesystemManager:
         return self._client.json('filesystem.open', args)
 
     def read(self, fd):
+        """
+        Read a block from the given file descriptor
+
+        :param fd: file descriptor
+        :return: bytes
+        """
         args = {
             'fd': fd,
         }
@@ -186,6 +207,15 @@ class FilesystemManager:
         return base64.decodebytes(data.encode())
 
     def write(self, fd, bytes):
+        """
+        Write a block of bytes to an open file descriptor (that is open with one of the writing modes
+
+        :param fd: file descriptor
+        :param bytes: bytes block to write
+        :return:
+
+        :note: don't overkill the node with large byte chunks, also for large file upload check the upload method.
+        """
         args = {
             'fd': fd,
             'block': base64.encodebytes(bytes).decode(),
@@ -194,6 +224,11 @@ class FilesystemManager:
         return self._client.json('filesystem.write', args)
 
     def close(self, fd):
+        """
+        Close file
+        :param fd: file descriptor
+        :return:
+        """
         args = {
             'fd': fd,
         }
@@ -290,6 +325,9 @@ class BaseClient:
         Implements the low level command call, this needs to build the command structure
         and push it on the correct queue.
 
+        :param command: Command name to execute supported by the node (ex: core.system, info.cpu, etc...)
+                        check documentation for list of built in commands
+        :param arguments: A dict of required command arguments depends on the command name.
         :return: Response object
         """
         raise NotImplemented()
@@ -321,6 +359,11 @@ class BaseClient:
         return json.loads(result.data)
 
     def ping(self):
+        """
+        Ping a node, checking for it's availability. a Ping should never fail unless the node is not reachable
+        or not responsive.
+        :return:
+        """
         response = self.raw('core.ping', {})
 
         result = response.get()
@@ -330,6 +373,15 @@ class BaseClient:
         return json.loads(result.data)
 
     def system(self, command, dir='', stdin='', env=None):
+        """
+        Execute a command
+
+        :param command:  command to execute (with its arguments) ex: `ls -l /root`
+        :param dir: CWD of command
+        :param stdin: Stdin data to feed to the command stdin
+        :param env: dict with ENV variables that will be exported to the command
+        :return:
+        """
         parts = shlex.split(command)
         if len(parts) == 0:
             raise ValueError('invalid command')
@@ -348,6 +400,13 @@ class BaseClient:
         return response
 
     def bash(self, script, stdin=''):
+        """
+        Execute a bash script, or run a process inside a bash shell.
+
+        :param script: Script to execute (can be multiline script)
+        :param stdin: Stdin data to feed to the script
+        :return:
+        """
         args = {
             'script': script,
             'stdin': stdin,
@@ -374,6 +433,15 @@ class ContainerClient(BaseClient):
         self._container = container
 
     def raw(self, command, arguments):
+        """
+        Implements the low level command call, this needs to build the command structure
+        and push it on the correct queue.
+
+        :param command: Command name to execute supported by the node (ex: core.system, info.cpu, etc...)
+                        check documentation for list of built in commands
+        :param arguments: A dict of required command arguments depends on the command name.
+        :return: Response object
+        """
         args = {
             'container': self._container,
             'command': {
@@ -590,6 +658,10 @@ class BridgeManager:
         return json.loads(result.data)
 
     def list(self):
+        """
+        List all available bridges
+        :return: list of bridge names
+        """
         response = self._client.raw('bridge.list', {})
 
         result = response.get()
@@ -599,6 +671,12 @@ class BridgeManager:
         return json.loads(result.data)
 
     def delete(self, bridge):
+        """
+        Delete a bridge by name
+
+        :param bridge: bridge name
+        :return:
+        """
         args = {
             'name': bridge,
         }
@@ -980,6 +1058,12 @@ class ZerotierManager:
         self._client = client
 
     def join(self, network):
+        """
+        Join a zerotier network
+
+        :param network: network id to join
+        :return:
+        """
         args = {'network': network}
         self._network_chk.check(args)
         response = self._client.raw('zerotier.join', args)
@@ -989,6 +1073,12 @@ class ZerotierManager:
             raise RuntimeError('failed to join zerotier network: %s', result.stderr)
 
     def leave(self, network):
+        """
+        Leave a zerotier network
+
+        :param network: network id to leave
+        :return:
+        """
         args = {'network': network}
         self._network_chk.check(args)
         response = self._client.raw('zerotier.leave', args)
@@ -998,6 +1088,11 @@ class ZerotierManager:
             raise RuntimeError('failed to leave zerotier network: %s', result.stderr)
 
     def list(self):
+        """
+        List joined zerotier networks
+
+        :return: list of joined networks with their info
+        """
         response = self._client.raw('zerotier.list', {})
         result = response.get()
 
@@ -1066,6 +1161,11 @@ class KvmManager:
         self._client.sync('kvm.create', args)
 
     def destroy(self, name):
+        """
+        Destroy a kvm domain by name
+        :param name: name of the kvm container (same as the used in create)
+        :return:
+        """
         args = {
             'name': name,
         }
@@ -1074,6 +1174,11 @@ class KvmManager:
         self._client.sync('kvm.destroy', args)
 
     def list(self):
+        """
+        List configured domains
+
+        :return:
+        """
         return self._client.json('kvm.list', {})
 
 
@@ -1123,6 +1228,15 @@ class Client(BaseClient):
         return self._zerotier
 
     def raw(self, command, arguments):
+        """
+        Implements the low level command call, this needs to build the command structure
+        and push it on the correct queue.
+
+        :param command: Command name to execute supported by the node (ex: core.system, info.cpu, etc...)
+                        check documentation for list of built in commands
+        :param arguments: A dict of required command arguments depends on the command name.
+        :return: Response object
+        """
         id = str(uuid.uuid4())
 
         payload = {
