@@ -491,6 +491,10 @@ class ContainerManager:
         return json.loads(result.data)
 
     def list(self):
+        """
+        List running containers
+        :return: a dict with {container_id: <container info object>}
+        """
         response = self._client.raw('corex.list', {})
 
         result = response.get()
@@ -500,6 +504,12 @@ class ContainerManager:
         return json.loads(result.data)
 
     def terminate(self, container):
+        """
+        Terminate a container given it's id
+
+        :param container: container id
+        :return:
+        """
         args = {
             'container': container,
         }
@@ -511,6 +521,12 @@ class ContainerManager:
             raise RuntimeError('failed to terminate container: %s' % result.data)
 
     def client(self, container):
+        """
+        Return a client instance that is bound to that container.
+
+        :param container: container id
+        :return: Client object bound to the specified container id
+        """
         return ContainerClient(self._client, container)
 
 
