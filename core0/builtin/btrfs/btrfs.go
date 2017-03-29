@@ -1,8 +1,7 @@
-package builtin
+package btrfs
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -16,19 +15,23 @@ import (
 )
 
 var (
-	errBtrfsNoFS        = errors.New("No btrfs FS found")
 	reBtrfsFilesystemDf = regexp.MustCompile(`(?m:(\w+),\s(\w+):\s+total=(\d+),\s+used=(\d+))`)
 )
 
+type btrfsManager struct{}
+
 func init() {
-	pm.CmdMap["btrfs.list"] = process.NewInternalProcessFactory(btrfsList)
-	pm.CmdMap["btrfs.info"] = process.NewInternalProcessFactory(btrfsInfo)
-	pm.CmdMap["btrfs.create"] = process.NewInternalProcessFactory(btrfsCreate)
-	pm.CmdMap["btrfs.add_device"] = process.NewInternalProcessFactory(btrfsAddDevice)
-	pm.CmdMap["btrfs.remove_device"] = process.NewInternalProcessFactory(btrfsRemoveDevice)
-	pm.CmdMap["btrfs.subvol_create"] = process.NewInternalProcessFactory(btrfsSubvolCreate)
-	pm.CmdMap["btrfs.subvol_delete"] = process.NewInternalProcessFactory(btrfsSubvolDelete)
-	pm.CmdMap["btrfs.subvol_list"] = process.NewInternalProcessFactory(btrfsSubvolList)
+	var m btrfsManager
+
+	pm.CmdMap["btrfs.list"] = process.NewInternalProcessFactory(m.List)
+	pm.CmdMap["btrfs.info"] = process.NewInternalProcessFactory(m.Info)
+	pm.CmdMap["btrfs.create"] = process.NewInternalProcessFactory(m.Create)
+	pm.CmdMap["btrfs.device_add"] = process.NewInternalProcessFactory(m.DeviceAdd)
+	pm.CmdMap["btrfs.device_remove"] = process.NewInternalProcessFactory(m.DeviceRemove)
+	pm.CmdMap["btrfs.subvol_create"] = process.NewInternalProcessFactory(m.SubvolCreate)
+	pm.CmdMap["btrfs.subvol_delete"] = process.NewInternalProcessFactory(m.SubvolDelete)
+	pm.CmdMap["btrfs.subvol_list"] = process.NewInternalProcessFactory(m.SubvolList)
+	pm.CmdMap["btrfs.subvol_snapshot"] = process.NewInternalProcessFactory(m.SubvolSnapshot)
 }
 
 type btrfsFS struct {
@@ -61,9 +64,16 @@ type btrfsDevice struct {
 	Path    string `json:"path"`
 }
 
+type btrfsSubvol struct {
+	ID       int
+	Gen      int
+	TopLevel int
+	Path     string
+}
+
 var (
 	// valid btrfs data & metadata profiles
-	btrfsProfiles = map[string]struct{}{
+	Profiles = map[string]struct{}{
 		"raid0":  struct{}{},
 		"raid1":  struct{}{},
 		"raid5":  struct{}{},
@@ -75,44 +85,43 @@ var (
 	}
 )
 
-type btrfsCreateArgument struct {
+type CreateArgument struct {
 	Label    string   `json:"label"`
 	Metadata string   `json:"metadata"`
 	Data     string   `json:"data"`
 	Devices  []string `json:"devices"`
 }
 
-type btrfsInfoArgument struct {
+type InfoArgument struct {
 	Mountpoint string `json:"mountpoint"`
 }
 
-type btrfsAddDevicesArgument struct {
-	btrfsInfoArgument
+type DeviceAddArgument struct {
+	InfoArgument
 	Devices []string `json:"devices"`
 }
 
-type btrfsSubvol struct {
-	ID       int
-	Gen      int
-	TopLevel int
-	Path     string
+type SnapshotArgument struct {
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+	Readonly    bool   `json:"read_only"`
 }
 
-func (arg btrfsCreateArgument) Validate() error {
+func (arg CreateArgument) Validate() error {
 	if len(arg.Devices) == 0 {
 		return fmt.Errorf("need to specify devices to create btrfs")
 	}
-	if v, ok := btrfsProfiles[arg.Metadata]; !ok {
+	if v, ok := Profiles[arg.Metadata]; !ok {
 		return fmt.Errorf("invalid metadata profile:%v", v)
 	}
-	if v, ok := btrfsProfiles[arg.Data]; !ok {
+	if v, ok := Profiles[arg.Data]; !ok {
 		return fmt.Errorf("invalid data profile:%v", v)
 	}
 	return nil
 }
 
-func btrfsCreate(cmd *core.Command) (interface{}, error) {
-	var args btrfsCreateArgument
+func (m *btrfsManager) Create(cmd *core.Command) (interface{}, error) {
+	var args CreateArgument
 	var opts []string
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
@@ -133,20 +142,16 @@ func btrfsCreate(cmd *core.Command) (interface{}, error) {
 	}
 	opts = append(opts, args.Devices...)
 
-	result, err := runBtrfsCmd("mkfs.btrfs", opts)
+	_, err := m.exec("mkfs.btrfs", opts...)
 	if err != nil {
 		return nil, err
-	}
-
-	if result.State != core.StateSuccess {
-		return "", fmt.Errorf("error creating btrfs filesystem: %v", result.Streams)
 	}
 
 	return nil, nil
 }
 
-func btrfsAddDevice(cmd *core.Command) (interface{}, error) {
-	var args btrfsAddDevicesArgument
+func (m *btrfsManager) DeviceAdd(cmd *core.Command) (interface{}, error) {
+	var args DeviceAddArgument
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -154,20 +159,16 @@ func btrfsAddDevice(cmd *core.Command) (interface{}, error) {
 	cmdArgs := []string{"device", "add", "-K", "-f"}
 	cmdArgs = append(cmdArgs, args.Devices...)
 	cmdArgs = append(cmdArgs, args.Mountpoint)
-	result, err := runBtrfsCmd("btrfs", cmdArgs)
+	_, err := m.btrfs(cmdArgs...)
 	if err != nil {
 		return nil, err
-	}
-
-	if result.State != core.StateSuccess {
-		return nil, fmt.Errorf("%v", result.Streams)
 	}
 
 	return nil, nil
 }
 
-func btrfsRemoveDevice(cmd *core.Command) (interface{}, error) {
-	var args btrfsAddDevicesArgument
+func (m *btrfsManager) DeviceRemove(cmd *core.Command) (interface{}, error) {
+	var args DeviceAddArgument
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -175,29 +176,23 @@ func btrfsRemoveDevice(cmd *core.Command) (interface{}, error) {
 	cmdArgs := []string{"device", "remove"}
 	cmdArgs = append(cmdArgs, args.Devices...)
 	cmdArgs = append(cmdArgs, args.Mountpoint)
-	result, err := runBtrfsCmd("btrfs", cmdArgs)
+	_, err := m.btrfs(cmdArgs...)
 	if err != nil {
 		return nil, err
-	}
-
-	if result.State != core.StateSuccess {
-		return nil, fmt.Errorf("%v", result.Streams)
 	}
 
 	return nil, nil
 }
 
-func btrfsListCmd(cmd *core.Command, args []string) ([]btrfsFS, error) {
+func (m *btrfsManager) list(cmd *core.Command, args []string) ([]btrfsFS, error) {
 	defaultargs := []string{"filesystem", "show", "--raw"}
-	result, err := runBtrfsCmd("btrfs", append(defaultargs, args...))
+	defaultargs = append(defaultargs, args...)
+	result, err := m.btrfs(defaultargs...)
 	if err != nil {
 		return nil, err
 	}
 
-	if result.State != core.StateSuccess || len(result.Streams) == 0 {
-		return nil, fmt.Errorf("error listing btrfs filesystem: %v", result.Streams)
-	}
-	fss, err := btrfsParseList(result.Streams[0])
+	fss, err := m.parseList(result.Streams[0])
 	if err != nil {
 		return nil, err
 	}
@@ -210,40 +205,40 @@ func btrfsListCmd(cmd *core.Command, args []string) ([]btrfsFS, error) {
 }
 
 // list btrfs FSs
-func btrfsList(cmd *core.Command) (interface{}, error) {
-	return btrfsListCmd(cmd, []string{})
+func (m *btrfsManager) List(cmd *core.Command) (interface{}, error) {
+	return m.list(cmd, []string{})
 }
 
 // get btrfs info
-func btrfsInfo(cmd *core.Command) (interface{}, error) {
-	var args btrfsInfoArgument
+func (m *btrfsManager) Info(cmd *core.Command) (interface{}, error) {
+	var args InfoArgument
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
-	fss, err := btrfsListCmd(cmd, []string{args.Mountpoint})
+	fss, err := m.list(cmd, []string{args.Mountpoint})
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := runBtrfsCmd("btrfs", []string{"filesystem", "df", "--raw", args.Mountpoint})
+	result, err := m.btrfs("filesystem", "df", "--raw", args.Mountpoint)
 	if err != nil {
 		return nil, err
 	}
 	fsinfo := btrfsFSInfo{
 		btrfsFS: fss[0],
 	}
-	err = btrfsParserFilesystemDF(result.Streams[0], &fsinfo)
+	err = m.parseFilesystemDF(result.Streams[0], &fsinfo)
 	return fsinfo, err
 
 }
 
-type btrfsSubvolArgument struct {
+type SubvolArgument struct {
 	Path string `json:"path"`
 }
 
 // create subvolume under a mount point
-func btrfsSubvolCreate(cmd *core.Command) (interface{}, error) {
-	var args btrfsSubvolArgument
+func (m *btrfsManager) SubvolCreate(cmd *core.Command) (interface{}, error) {
+	var args SubvolArgument
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
@@ -252,20 +247,17 @@ func btrfsSubvolCreate(cmd *core.Command) (interface{}, error) {
 		return nil, fmt.Errorf("invalid path=%v", args.Path)
 	}
 
-	result, err := runBtrfsCmd("btrfs", []string{"subvolume", "create", args.Path})
+	_, err := m.btrfs("subvolume", "create", args.Path)
 	if err != nil {
 		return nil, err
 	}
 
-	if result.State != core.StateSuccess {
-		return nil, fmt.Errorf("error creating btrfs subvolume: %v:%v", result.Streams, result.Data)
-	}
 	return nil, nil
 }
 
 // delete subvolume under a mount point
-func btrfsSubvolDelete(cmd *core.Command) (interface{}, error) {
-	var args btrfsSubvolArgument
+func (m *btrfsManager) SubvolDelete(cmd *core.Command) (interface{}, error) {
+	var args SubvolArgument
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
@@ -274,21 +266,38 @@ func btrfsSubvolDelete(cmd *core.Command) (interface{}, error) {
 		return nil, fmt.Errorf("invalid path=%v", args.Path)
 	}
 
-	result, err := runBtrfsCmd("btrfs", []string{"subvolume", "delete", args.Path})
+	_, err := m.btrfs("subvolume", "delete", args.Path)
 	if err != nil {
 		return nil, err
 	}
 
-	if result.State != core.StateSuccess {
-		return nil, fmt.Errorf("error deleting btrfs subvolume: %v:%v", result.Streams, result.Data)
+	return nil, nil
+}
+
+// make a subvol snapshot
+func (m *btrfsManager) SubvolSnapshot(cmd *core.Command) (interface{}, error) {
+	var args SnapshotArgument
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+
+	in := []string{"subvolume", "snapshot"}
+	if args.Readonly {
+		in = append(in, "-r")
+	}
+	in = append(in, args.Source, args.Destination)
+
+	_, err := m.btrfs(in...)
+	if err != nil {
+		return nil, err
 	}
 
 	return nil, nil
 }
 
 // list subvolume under a mount point
-func btrfsSubvolList(cmd *core.Command) (interface{}, error) {
-	var args btrfsSubvolArgument
+func (m *btrfsManager) SubvolList(cmd *core.Command) (interface{}, error) {
+	var args SubvolArgument
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
@@ -297,19 +306,15 @@ func btrfsSubvolList(cmd *core.Command) (interface{}, error) {
 		return nil, fmt.Errorf("invalid path=%v", args.Path)
 	}
 
-	result, err := runBtrfsCmd("btrfs", []string{"subvolume", "list", args.Path})
+	result, err := m.btrfs("subvolume", "list", args.Path)
 	if err != nil {
 		return nil, err
 	}
 
-	if result.State != core.StateSuccess || len(result.Streams) != 2 {
-		return nil, fmt.Errorf("error list btrfs subvolume: %v:%v", result.Streams, result.Data)
-	}
-
-	return btrfsParseSubvolList(result.Streams[0])
+	return m.parseSubvolList(result.Streams[0])
 }
 
-func runBtrfsCmd(cmd string, args []string) (*core.JobResult, error) {
+func (m *btrfsManager) exec(cmd string, args ...string) (*core.JobResult, error) {
 	shellCmd := &core.Command{
 		ID:      uuid.New(),
 		Command: process.CommandSystem,
@@ -326,9 +331,20 @@ func runBtrfsCmd(cmd string, args []string) (*core.JobResult, error) {
 		return nil, err
 	}
 
-	return runner.Wait(), nil
+	result := runner.Wait()
+
+	if result.State != core.StateSuccess {
+		return nil, fmt.Errorf("output: %v (%v)", result.Streams, result.Data)
+	}
+
+	return result, nil
 }
-func btrfsParseSubvolList(out string) ([]btrfsSubvol, error) {
+
+func (m *btrfsManager) btrfs(args ...string) (*core.JobResult, error) {
+	return m.exec("btrfs", args...)
+}
+
+func (m *btrfsManager) parseSubvolList(out string) ([]btrfsSubvol, error) {
 	var svs []btrfsSubvol
 
 	for _, line := range strings.Split(out, "\n") {
@@ -345,7 +361,7 @@ func btrfsParseSubvolList(out string) ([]btrfsSubvol, error) {
 	return svs, nil
 }
 
-func btrfsParserFilesystemDF(output string, fsinfo *btrfsFSInfo) error {
+func (m *btrfsManager) parseFilesystemDF(output string, fsinfo *btrfsFSInfo) error {
 	var err error
 	lines := reBtrfsFilesystemDf.FindAllStringSubmatch(output, -1)
 	for _, line := range lines {
@@ -379,7 +395,7 @@ func btrfsParserFilesystemDF(output string, fsinfo *btrfsFSInfo) error {
 }
 
 // parse `btrfs filesystem show` output
-func btrfsParseList(output string) ([]btrfsFS, error) {
+func (m *btrfsManager) parseList(output string) ([]btrfsFS, error) {
 	var fss []btrfsFS
 
 	all := strings.Split(output, "\n")
@@ -402,7 +418,7 @@ func btrfsParseList(output string) ([]btrfsFS, error) {
 			if len(fsLines) < 3 {
 				continue
 			}
-			fs, err := btrfsParseFS(fsLines)
+			fs, err := m.parseFS(fsLines)
 			if err != nil {
 				return fss, err
 			}
@@ -419,7 +435,7 @@ func btrfsParseList(output string) ([]btrfsFS, error) {
 	return fss, nil
 }
 
-func btrfsParseFS(lines []string) (btrfsFS, error) {
+func (m *btrfsManager) parseFS(lines []string) (btrfsFS, error) {
 	// first line should be label && uuid
 	var label, uuid string
 	_, err := fmt.Sscanf(lines[0], `Label: %s uuid: %s`, &label, &uuid)
@@ -437,7 +453,7 @@ func btrfsParseFS(lines []string) (btrfsFS, error) {
 		return btrfsFS{}, err
 	}
 
-	devs, err := btrfsParseDevices(lines[2:])
+	devs, err := m.parseDevices(lines[2:])
 	if err != nil {
 		return btrfsFS{}, err
 	}
@@ -450,7 +466,7 @@ func btrfsParseFS(lines []string) (btrfsFS, error) {
 	}, nil
 }
 
-func btrfsParseDevices(lines []string) ([]btrfsDevice, error) {
+func (m *btrfsManager) parseDevices(lines []string) ([]btrfsDevice, error) {
 	var devs []btrfsDevice
 	for _, line := range lines {
 		if line == "" {
