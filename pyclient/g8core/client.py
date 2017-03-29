@@ -192,6 +192,107 @@ class FilesystemManager:
 
         return self._client.json('filesystem.open', args)
 
+    def exists(self, path):
+        """
+        Check if path exists
+
+        :param path: path to file/dir
+        :return: boolean
+        """
+        args = {
+            'path': path,
+        }
+
+        return self._client.json('filesystem.exists', args)
+
+    def list(self, path):
+        """
+        List all entries in directory
+        :param path: path to dir
+        :return: list of director entries
+        """
+        args = {
+            'path': path,
+        }
+
+        return self._client.json('filesystem.list', args)
+
+    def mkdir(self, path):
+        """
+        Make a new directory == mkdir -p path
+        :param path: path to directory to create
+        :return:
+        """
+        args = {
+            'path': path,
+        }
+
+        return self._client.json('filesystem.mkdir', args)
+
+    def remove(self, path):
+        """
+        Removes a path (recursively)
+
+        :param path: path to remove
+        :return:
+        """
+        args = {
+            'path': path,
+        }
+
+        return self._client.json('filesystem.remove', args)
+
+    def move(self, path, destination):
+        """
+        Move a path to destination
+
+        :param path: source
+        :param destination: destination
+        :return:
+        """
+        args = {
+            'path': path,
+            'destination': destination,
+        }
+
+        return self._client.json('filesystem.move', args)
+
+    def chmod(self, path, mode, recursive=False):
+        """
+        Change file/dir permission
+
+        :param path: path of file/dir to change
+        :param mode: octet mode
+        :param recursive: apply chmod recursively
+        :return:
+        """
+        args = {
+            'path': path,
+            'mode': mode,
+            'recursive': recursive,
+        }
+
+        return self._client.json('filesystem.chmod', args)
+
+    def chown(self, path, user, group, recursive=False):
+        """
+        Change file/dir owner
+
+        :param path: path of file/dir
+        :param user: user name
+        :param group: group name
+        :param recursive: apply chown recursively
+        :return:
+        """
+        args = {
+            'path': path,
+            'user': user,
+            'group': group,
+            'recursive': recursive,
+        }
+
+        return self._client.json('filesystem.chown', args)
+
     def read(self, fd):
         """
         Read a block from the given file descriptor
