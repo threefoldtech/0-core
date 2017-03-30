@@ -2,6 +2,7 @@ package process
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/stream"
 	"github.com/g8os/core0/base/utils"
@@ -68,12 +69,12 @@ func (process *extensionProcess) Run() (<-chan *stream.Message, error) {
 	return process.system.Run()
 }
 
-func (process *extensionProcess) Kill() error {
-	return process.system.Kill()
-}
-
 func (process *extensionProcess) Signal(sig syscall.Signal) error {
-	return process.system.Signal(sig)
+	if ps, ok := process.system.(Signaler); ok {
+		return ps.Signal(sig)
+	}
+
+	return fmt.Errorf("not supported")
 }
 
 func (process *extensionProcess) Stats() *ProcessStats {

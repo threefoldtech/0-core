@@ -228,8 +228,10 @@ func (b *bridgeMgr) addHost(cmd *core.Command) (interface{}, error) {
 		return nil, err
 	}
 
-	if err := runner.Process().Signal(syscall.SIGHUP); err != nil {
-		return nil, err
+	if ps, ok := runner.Process().(process.Signaler); ok {
+		if err := ps.Signal(syscall.SIGHUP); err != nil {
+			return nil, err
+		}
 	}
 
 	return nil, nil

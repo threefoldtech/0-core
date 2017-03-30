@@ -37,7 +37,9 @@ type ProcessStats struct {
 type Process interface {
 	Command() *core.Command
 	Run() (<-chan *stream.Message, error)
-	Kill() error //==Signal(SIGTERM)
+}
+
+type Signaler interface {
 	Signal(sig syscall.Signal) error
 }
 

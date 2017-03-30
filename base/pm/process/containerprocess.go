@@ -50,10 +50,6 @@ func (process *containerProcessImpl) Signal(sig syscall.Signal) error {
 	return fmt.Errorf("process not found")
 }
 
-func (process *containerProcessImpl) Kill() error {
-	return process.Signal(syscall.SIGTERM)
-}
-
 //GetStats gets stats of an external process
 func (process *containerProcessImpl) Stats() *ProcessStats {
 	stats := ProcessStats{}

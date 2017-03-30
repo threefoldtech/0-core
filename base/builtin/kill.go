@@ -39,6 +39,16 @@ func kill(cmd *core.Command) (interface{}, error) {
 		return false, nil
 	}
 
-	return true, runner.Process().Signal(data.Signal)
+	if ps, ok := runner.Process().(process.Signaler); ok {
+		if err := ps.Signal(data.Signal); err != nil {
+			return false, err
+		}
+	}
+
+	if data.Signal == syscall.SIGTERM || data.Signal == syscall.SIGKILL {
+		runner.Terminate()
+	}
+
+	return true, nil
 
 }

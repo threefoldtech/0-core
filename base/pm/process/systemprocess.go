@@ -45,11 +45,6 @@ func (process *systemProcessImpl) Command() *core.Command {
 	return process.cmd
 }
 
-func (process *systemProcessImpl) Kill() error {
-	//should force system process to exit.
-	return process.Signal(syscall.SIGTERM)
-}
-
 //GetStats gets stats of an external process
 func (process *systemProcessImpl) Stats() *ProcessStats {
 	stats := ProcessStats{}

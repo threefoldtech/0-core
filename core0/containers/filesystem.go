@@ -258,6 +258,10 @@ func (c *container) root() string {
 func (c *container) mount() error {
 	//mount root plist.
 	//prepare root folder.
+
+	//clean up temp before starting.
+	os.RemoveAll(path.Join(BackendBaseDir, c.name()))
+
 	root := c.root()
 	log.Debugf("Container root: %s", root)
 	os.RemoveAll(root)

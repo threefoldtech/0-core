@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/stream"
+	"runtime/debug"
 	"syscall"
 )
 
@@ -52,6 +53,8 @@ func (process *internalProcess) Run() (<-chan *stream.Message, error) {
 	go func(channel chan *stream.Message) {
 		defer func() {
 			if err := recover(); err != nil {
+				log.Errorf("panic: %v", err)
+				debug.PrintStack()
 				m, _ := json.Marshal(fmt.Sprintf("%v", err))
 				channel <- &stream.Message{
 					Level:   stream.LevelResultJSON,

@@ -176,6 +176,9 @@ func (c *container) cleanup() {
 	if err := c.unMountAll(); err != nil {
 		log.Errorf("unmounting container-%d was not clean", err)
 	}
+
+	os.RemoveAll(path.Join(BackendBaseDir, c.name()))
+	os.RemoveAll(c.root())
 }
 
 func (c *container) namespace() error {

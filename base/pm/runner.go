@@ -20,6 +20,7 @@ const (
 type Runner interface {
 	Command() *core.Command
 	Run()
+	Terminate()
 	Process() process.Process
 	Wait() *core.JobResult
 	StartTime() int64
@@ -101,9 +102,9 @@ func (runner *runnerImpl) run() (jobresult *core.JobResult) {
 
 	runner.process = runner.factory(runner, runner.command)
 
-	process := runner.process
+	ps := runner.process
 
-	channel, err := process.Run()
+	channel, err := ps.Run()
 
 	if err != nil {
 		//this basically means process couldn't spawn
@@ -127,11 +128,15 @@ loop:
 	for {
 		select {
 		case <-runner.kill:
-			process.Kill()
+			if ps, ok := ps.(process.Signaler); ok {
+				ps.Signal(syscall.SIGTERM)
+			}
 			jobresult.State = core.StateKilled
 			break loop
 		case <-timeout:
-			process.Kill()
+			if ps, ok := ps.(process.Signaler); ok {
+				ps.Signal(syscall.SIGKILL)
+			}
 			jobresult.State = core.StateTimeout
 			break loop
 		case <-handlersTicker.C:
@@ -246,7 +251,7 @@ loop:
 
 }
 
-func (runner *runnerImpl) Kill() {
+func (runner *runnerImpl) Terminate() {
 	runner.kill <- 1
 }
 

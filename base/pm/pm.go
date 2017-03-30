@@ -400,18 +400,18 @@ func (pm *PM) Killall() {
 	defer pm.runnersMux.Unlock()
 
 	for _, v := range pm.runners {
-		v.Process().Kill()
+		v.Terminate()
 	}
 }
 
 //Kill kills a process by the cmd ID
 func (pm *PM) Kill(cmdID string) error {
-	v, o := pm.runners[cmdID]
-	if o {
-		return v.Process().Kill()
-	} else {
-		return fmt.Errorf("no process with id '%s' found", cmdID)
+	v, ok := pm.runners[cmdID]
+	if !ok {
+		return fmt.Errorf("not found")
 	}
+	v.Terminate()
+	return nil
 }
 
 func (pm *PM) Aggregate(op, key string, value float64, tags string) {
