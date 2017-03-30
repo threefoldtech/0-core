@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	BackendBaseDir       = "/tmp"
+	BackendBaseDir       = "/var/cache/containers"
 	ContainerBaseRootDir = "/mnt"
 )
 
