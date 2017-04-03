@@ -14,7 +14,7 @@ Systemd replacement for G8OS
 ## Development setup
 To run core0 in a container, just run the following command (this will pull the needed image as well)
 ```
-docker run --privileged -d --name core -p 6379:6379 g8os/g8os:1.0
+docker run --privileged -d --name core -p 6379:6379 g8os/g8os-dev:1.0
 ```
 
 To follow the container logs do
