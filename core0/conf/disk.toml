@@ -1,18 +1,18 @@
 [extension."disk.list"]
 binary = "sh"
-args = ["-c", "echo 20::: && lsblk -J -b && echo :::"]
+args = ["-c", "echo 20::: && lsblk -J -O -b && echo :::"]
 
 [extension."disk.mktable"]
 binary = "parted"
-args = ["{disk}", "mktable", "{table_type}"]
+args = ["-s", "/dev/{disk}", "mktable", "{table_type}"]
 
 [extension."disk.mkpart"]
 binary = "parted"
-args = ["{disk}", "mkpart", "{part_type}", "{start}", "{end}"]
+args = ["-s", "/dev/{disk}", "mkpart", "{part_type}", "{start}", "{end}"]
 
 [extension."disk.rmpart"]
 binary = "parted"
-args = ["{disk}", "rm", "{number}"]
+args = ["-s", "/dev/{disk}", "rm", "{number}"]
 
 [extension."disk.mount"]
 binary = "mount"

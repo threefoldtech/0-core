@@ -1,6 +1,7 @@
 package pm
 
 import (
+	"fmt"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/process"
 	"github.com/g8os/core0/base/pm/stream"
@@ -19,9 +20,10 @@ const (
 type Runner interface {
 	Command() *core.Command
 	Run()
-	Kill()
+	Terminate()
 	Process() process.Process
 	Wait() *core.JobResult
+	StartTime() int64
 }
 
 type runnerImpl struct {
@@ -30,8 +32,9 @@ type runnerImpl struct {
 	factory process.ProcessFactory
 	kill    chan int
 
-	process process.Process
-	hooks   []RunnerHook
+	process   process.Process
+	hooks     []RunnerHook
+	startTime time.Time
 
 	waitOnce sync.Once
 	result   *core.JobResult
@@ -56,12 +59,6 @@ NewRunner creates a new runner object that is bind to this PM instance.
         with SUCCESS exit code.
 */
 func NewRunner(manager *PM, command *core.Command, factory process.ProcessFactory, hooks ...RunnerHook) Runner {
-	statsInterval := command.StatsInterval
-
-	if statsInterval < 30 {
-		statsInterval = 30
-	}
-
 	runner := &runnerImpl{
 		manager: manager,
 		command: command,
@@ -86,23 +83,28 @@ func (runner *runnerImpl) timeout() <-chan time.Time {
 	return timeout
 }
 
-func (runner *runnerImpl) run() *core.JobResult {
-	runner.process = runner.factory(runner, runner.command)
-
-	process := runner.process
-
-	starttime := time.Now()
-
-	channel, err := process.Run()
-	jobresult := core.NewBasicJobResult(runner.command)
+func (runner *runnerImpl) run() (jobresult *core.JobResult) {
+	runner.startTime = time.Now()
+	jobresult = core.NewBasicJobResult(runner.command)
 	jobresult.State = core.StateError
 
 	defer func() {
-		jobresult.StartTime = int64(time.Duration(starttime.UnixNano()) / time.Millisecond)
+		jobresult.StartTime = int64(time.Duration(runner.startTime.UnixNano()) / time.Millisecond)
 		endtime := time.Now()
 
-		jobresult.Time = endtime.Sub(starttime).Nanoseconds() / int64(time.Millisecond)
+		jobresult.Time = endtime.Sub(runner.startTime).Nanoseconds() / int64(time.Millisecond)
+
+		if err := recover(); err != nil {
+			jobresult.State = core.StateError
+			jobresult.Critical = fmt.Sprintf("PANIC(%v)", err)
+		}
 	}()
+
+	runner.process = runner.factory(runner, runner.command)
+
+	ps := runner.process
+
+	channel, err := ps.Run()
 
 	if err != nil {
 		//this basically means process couldn't spawn
@@ -126,15 +128,19 @@ loop:
 	for {
 		select {
 		case <-runner.kill:
-			process.Kill()
+			if ps, ok := ps.(process.Signaler); ok {
+				ps.Signal(syscall.SIGTERM)
+			}
 			jobresult.State = core.StateKilled
 			break loop
 		case <-timeout:
-			process.Kill()
+			if ps, ok := ps.(process.Signaler); ok {
+				ps.Signal(syscall.SIGKILL)
+			}
 			jobresult.State = core.StateTimeout
 			break loop
 		case <-handlersTicker.C:
-			d := time.Now().Sub(starttime)
+			d := time.Now().Sub(runner.startTime)
 			for _, hook := range runner.hooks {
 				go hook.Tick(d)
 			}
@@ -163,7 +169,7 @@ loop:
 
 	runner.process = nil
 
-	//consume channel to the end to allow process to cleanup probabry
+	//consume channel to the end to allow process to cleanup properly
 	for _ = range channel {
 		//noop.
 	}
@@ -245,7 +251,7 @@ loop:
 
 }
 
-func (runner *runnerImpl) Kill() {
+func (runner *runnerImpl) Terminate() {
 	runner.kill <- 1
 }
 
@@ -275,6 +281,10 @@ func (runner *runnerImpl) Register(g process.GetPID) error {
 	})
 }
 
-func (runner *runnerImpl) WaitPID(pid int) *syscall.WaitStatus {
+func (runner *runnerImpl) WaitPID(pid int) syscall.WaitStatus {
 	return runner.manager.WaitPID(pid)
+}
+
+func (runner *runnerImpl) StartTime() int64 {
+	return int64(time.Duration(runner.startTime.UnixNano()) / time.Millisecond)
 }

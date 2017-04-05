@@ -21,24 +21,26 @@ type PIDTable interface {
 	//Register atomic registration of PID. MUST grantee that that no wait4 will happen
 	//on any of the child process until the register operation is done.
 	Register(g GetPID) error
-	WaitPID(pid int) *syscall.WaitStatus
+	WaitPID(pid int) syscall.WaitStatus
 }
 
 //ProcessStats holds process cpu and memory usage
 type ProcessStats struct {
-	Cmd   *core.Command `json:"cmd,omitempty"`
-	CPU   float64       `json:"cpu"`
-	RSS   uint64        `json:"rss"`
-	VMS   uint64        `json:"vms"`
-	Swap  uint64        `json:"swap"`
-	Debug string        `json:"debug,ommitempty"`
+	CPU   float64 `json:"cpu"`
+	RSS   uint64  `json:"rss"`
+	VMS   uint64  `json:"vms"`
+	Swap  uint64  `json:"swap"`
+	Debug string  `json:"debug,ommitempty"`
 }
 
 //Process interface
 type Process interface {
 	Command() *core.Command
 	Run() (<-chan *stream.Message, error)
-	Kill()
+}
+
+type Signaler interface {
+	Signal(sig syscall.Signal) error
 }
 
 type Stater interface {

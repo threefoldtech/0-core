@@ -2,9 +2,11 @@ package process
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/stream"
 	"github.com/g8os/core0/base/utils"
+	"syscall"
 )
 
 type extensionProcess struct {
@@ -29,9 +31,9 @@ func NewExtensionProcessFactory(exe string, dir string, args []string, env map[s
 		if stdin, ok := input["stdin"]; ok {
 			switch in := stdin.(type) {
 			case string:
-				sysargs.StdIn = []byte(in)
-			case []byte:
 				sysargs.StdIn = in
+			case []byte:
+				sysargs.StdIn = string(in)
 			default:
 				log.Errorf("invalid stdin to extesion command, expecting string, or bytes")
 			}
@@ -67,8 +69,12 @@ func (process *extensionProcess) Run() (<-chan *stream.Message, error) {
 	return process.system.Run()
 }
 
-func (process *extensionProcess) Kill() {
-	process.system.Kill()
+func (process *extensionProcess) Signal(sig syscall.Signal) error {
+	if ps, ok := process.system.(Signaler); ok {
+		return ps.Signal(sig)
+	}
+
+	return fmt.Errorf("not supported")
 }
 
 func (process *extensionProcess) Stats() *ProcessStats {

@@ -61,7 +61,7 @@ type Domain struct {
 	Name    string     `xml:"name"`
 	UUID    string     `xml:"uuid"`
 	Memory  Memory     `xml:"memory"`
-	VCPU    int        `xml:"vcpu`
+	VCPU    int        `xml:"vcpu"`
 	OS      OS         `xml:"os"`
 	Devices Devices    `xml:"devices"`
 }
@@ -92,6 +92,19 @@ type DiskSourceFile struct {
 
 type DiskSourceBlock struct {
 	Dev string `xml:"dev,attr"`
+}
+
+type DiskSourceNetworkHost struct {
+	Transport string `xml:"transport,attr"`
+	Socket    string `xml:"socket,attr,omitempty"`
+	Port      string `xml:"port,attr,omitempty"`
+	Name      string `xml:"name,attr,omitempty"`
+}
+
+type DiskSourceNetwork struct {
+	Protocol string                `xml:"protocol,attr"`
+	Host     DiskSourceNetworkHost `xml:"host"`
+	Name     string                `xml:"name,attr,omitempty"`
 }
 
 type DiskTarget struct {
@@ -138,8 +151,61 @@ type InterfaceDeviceSourceBridge struct {
 	Bridge string `xml:"bridge,attr"`
 }
 
+type InterfaceDeviceModel struct {
+	Type string `xml:"type,attr"`
+}
+
+type InterfaceDeviceMac struct {
+	Address string `xml:"address,attr"`
+}
+
 type InterfaceDevice struct {
 	XMLName xml.Name              `xml:"interface"`
 	Type    InterfaceDeviceType   `xml:"type,attr"`
 	Source  InterfaceDeviceSource `xml:"source"`
+	Model   InterfaceDeviceModel  `xml:"model"`
+	Mac     *InterfaceDeviceMac   `xml:"mac,omitempty"`
+}
+
+type SerialDeviceType string
+
+const (
+	SerialDeviceTypePTY SerialDeviceType = "pty"
+)
+
+type SerialSource struct {
+	XMLName xml.Name `xml:"source"`
+	Path    string   `xml:"path,attr"`
+}
+
+type SerialTarget struct {
+	XMLName xml.Name `xml:"target"`
+	Port    int      `xml:"port,attr"`
+}
+
+type SerialAlias struct {
+	XMLName xml.Name `xml:"alias"`
+	Name    string   `xml:"name,attr"`
+}
+
+type ConsoleTarget struct {
+	XMLName xml.Name `xml:"target"`
+	Port    int      `xml:"port,attr"`
+	Type    string   `xml:"type,attr"`
+}
+
+type SerialDevice struct {
+	XMLName xml.Name         `xml:"serial"`
+	Type    SerialDeviceType `xml:"type,attr"`
+	Source  SerialSource     `xml:"source"`
+	Target  SerialTarget     `xml:"target"`
+	Alias   SerialAlias      `xml:"alias"`
+}
+type ConsoleDevice struct {
+	XMLName xml.Name         `xml:"console"`
+	Type    SerialDeviceType `xml:"type,attr"`
+	TTY     string           `xml:"tty,attr"`
+	Source  SerialSource     `xml:"source"`
+	Target  ConsoleTarget    `xml:"target"`
+	Alias   SerialAlias      `xml:"alias"`
 }

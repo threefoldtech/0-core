@@ -9,51 +9,18 @@ Systemd replacement for G8OS
 ## Releases:
 - [0.9.0](https://github.com/g8os/core0/tree/0.9.0)
 - [0.10.0](https://github.com/g8os/core0/tree/0.10.0)
-- [0.11.0](https://github.com/g8os/core0/tree/0.11.0) - last release
+- [0.11.0](https://github.com/g8os/core0/tree/0.11.0)
+- [1.0.0](https://github.com/g8os/core0/tree/1.0.0) - last release
 
-## Sample setup
-The following steps will create a docker container that have core0 as the init process. When running,
-u can send commands to core0 using the pyclient
-
-First we need to prepare the base docker image to host core0
-```dockerfile
-FROM ubuntu:16.04
-RUN apt-get update && \
-    apt-get install -y wget && \
-    apt-get install -y fuse && \
-    apt-get install -y iproute2 && \
-    apt-get install -y nftables && \
-    apt-get install -y dnsmasq && \
-    apt-get install -y redis-server
+## Development setup
+To run core0 in a container, just run the following command (this will pull the needed image as well)
 ```
-
-Make sure that you build both core0 and coreX as following
-```bash
-go get github.com/g8os/core0/core
-go get github.com/g8os/core0/corex
+docker run --privileged -d --name core -p 6379:6379 g8os/g8os-dev:1.0
 ```
-
-The do
-```
-cd $GOPATH/src/github.com/g8os/core0
-# then start the docker container
-docker run --privileged -d \
-    --name core0 \
-    -v `pwd`/core0/core0:/usr/sbin/core0 \
-    -v `pwd`/coreX/coreX:/usr/sbin/coreX \
-    -v `pwd`/core0/g8os.dev.toml:/root/core.toml \
-    -v `pwd`/core0/conf:/root/conf \
-    corebase \
-    core0 -c /root/core.toml
-```
-
-> Note: You might ask why we do this instead of copying those files directly to the image
-> the point is, now it's very easy for development, each time u rebuild the binary or change the config
-> u can just do `docker restart core0` without rebuilding the whole image.
 
 To follow the container logs do
 ```bash
-docker logs -f core0
+docker logs -f core
 ```
 
 ## Using the client
@@ -103,6 +70,13 @@ v0.11:
 - include of the monitoring of all processes running on the g8os.
   It produces aggregated statistics on the processes that can be dump into a time series database and displayed used something like grafana.
 
+v1.0.0:
+- New Flist format, the Flist used in the G8OSFS is now a distributed as a rocksdb database.
+- Creation of the [G8OS Hub](https://github.com/g8os/core0/tree/1.0.0), see https://github.com/g8os/hub
+- Improvement of the builtin commands of core0 and coreX
+
+# Documentation
+The full documentation, examples and walkthrough is now located in the [Home repo](https://github.com/g8os/home) of this github account.
 
 # Available Commands
 [Commands Documentation](docs/commands.md)

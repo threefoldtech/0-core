@@ -3,12 +3,6 @@ package pm
 import (
 	"errors"
 	"fmt"
-	"github.com/g8os/core0/base/pm/core"
-	"github.com/g8os/core0/base/pm/process"
-	"github.com/g8os/core0/base/pm/stream"
-	"github.com/g8os/core0/base/settings"
-	"github.com/op/go-logging"
-	psutil "github.com/shirou/gopsutil/process"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -17,6 +11,14 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/g8os/core0/base/pm/core"
+	"github.com/g8os/core0/base/pm/process"
+	"github.com/g8os/core0/base/pm/stream"
+	"github.com/g8os/core0/base/settings"
+	"github.com/g8os/core0/base/utils"
+	"github.com/op/go-logging"
+	psutil "github.com/shirou/gopsutil/process"
 )
 
 const (
@@ -57,7 +59,7 @@ type PM struct {
 	statsFlushHandlers  []StatsHandler
 	queueMgr            *cmdQueueManager
 
-	pids    map[int]chan *syscall.WaitStatus
+	pids    map[int]chan syscall.WaitStatus
 	pidsMux sync.Mutex
 }
 
@@ -73,7 +75,7 @@ func InitProcessManager(maxJobs int) *PM {
 		routeResultHandlers: make(map[core.Route][]ResultHandler),
 		queueMgr:            newCmdQueueManager(),
 
-		pids: make(map[int]chan *syscall.WaitStatus),
+		pids: make(map[int]chan syscall.WaitStatus),
 	}
 
 	log.Infof("Process manager intialization completed")
@@ -213,32 +215,40 @@ func (pm *PM) processCmds() {
 }
 
 func (pm *PM) processWait() {
-	ch := make(chan os.Signal)
-	signal.Notify(ch, syscall.SIGCHLD)
-	for _ = range ch {
-		var status syscall.WaitStatus
-		var rusage syscall.Rusage
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, syscall.SIGCHLD)
+	for range c {
+		//we wait for sigchld
+		for {
+			//once we get a signal, we consume ALL the died children
+			//since signal.Notify will not wait on channel writes
+			//we create a buffer of 2 and on each signal we loop until wait gives an error
+			var status syscall.WaitStatus
+			var rusage syscall.Rusage
 
-		pid, err := syscall.Wait4(-1, &status, syscall.WNOHANG, &rusage)
-		if err != nil {
-			log.Errorf("Wait error: %s", err)
-			continue
+			log.Debug("Waiting for children")
+			pid, err := syscall.Wait4(-1, &status, 0, &rusage)
+			if err != nil {
+				log.Debugf("wait error: %s", err)
+				break
+			}
+
+			//Avoid reading the process state before the Register call is complete.
+			pm.pidsMux.Lock()
+			ch, ok := pm.pids[pid]
+			pm.pidsMux.Unlock()
+
+			if ok {
+				go func(ch chan syscall.WaitStatus, status syscall.WaitStatus) {
+					ch <- status
+					close(ch)
+					pm.pidsMux.Lock()
+					defer pm.pidsMux.Unlock()
+					delete(pm.pids, pid)
+				}(ch, status)
+			}
 		}
 
-		//Avoid reading the process state before the Register call is complete.
-		pm.pidsMux.Lock()
-		ch, ok := pm.pids[pid]
-		pm.pidsMux.Unlock()
-
-		if ok {
-			go func() {
-				ch <- &status
-				close(ch)
-				pm.pidsMux.Lock()
-				defer pm.pidsMux.Unlock()
-				delete(pm.pids, pid)
-			}()
-		}
 	}
 }
 
@@ -250,14 +260,20 @@ func (pm *PM) Register(g process.GetPID) error {
 		return err
 	}
 
-	ch := make(chan *syscall.WaitStatus)
+	ch := make(chan syscall.WaitStatus)
 	pm.pids[pid] = ch
 
 	return nil
 }
 
-func (pm *PM) WaitPID(pid int) *syscall.WaitStatus {
-	return <-pm.pids[pid]
+func (pm *PM) WaitPID(pid int) syscall.WaitStatus {
+	pm.pidsMux.Lock()
+	c, ok := pm.pids[pid]
+	pm.pidsMux.Unlock()
+	if !ok {
+		return syscall.WaitStatus(0)
+	}
+	return <-c
 }
 
 //Run starts the process manager.
@@ -265,6 +281,22 @@ func (pm *PM) Run() {
 	//process and start all commands according to args.
 	go pm.processWait()
 	go pm.processCmds()
+}
+
+func processArgs(args map[string]interface{}, values map[string]interface{}) {
+	for key, value := range args {
+		switch value := value.(type) {
+		case string:
+			args[key] = utils.Format(value, values)
+		case []string:
+			newstrlist := make([]string, len(value))
+			for _, strvalue := range value {
+				newstrlist = append(newstrlist, utils.Format(strvalue, values))
+			}
+			args[key] = newstrlist
+		}
+	}
+
 }
 
 /*
@@ -279,16 +311,20 @@ func (pm *PM) RunSlice(slice settings.StartupSlice) {
 	}
 
 	state := NewStateMachine(all...)
+	cmdline := utils.GetCmdLine()
 
 	for _, startup := range slice {
 		if startup.Args == nil {
 			startup.Args = make(map[string]interface{})
 		}
 
+		processArgs(startup.Args, cmdline)
+
 		cmd := &core.Command{
 			ID:              startup.Key(),
 			Command:         startup.Name,
 			RecurringPeriod: startup.RecurringPeriod,
+			MaxRestart:      startup.MaxRestart,
 			Arguments:       core.MustArguments(startup.Args),
 		}
 
@@ -364,16 +400,18 @@ func (pm *PM) Killall() {
 	defer pm.runnersMux.Unlock()
 
 	for _, v := range pm.runners {
-		v.Kill()
+		v.Terminate()
 	}
 }
 
 //Kill kills a process by the cmd ID
-func (pm *PM) Kill(cmdID string) {
-	v, o := pm.runners[cmdID]
-	if o {
-		v.Kill()
+func (pm *PM) Kill(cmdID string) error {
+	v, ok := pm.runners[cmdID]
+	if !ok {
+		return fmt.Errorf("not found")
 	}
+	v.Terminate()
+	return nil
 }
 
 func (pm *PM) Aggregate(op, key string, value float64, tags string) {

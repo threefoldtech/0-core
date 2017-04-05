@@ -47,22 +47,10 @@ type IncludedSettings struct {
 	Startup   map[string]Startup
 }
 
-//GetPartialSettings loads partial settings according to main configurations
-func (s *AppSettings) GetIncludedSettings() (partial *IncludedSettings, errors []error) {
-	errors = make([]error, 0)
-
-	partial = &IncludedSettings{
-		Extension: make(map[string]Extension),
-		Startup:   make(map[string]Startup),
-	}
-
-	if s.Main.Include == "" {
-		return
-	}
-
-	infos, err := ioutil.ReadDir(s.Main.Include)
+func (s *AppSettings) include(partial *IncludedSettings, include string) (errors []error) {
+	infos, err := ioutil.ReadDir(include)
 	if err != nil {
-		errors = append(errors, fmt.Errorf("failed to read dir %s: %s", s.Main.Include, err))
+		errors = append(errors, err)
 		return
 	}
 
@@ -80,7 +68,7 @@ func (s *AppSettings) GetIncludedSettings() (partial *IncludedSettings, errors [
 		}
 
 		partialCfg := IncludedSettings{}
-		partialPath := path.Join(s.Main.Include, name)
+		partialPath := path.Join(include, name)
 
 		err := utils.LoadTomlFile(partialPath, &partialCfg)
 		if err != nil {
@@ -107,6 +95,21 @@ func (s *AppSettings) GetIncludedSettings() (partial *IncludedSettings, errors [
 			startup.key = key
 			partial.Startup[key] = startup
 		}
+	}
+
+	return
+}
+
+//GetPartialSettings loads partial settings according to main configurations
+func (s *AppSettings) GetIncludedSettings() (partial *IncludedSettings, errors []error) {
+	partial = &IncludedSettings{
+		Extension: make(map[string]Extension),
+		Startup:   make(map[string]Startup),
+	}
+
+	for _, include := range s.Main.Include {
+		errs := s.include(partial, include)
+		errors = append(errors, errs...)
 	}
 
 	return

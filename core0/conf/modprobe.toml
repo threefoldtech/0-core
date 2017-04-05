@@ -4,7 +4,7 @@ after = ["init"]
 running_delay = -1
 
 [startup.modprobe.args]
-stdin = """
+script = """
 
 # load all required hardware modules here
 echo 'Loading kernel modules'

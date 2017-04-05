@@ -65,7 +65,6 @@ func (l *redisLogger) LogRecord(record *LogRecord) {
 func (l *redisLogger) pusher() {
 	for {
 		if err := l.push(); err != nil {
-			log.Errorf("redis log pusher error: %s", err)
 			//we don't sleep to avoid blocking the logging channel and to not slow down processes.
 		}
 	}
@@ -77,11 +76,9 @@ func (l *redisLogger) push() error {
 
 	for {
 		record := <-l.ch
-		log.Debugf("received log message: %v", record)
 
 		bytes, err := json.Marshal(record)
 		if err != nil {
-			log.Errorf("Failed to serialize message for redis logger: %s", err)
 			continue
 		}
 

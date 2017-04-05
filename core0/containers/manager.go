@@ -68,11 +68,13 @@ type Network struct {
 }
 
 type ContainerCreateArguments struct {
-	Root     string            `json:"root"`     //Root plist
-	Mount    map[string]string `json:"mount"`    //data disk mounts.
-	Network  Network           `json:"network"`  // network setup
-	Port     map[int]int       `json:"port"`     //port forwards
-	Hostname string            `json:"hostname"` //hostname
+	Root        string            `json:"root"`         //Root plist
+	Mount       map[string]string `json:"mount"`        //data disk mounts.
+	HostNetwork bool              `json:"host_network"` //share host networking stack
+	Network     Network           `json:"network"`      //network setup (only respected if HostNetwork is false)
+	Port        map[int]int       `json:"port"`         //port forwards
+	Hostname    string            `json:"hostname"`     //hostname
+	Storage     string            `json:"storage"`      //ardb storage needed for g8ufs mounts.
 }
 
 type ContainerDispatchArguments struct {
@@ -276,8 +278,13 @@ func (m *containerManager) create(cmd *core.Command) (interface{}, error) {
 	return id, nil
 }
 
+type ContainerInfo struct {
+	process.ProcessStats
+	Root string `json:"root"`
+}
+
 func (m *containerManager) list(cmd *core.Command) (interface{}, error) {
-	containers := make(map[uint64]*process.ProcessStats)
+	containers := make(map[uint64]ContainerInfo)
 
 	for name, runner := range pm.GetManager().Runners() {
 		var id uint64
@@ -285,15 +292,17 @@ func (m *containerManager) list(cmd *core.Command) (interface{}, error) {
 			continue
 		}
 		ps := runner.Process()
-		var state *process.ProcessStats
+		var state process.ProcessStats
 		if ps != nil {
 			if stater, ok := ps.(process.Stater); ok {
-				state = stater.Stats()
-				state.Cmd = nil
+				state = *(stater.Stats())
 			}
 		}
 
-		containers[id] = state
+		containers[id] = ContainerInfo{
+			ProcessStats: state,
+			Root:         path.Join(ContainerBaseRootDir, fmt.Sprintf("container-%d", id)),
+		}
 	}
 
 	return containers, nil

@@ -1,16 +1,11 @@
 {
 	"ImportPath": "github.com/g8os/core0",
-	"GoVersion": "go1.7",
-	"GodepVersion": "v75",
+	"GoVersion": "go1.8",
+	"GodepVersion": "v79",
 	"Packages": [
 		"./..."
 	],
 	"Deps": [
-		{
-			"ImportPath": "github.com/BurntSushi/toml",
-			"Comment": "v0.2.0-9-gf0aeabc",
-			"Rev": "f0aeabca5a127c4078abb8c8d64298b147264b55"
-		},
 		{
 			"ImportPath": "github.com/StackExchange/wmi",
 			"Rev": "f3e2bae1e0cb5aef83e319133eabfee30013a4a5"
@@ -24,40 +19,6 @@
 			"ImportPath": "github.com/davecgh/go-spew/spew",
 			"Comment": "v1.0.0-9-g346938d",
 			"Rev": "346938d642f2ec3594ed81d874461961cd0faa76"
-		},
-		{
-			"ImportPath": "github.com/dsnet/compress/brotli",
-			"Rev": "b9aab3c6a04eef14c56384b4ad065e7b73438862"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/config",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/crypto",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/files",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/meta",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/storage",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/utils",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
 		},
 		{
 			"ImportPath": "github.com/garyburd/redigo/internal",
@@ -78,27 +39,6 @@
 			"Rev": "97ac8b05c02bbb755d36549e7e607433dfbef4b2"
 		},
 		{
-			"ImportPath": "github.com/hanwen/go-fuse/fuse",
-			"Rev": "ed841342e5daf4711f24106b93c1035864a8914b"
-		},
-		{
-			"ImportPath": "github.com/hanwen/go-fuse/fuse/nodefs",
-			"Rev": "ed841342e5daf4711f24106b93c1035864a8914b"
-		},
-		{
-			"ImportPath": "github.com/hanwen/go-fuse/fuse/pathfs",
-			"Rev": "ed841342e5daf4711f24106b93c1035864a8914b"
-		},
-		{
-			"ImportPath": "github.com/hanwen/go-fuse/splice",
-			"Rev": "ed841342e5daf4711f24106b93c1035864a8914b"
-		},
-		{
-			"ImportPath": "github.com/mattn/go-sqlite3",
-			"Comment": "v1.1.0-11-gb808f01",
-			"Rev": "b808f01f660667b1510acf216aa2b9fe7f555ddb"
-		},
-		{
 			"ImportPath": "github.com/naoina/go-stringutil",
 			"Rev": "6b638e95a32d0c1131db0e7fe83775cbea4a0d0b"
 		},
@@ -116,6 +56,10 @@
 			"ImportPath": "github.com/op/go-logging",
 			"Comment": "v1-7-g970db52",
 			"Rev": "970db520ece77730c7e4724c61121037378659d9"
+		},
+		{
+			"ImportPath": "github.com/patrickmn/go-cache",
+			"Rev": "1881a9bccb818787f68c52bfba648c6cf34c34fa"
 		},
 		{
 			"ImportPath": "github.com/pborman/uuid",
@@ -180,70 +124,6 @@
 		{
 			"ImportPath": "golang.org/x/sys/unix",
 			"Rev": "833a04a10549a95dc34458c195cbad61bbb6cb4d"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/naoina/toml",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/op/go-logging",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/naoina/go-stringutil",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/naoina/toml/ast",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/dsnet/compress/brotli",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/hanwen/go-fuse/fuse",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/hanwen/go-fuse/fuse/nodefs",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/hanwen/go-fuse/fuse/pathfs",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/BurntSushi/toml",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/g8os/fs/vendor/github.com/hanwen/go-fuse/splice",
-			"Comment": "readonly-105-ge4bb51c",
-			"Rev": "e4bb51c2d3053bf59ebfe020a1f51451691a4260"
-		},
-		{
-			"ImportPath": "github.com/stretchr/testify/vendor/github.com/davecgh/go-spew/spew",
-			"Comment": "v1.1.4-4-g976c720",
-			"Rev": "976c720a22c8eb4eb6a0b4348ad85ad12491a506"
-		},
-		{
-			"ImportPath": "github.com/stretchr/testify/vendor/github.com/pmezard/go-difflib/difflib",
-			"Comment": "v1.1.4-4-g976c720",
-			"Rev": "976c720a22c8eb4eb6a0b4348ad85ad12491a506"
-		},
-		{
-			"ImportPath": "golang.org/x/net/context",
-			"Rev": "6cdc0daab091c43fc46193327e0047b4f883c613"
 		}
 	]
 }

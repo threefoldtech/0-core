@@ -2,8 +2,11 @@ package process
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/stream"
+	"runtime/debug"
+	"syscall"
 )
 
 /*
@@ -48,7 +51,21 @@ func (process *internalProcess) Run() (<-chan *stream.Message, error) {
 	channel := make(chan *stream.Message)
 
 	go func(channel chan *stream.Message) {
-		defer close(channel)
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic: %v", err)
+				debug.PrintStack()
+				m, _ := json.Marshal(fmt.Sprintf("%v", err))
+				channel <- &stream.Message{
+					Level:   stream.LevelResultJSON,
+					Message: string(m),
+				}
+				channel <- stream.MessageExitError
+			}
+
+			close(channel)
+		}()
+
 		value, err := process.runnable(process.cmd)
 		msg := stream.Message{
 			Level: stream.LevelResultJSON,
@@ -77,6 +94,11 @@ func (process *internalProcess) Run() (<-chan *stream.Message, error) {
 /*
 Kill kills internal process (not implemented)
 */
-func (process *internalProcess) Kill() {
+func (process *internalProcess) Kill() error {
 	//you can't kill an internal process.
+	return nil
+}
+
+func (process *internalProcess) Signal(sig syscall.Signal) error {
+	return nil
 }

@@ -15,6 +15,8 @@ import (
 
 	_ "github.com/g8os/core0/base/builtin"
 	_ "github.com/g8os/core0/coreX/builtin"
+	"os/signal"
+	"syscall"
 )
 
 var (
@@ -24,9 +26,27 @@ var (
 func init() {
 	formatter := logging.MustStringFormatter("%{color}%{module} %{level:.1s} > %{message} %{color:reset}")
 	logging.SetFormatter(formatter)
+	logging.SetLevel(logging.INFO, "")
+}
+
+func handleSignal(bs *bootstrap.Bootstrap) {
+	ch := make(chan os.Signal)
+	signal.Notify(ch, syscall.SIGTERM)
+	go func(ch <-chan os.Signal, bs *bootstrap.Bootstrap) {
+		<-ch
+		log.Infof("Received SIGTERM, terminating.")
+		bs.UnBootstrap()
+		os.Exit(0)
+	}(ch, bs)
 }
 
 func main() {
+	var opt = options.Options
+	fmt.Println(core.Version())
+	if opt.Version() {
+		os.Exit(0)
+	}
+
 	if errors := options.Options.Validate(); len(errors) != 0 {
 		for _, err := range errors {
 			log.Errorf("Validation Error: %s\n", err)
@@ -35,7 +55,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	var opt = options.Options
+	//redis logger for commands
+	rl := logger.NewRedisLogger(uint16(opt.CoreID()), opt.RedisSocket(), "", nil, 100000)
+
+	//set backend so coreX logs itself also get pushed to redis
+	logging.SetBackend(
+		&logBackend{
+			logger: rl,
+			cmd: pmcore.Command{
+				ID: "core-x",
+			},
+		},
+	)
 
 	pm.InitProcessManager(opt.MaxJobs())
 
@@ -45,21 +76,16 @@ func main() {
 
 	//handle process results. Forwards the result to the correct controller.
 	mgr.AddResultHandler(func(cmd *pmcore.Command, result *pmcore.JobResult) {
+		result.Container = opt.CoreID()
 		log.Infof("Job result for command '%s' is '%s'", cmd, result.State)
 	})
 
 	mgr.Run()
 
-	//start local transport
-	log.Infof("Starting local transport")
-	local, err := core.NewLocal("/var/run/core.sock")
-	if err != nil {
-		log.Errorf("Failed to start local transport: %s", err)
-	} else {
-		go local.Serve()
-	}
-
 	bs := bootstrap.NewBootstrap()
+
+	handleSignal(bs)
+
 	if err := bs.Bootstrap(opt.Hostname()); err != nil {
 		log.Fatalf("Failed to bootstrap corex: %s", err)
 	}
@@ -81,7 +107,7 @@ func main() {
 	}
 
 	log.Infof("Configure redis logger")
-	rl := logger.NewRedisLogger(uint16(opt.CoreID()), opt.RedisSocket(), "", nil, 100000)
+
 	mgr.AddMessageHandler(rl.Log)
 
 	//forward stats messages to core0

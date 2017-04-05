@@ -2,12 +2,12 @@ package containers
 
 import (
 	"fmt"
-	"github.com/g8os/core0/base/logger"
 	"github.com/g8os/core0/base/pm"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/process"
 	"github.com/pborman/uuid"
 	"github.com/vishvananda/netlink"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -40,32 +40,35 @@ func (c *container) Start() error {
 
 	if err := c.mount(); err != nil {
 		c.cleanup()
+		log.Errorf("error in container mount: %s", err)
 		return err
 	}
 
 	if err := c.preStart(); err != nil {
 		c.cleanup()
+		log.Errorf("error in container prestart: %s", err)
 		return err
 	}
-	//
+
 	mgr := pm.GetManager()
 	extCmd := &core.Command{
-		ID:        coreID,
-		Route:     c.route,
-		LogLevels: logger.Disabled,
+		ID:    coreID,
+		Route: c.route,
 		Arguments: core.MustArguments(
 			process.ContainerCommandArguments{
-				Name:   "/coreX",
-				Chroot: c.root(),
-				Dir:    "/",
+				Name:        "/coreX",
+				Chroot:      c.root(),
+				Dir:         "/",
+				HostNetwork: c.args.HostNetwork,
 				Args: []string{
 					"-core-id", fmt.Sprintf("%d", c.id),
 					"-redis-socket", "/redis.socket",
 					"-reply-to", coreXResponseQueue,
-                    "-hostname", c.args.Hostname,
+					"-hostname", c.args.Hostname,
 				},
 				Env: map[string]string{
 					"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+					"HOME": "/",
 				},
 			},
 		),
@@ -81,10 +84,20 @@ func (c *container) Start() error {
 
 	_, err := mgr.NewRunner(extCmd, process.NewContainerProcess, onpid, onexit)
 	if err != nil {
+		c.cleanup()
+		log.Errorf("error in container runner: %s", err)
 		return err
 	}
 
 	return nil
+}
+
+func (c *container) preStartHostNetworking() error {
+	os.MkdirAll(path.Join(c.root(), "etc"), 0755)
+	p := path.Join(c.root(), "etc", "resolv.conf")
+	os.Remove(p)
+	ioutil.WriteFile(p, []byte{}, 0644) //touch the file.
+	return syscall.Mount("/etc/resolv.conf", p, "", syscall.MS_BIND, "")
 }
 
 func (c *container) preStart() error {
@@ -119,6 +132,10 @@ func (c *container) preStart() error {
 		return err
 	}
 
+	if c.args.HostNetwork {
+		return c.preStartHostNetworking()
+	}
+
 	return nil
 }
 
@@ -131,53 +148,38 @@ func (c *container) onpid(pid int) {
 }
 
 func (c *container) onexit(state bool) {
-	log.Debugf("Container %s exited with state %v", c.id, state)
+	log.Debugf("Container %v exited with state %v", c.id, state)
 	c.cleanup()
 }
 
 func (c *container) cleanup() {
-	root := c.root()
+	log.Debugf("cleaning up container-%d", c.id)
 
-	//TODO: remove port forwards
-
-	c.unPortForward()
-	//remove bridge links
-	for _, bridge := range c.args.Network.Bridge {
-		c.unbridge(bridge)
-	}
-
-	pm.GetManager().Kill(fmt.Sprintf("net-%v", c.id))
-
-	if c.pid > 0 {
-		targetNs := fmt.Sprintf("/run/netns/%v", c.id)
-
-		if err := syscall.Unmount(targetNs, 0); err != nil {
-			log.Errorf("Failed to unmount %s: %s", targetNs, err)
+	if !c.args.HostNetwork {
+		c.unPortForward()
+		//remove bridge links
+		for _, bridge := range c.args.Network.Bridge {
+			c.unbridge(bridge)
 		}
-		os.RemoveAll(targetNs)
-	}
 
-	for _, guest := range c.args.Mount {
-		target := path.Join(root, guest)
-		if err := syscall.Unmount(target, syscall.MNT_DETACH); err != nil {
-			log.Errorf("Failed to unmount %s: %s", target, err)
+		pm.GetManager().Kill(fmt.Sprintf("net-%v", c.id))
+
+		if c.pid > 0 {
+			targetNs := fmt.Sprintf("/run/netns/%v", c.id)
+
+			if err := syscall.Unmount(targetNs, 0); err != nil {
+				log.Errorf("Failed to unmount %s: %s", targetNs, err)
+			}
+			os.RemoveAll(targetNs)
 		}
 	}
 
-	redisSocketTarget := path.Join(root, "redis.socket")
-	coreXTarget := path.Join(root, coreXBinaryName)
-
-	if err := syscall.Unmount(redisSocketTarget, syscall.MNT_DETACH); err != nil {
-		log.Errorf("Failed to unmount %s: %s", redisSocketTarget, err)
+	if err := c.unMountAll(); err != nil {
+		log.Errorf("unmounting container-%d was not clean", err)
 	}
 
-	if err := syscall.Unmount(coreXTarget, syscall.MNT_DETACH); err != nil {
-		log.Errorf("Failed to unmount %s: %s", coreXTarget, err)
-	}
-
-	if err := syscall.Unmount(root, syscall.MNT_DETACH); err != nil {
-		log.Errorf("Failed to unmount %s: %s", root, err)
-	}
+	os.RemoveAll(path.Join(BackendBaseDir, c.name()))
+	os.RemoveAll(c.root())
 }
 
 func (c *container) namespace() error {
@@ -302,23 +304,15 @@ func (c *container) bridge(index int, bridge ContainerBridgeSettings) error {
 		//start a dhcpc inside the container.
 		dhcpc := &core.Command{
 			ID:      uuid.New(),
-			Command: cmdContainerDispatch,
+			Command: process.CommandSystem,
 			Arguments: core.MustArguments(
-				ContainerDispatchArguments{
-					Container: c.id,
-					Command: core.Command{
-						ID:      "dhcpc",
-						Command: process.CommandSystem,
-						Arguments: core.MustArguments(
-							process.SystemCommandArguments{
-								Name: "udhcpc",
-								Args: []string{
-									"-f",
-									"-i", dev,
-									"-s", "/usr/share/udhcp/simple.script",
-								},
-							},
-						),
+				process.SystemCommandArguments{
+					Name: "ip",
+					Args: []string{
+						"netns",
+						"exec",
+						fmt.Sprintf("%v", c.id),
+						"udhcpc", "-q", "-i", dev, "-s", "/usr/share/udhcp/simple.script",
 					},
 				},
 			),
@@ -338,7 +332,11 @@ func (c *container) bridge(index int, bridge ContainerBridgeSettings) error {
 				Arguments: core.MustArguments(
 					process.SystemCommandArguments{
 						Name: "ip",
-						Args: []string{"netns", "exec", fmt.Sprintf("%v", c.id), "ip", "link", "set", "dev", dev, "up"},
+						Args: []string{
+							"netns",
+							"exec",
+							fmt.Sprintf("%v", c.id),
+							"ip", "link", "set", "dev", dev, "up"},
 					},
 				),
 			}
@@ -448,6 +446,7 @@ func (c *container) setPortForwards() error {
 						fmt.Sprintf("tcp-listen:%d,reuseaddr,fork", host),
 						fmt.Sprintf("tcp-connect:%s:%d", ip, container),
 					},
+					NoOutput: true,
 				},
 			),
 		}
@@ -463,7 +462,9 @@ func (c *container) setPortForwards() error {
 
 	return nil
 }
-func (c *container) postStart() error {
+
+func (c *container) postStartIsolatedNetworking() error {
+	//only setup networking if host-network is false
 	if err := c.namespace(); err != nil {
 		return err
 	}
@@ -507,4 +508,12 @@ func (c *container) postStart() error {
 	}
 
 	return nil
+}
+
+func (c *container) postStart() error {
+	if c.args.HostNetwork {
+		return nil
+	}
+
+	return c.postStartIsolatedNetworking()
 }

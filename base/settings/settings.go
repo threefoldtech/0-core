@@ -80,7 +80,7 @@ func (g Globals) Get(key string, def ...string) string {
 type AppSettings struct {
 	Main struct {
 		MaxJobs  int
-		Include  string
+		Include  []string
 		Network  string
 		LogLevel string
 	}
@@ -94,6 +94,7 @@ type AppSettings struct {
 	Logging map[string]Logger
 
 	Stats struct {
+		//Interval is deprecated
 		Interval int
 		Redis    struct {
 			Enabled       bool

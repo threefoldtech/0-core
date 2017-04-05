@@ -13,8 +13,9 @@ import (
 	"fmt"
 	_ "github.com/g8os/core0/base/builtin"
 	_ "github.com/g8os/core0/core0/builtin"
+	_ "github.com/g8os/core0/core0/builtin/btrfs"
 	"github.com/g8os/core0/core0/containers"
-	_ "github.com/g8os/core0/core0/kvm"
+	"github.com/g8os/core0/core0/kvm"
 	"github.com/g8os/core0/core0/options"
 	"github.com/g8os/core0/core0/stats"
 	"os"
@@ -24,7 +25,7 @@ var (
 	log = logging.MustGetLogger("main")
 )
 
-func init() {
+func setupLogging() {
 	l, err := os.Create("/var/log/core.log")
 	if err != nil {
 		panic(err)
@@ -42,6 +43,12 @@ func init() {
 
 func main() {
 	var options = options.Options
+	fmt.Println(core.Version())
+	if options.Version() {
+		os.Exit(0)
+	}
+
+	setupLogging()
 
 	if err := settings.LoadSettings(options.Config()); err != nil {
 		log.Fatal(err)
@@ -126,6 +133,10 @@ func main() {
 	//start/register containers commands and process
 	if err := containers.ContainerSubsystem(sinks); err != nil {
 		log.Errorf("failed to intialize container subsystem", err)
+	}
+
+	if err := kvm.KVMSubsystem(); err != nil {
+		log.Errorf("failed to initialize kvm subsystem", err)
 	}
 
 	//start jobs sinks.

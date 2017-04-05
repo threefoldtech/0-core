@@ -5,6 +5,7 @@ import (
 	"github.com/g8os/core0/base/pm"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/process"
+	"syscall"
 )
 
 const (
@@ -16,7 +17,8 @@ func init() {
 }
 
 type killData struct {
-	ID string `json:"id"`
+	ID     string         `json:"id"`
+	Signal syscall.Signal `json:"signal"`
 }
 
 func kill(cmd *core.Command) (interface{}, error) {
@@ -28,6 +30,25 @@ func kill(cmd *core.Command) (interface{}, error) {
 		return nil, err
 	}
 
-	pm.GetManager().Kill(data.ID)
+	if data.Signal == syscall.Signal(0) {
+		data.Signal = syscall.SIGTERM
+	}
+
+	runner, ok := pm.GetManager().Runners()[data.ID]
+	if !ok {
+		return false, nil
+	}
+
+	if ps, ok := runner.Process().(process.Signaler); ok {
+		if err := ps.Signal(data.Signal); err != nil {
+			return false, err
+		}
+	}
+
+	if data.Signal == syscall.SIGTERM || data.Signal == syscall.SIGKILL {
+		runner.Terminate()
+	}
+
 	return true, nil
+
 }
