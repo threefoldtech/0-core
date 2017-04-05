@@ -9,7 +9,8 @@ Systemd replacement for G8OS
 ## Releases:
 - [0.9.0](https://github.com/g8os/core0/tree/0.9.0)
 - [0.10.0](https://github.com/g8os/core0/tree/0.10.0)
-- [0.11.0](https://github.com/g8os/core0/tree/0.11.0) - last release
+- [0.11.0](https://github.com/g8os/core0/tree/0.11.0)
+- [1.0.0](https://github.com/g8os/core0/tree/1.0.0) - last release
 
 ## Development setup
 To run core0 in a container, just run the following command (this will pull the needed image as well)
@@ -69,6 +70,13 @@ v0.11:
 - include of the monitoring of all processes running on the g8os.
   It produces aggregated statistics on the processes that can be dump into a time series database and displayed used something like grafana.
 
+v1.0.0:
+- New Flist format, the Flist used in the G8OSFS is now a distributed as a rocksdb database.
+- Creation of the [G8OS Hub](https://github.com/g8os/core0/tree/1.0.0), see https://github.com/g8os/hub
+- Improvement of the builtin commands of core0 and coreX
+
+# Documentation
+The full documentation, examples and walkthrough is now located in the [Home repo](https://github.com/g8os/home) of this github account.
 
 # Available Commands
 [Commands Documentation](docs/commands.md)
