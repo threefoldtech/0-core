@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"sort"
 	"strings"
@@ -203,7 +204,7 @@ func (c *container) mountPList(src string, target string) error {
 		return err
 	}
 
-	storageUrl := c.args.Storage
+	storageUrl := c.Arguments.Storage
 	if storageUrl == "" {
 		storageUrl = settings.Settings.Globals.Get("fuse_storage", "ardb://home.maxux.net:26379")
 	}
@@ -255,7 +256,7 @@ func (c *container) root() string {
 	return path.Join(ContainerBaseRootDir, c.name())
 }
 
-func (c *container) mount() error {
+func (c *container) sandbox() error {
 	//mount root plist.
 	//prepare root folder.
 
@@ -266,11 +267,11 @@ func (c *container) mount() error {
 	log.Debugf("Container root: %s", root)
 	os.RemoveAll(root)
 
-	if err := c.mountPList(c.args.Root, root); err != nil {
+	if err := c.mountPList(c.Arguments.Root, root); err != nil {
 		return fmt.Errorf("mount-root-plist(%s)", err)
 	}
 
-	for src, dst := range c.args.Mount {
+	for src, dst := range c.Arguments.Mount {
 		target := path.Join(root, dst)
 		if err := os.MkdirAll(target, 0755); err != nil {
 			return fmt.Errorf("mkdirAll(%s)", err)
@@ -291,6 +292,34 @@ func (c *container) mount() error {
 				return fmt.Errorf("mount-bind-plist(%s)", err)
 			}
 		}
+	}
+
+	redisSocketTarget := path.Join(root, "redis.socket")
+	coreXTarget := path.Join(root, coreXBinaryName)
+
+	if f, err := os.Create(redisSocketTarget); err == nil {
+		f.Close()
+	} else {
+		log.Errorf("Failed to touch file '%s': %s", redisSocketTarget, err)
+	}
+
+	if f, err := os.Create(coreXTarget); err == nil {
+		f.Close()
+	} else {
+		log.Errorf("Failed to touch file '%s': %s", coreXTarget, err)
+	}
+
+	if err := syscall.Mount(redisSocketSrc, redisSocketTarget, "", syscall.MS_BIND, ""); err != nil {
+		return err
+	}
+
+	coreXSrc, err := exec.LookPath(coreXBinaryName)
+	if err != nil {
+		return err
+	}
+
+	if err := syscall.Mount(coreXSrc, coreXTarget, "", syscall.MS_BIND, ""); err != nil {
+		return err
 	}
 
 	return nil

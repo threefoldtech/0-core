@@ -19,7 +19,6 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/op/go-logging"
 	"github.com/pborman/uuid"
-	"github.com/vishvananda/netlink"
 )
 
 const (
@@ -27,6 +26,7 @@ const (
 	cmdContainerList      = "corex.list"
 	cmdContainerDispatch  = "corex.dispatch"
 	cmdContainerTerminate = "corex.terminate"
+	cmdContainerFind      = "corex.find"
 
 	coreXResponseQueue = "corex:results"
 	coreXBinaryName    = "coreX"
@@ -35,7 +35,7 @@ const (
 	zeroTierCommand    = "_zerotier_"
 	zeroTierScriptPath = "/tmp/zerotier.sh"
 
-	DefaultBridgeName = "core-0"
+	DefaultBridgeName = "core0"
 )
 
 var (
@@ -48,33 +48,29 @@ var (
 	log = logging.MustGetLogger("containers")
 )
 
-type ContainerBridgeSettings [2]string
-
-func (s ContainerBridgeSettings) Name() string {
-	return s[0]
+type NetworkConfig struct {
+	Dhcp    bool     `json:"dhcp"`
+	CIDR    string   `json:"cidr"`
+	Gateway string   `json:"gateway"`
+	DNS     []string `json:"dns"`
 }
 
-func (s ContainerBridgeSettings) Setup() string {
-	return s[1]
-}
-
-func (s ContainerBridgeSettings) String() string {
-	return fmt.Sprintf("%v:%v", s[0], s[1])
-}
-
-type Network struct {
-	ZeroTier string                    `json:"zerotier,omitempty"`
-	Bridge   []ContainerBridgeSettings `json:"bridge,omitempty"`
+type Nic struct {
+	Type      string        `json:"type"`
+	ID        string        `json:"id"`
+	HWAddress string        `json:"hwaddr"`
+	Config    NetworkConfig `json:"config"`
 }
 
 type ContainerCreateArguments struct {
 	Root        string            `json:"root"`         //Root plist
 	Mount       map[string]string `json:"mount"`        //data disk mounts.
 	HostNetwork bool              `json:"host_network"` //share host networking stack
-	Network     Network           `json:"network"`      //network setup (only respected if HostNetwork is false)
-	Port        map[int]int       `json:"port"`         //port forwards
+	Nics        []Nic             `json:"nics"`         //network setup (only respected if HostNetwork is false)
+	Port        map[int]int       `json:"port"`         //port forwards (only if default networking is enabled)
 	Hostname    string            `json:"hostname"`     //hostname
 	Storage     string            `json:"storage"`      //ardb storage needed for g8ufs mounts.
+	Tags        []string          `json:"tags"`         //for searching containers
 }
 
 type ContainerDispatchArguments struct {
@@ -82,7 +78,7 @@ type ContainerDispatchArguments struct {
 	Command   core.Command `json:"command"`
 }
 
-func (c *ContainerCreateArguments) Valid() error {
+func (c *ContainerCreateArguments) Validate() error {
 	if c.Root == "" {
 		return fmt.Errorf("root plist is required")
 	}
@@ -117,15 +113,24 @@ func (c *ContainerCreateArguments) Valid() error {
 		}
 	}
 
-	for _, bridge := range c.Network.Bridge {
-		link, err := netlink.LinkByName(bridge.Name())
-		if err != nil {
-			return err
+	//validating networking
+	var def int
+	var zt int
+	for _, net := range c.Nics {
+		switch net.Type {
+		case "default":
+			def++
+		case "zt":
+			zt++
 		}
+	}
 
-		if link.Type() != "bridge" {
-			return fmt.Errorf("bridge '%s' doesn't exist", c.Network.Bridge)
-		}
+	if def > 1 {
+		return fmt.Errorf("only one default network is allowed")
+	}
+
+	if zt > 1 {
+		return fmt.Errorf("only one zerotier network is allowed")
 	}
 
 	return nil
@@ -133,12 +138,15 @@ func (c *ContainerCreateArguments) Valid() error {
 
 type containerManager struct {
 	sequence uint16
-	mutex    sync.Mutex
+	seqM     sync.Mutex
 
-	pool   *redis.Pool
-	ensure sync.Once
+	containers map[uint16]*container
+	conM       sync.RWMutex
 
-	sinks map[string]base.SinkClient
+	pool *redis.Pool
+
+	internal *internalRouter
+	sinks    map[string]base.SinkClient
 }
 
 /*
@@ -152,8 +160,10 @@ TODO:
 
 func ContainerSubsystem(sinks map[string]base.SinkClient) error {
 	containerMgr := &containerManager{
-		pool:  utils.NewRedisPool("unix", redisSocketSrc, ""),
-		sinks: sinks,
+		pool:       utils.NewRedisPool("unix", redisSocketSrc, ""),
+		containers: make(map[uint16]*container),
+		sinks:      sinks,
+		internal:   newInternalRouter(),
 	}
 
 	script, err := assets.Asset("scripts/network.sh")
@@ -175,6 +185,7 @@ func ContainerSubsystem(sinks map[string]base.SinkClient) error {
 	pm.CmdMap[cmdContainerList] = process.NewInternalProcessFactory(containerMgr.list)
 	pm.CmdMap[cmdContainerDispatch] = process.NewInternalProcessFactory(containerMgr.dispatch)
 	pm.CmdMap[cmdContainerTerminate] = process.NewInternalProcessFactory(containerMgr.terminate)
+	pm.CmdMap[cmdContainerFind] = process.NewInternalProcessFactory(containerMgr.find)
 
 	if err := containerMgr.setUpDefaultBridge(); err != nil {
 		return err
@@ -231,7 +242,9 @@ func (m *containerManager) forwardNext() error {
 	}
 
 	//use command tags for routing.
-	if sink, ok := m.sinks[result.Tags]; ok {
+	if result.Tags == string(InternalRoute) {
+		m.internal.Route(&result)
+	} else if sink, ok := m.sinks[result.Tags]; ok {
 		log.Debugf("Forwarding job result to %s", result.Tags)
 		return sink.Respond(&result)
 	} else {
@@ -252,8 +265,8 @@ func (m *containerManager) startForwarder() {
 }
 
 func (m *containerManager) getNextSequence() uint16 {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.seqM.Lock()
+	defer m.seqM.Unlock()
 	m.sequence += 1
 	return m.sequence
 }
@@ -264,12 +277,16 @@ func (m *containerManager) create(cmd *core.Command) (interface{}, error) {
 		return nil, err
 	}
 
-	if err := args.Valid(); err != nil {
+	if err := args.Validate(); err != nil {
 		return nil, err
 	}
 
 	id := m.getNextSequence()
-	c := newContainer(id, cmd.Route, &args)
+	c := newContainer(m, id, cmd.Route, args)
+
+	m.conM.Lock()
+	m.containers[id] = c
+	m.conM.Unlock()
 
 	if err := c.Start(); err != nil {
 		return nil, err
@@ -278,17 +295,27 @@ func (m *containerManager) create(cmd *core.Command) (interface{}, error) {
 	return id, nil
 }
 
+//cleanup is called when a container terminates.
+func (m *containerManager) cleanup(id uint16) {
+	m.conM.Lock()
+	defer m.conM.Unlock()
+	delete(m.containers, id)
+}
+
 type ContainerInfo struct {
 	process.ProcessStats
-	Root string `json:"root"`
+	Container *container `json:"container"`
 }
 
 func (m *containerManager) list(cmd *core.Command) (interface{}, error) {
-	containers := make(map[uint64]ContainerInfo)
+	containers := make(map[uint16]ContainerInfo)
 
-	for name, runner := range pm.GetManager().Runners() {
-		var id uint64
-		if n, err := fmt.Sscanf(name, "core-%d", &id); err != nil || n != 1 {
+	m.conM.RLock()
+	defer m.conM.RUnlock()
+	for id, c := range m.containers {
+		name := fmt.Sprintf("core-%d", id)
+		runner, ok := pm.GetManager().Runners()[name]
+		if !ok {
 			continue
 		}
 		ps := runner.Process()
@@ -298,10 +325,9 @@ func (m *containerManager) list(cmd *core.Command) (interface{}, error) {
 				state = *(stater.Stats())
 			}
 		}
-
 		containers[id] = ContainerInfo{
 			ProcessStats: state,
-			Root:         path.Join(ContainerBaseRootDir, fmt.Sprintf("container-%d", id)),
+			Container:    c,
 		}
 	}
 
@@ -310,6 +336,20 @@ func (m *containerManager) list(cmd *core.Command) (interface{}, error) {
 
 func (m *containerManager) getCoreXQueue(id uint16) string {
 	return fmt.Sprintf("core:%v", id)
+}
+
+func (m *containerManager) pushToContainer(container uint16, cmd *core.Command) error {
+	db := m.pool.Get()
+	defer db.Close()
+
+	data, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Do("RPUSH", m.getCoreXQueue(container), string(data))
+
+	return err
 }
 
 func (m *containerManager) dispatch(cmd *core.Command) (interface{}, error) {
@@ -322,7 +362,11 @@ func (m *containerManager) dispatch(cmd *core.Command) (interface{}, error) {
 		return nil, fmt.Errorf("invalid container id")
 	}
 
-	if _, ok := pm.GetManager().Runners()[fmt.Sprintf("core-%d", args.Container)]; !ok {
+	m.conM.RLock()
+	_, ok := m.containers[args.Container]
+	m.conM.RUnlock()
+
+	if !ok {
 		return nil, fmt.Errorf("container does not exist")
 	}
 
@@ -330,21 +374,32 @@ func (m *containerManager) dispatch(cmd *core.Command) (interface{}, error) {
 	args.Command.ID = id
 	args.Command.Tags = string(cmd.Route)
 
-	db := m.pool.Get()
-	defer db.Close()
-
-	data, err := json.Marshal(args.Command)
-	if err != nil {
+	if err := m.pushToContainer(args.Container, &args.Command); err != nil {
 		return nil, err
 	}
 
-	_, err = db.Do("RPUSH", m.getCoreXQueue(args.Container), string(data))
+	return id, nil
+}
 
-	return id, err
+//used internally to execute commands inside containers synchronusly
+func (m *containerManager) dispatchSync(args *ContainerDispatchArguments) (*core.JobResult, error) {
+	id := uuid.New()
+	args.Command.ID = id
+	args.Command.Tags = string(InternalRoute)
+
+	m.internal.Prepare(id)
+	if err := m.pushToContainer(args.Container, &args.Command); err != nil {
+		return nil, err
+	}
+	job := m.internal.Get(id)
+	if job == nil {
+		return nil, fmt.Errorf("timeout")
+	}
+	return job, nil
 }
 
 type ContainerTerminateArguments struct {
-	Container uint64 `json:"container"`
+	Container uint16 `json:"container"`
 }
 
 func (m *containerManager) terminate(cmd *core.Command) (interface{}, error) {
@@ -354,7 +409,67 @@ func (m *containerManager) terminate(cmd *core.Command) (interface{}, error) {
 	}
 
 	coreID := fmt.Sprintf("core-%d", args.Container)
-	pm.GetManager().Kill(coreID)
+	return nil, pm.GetManager().Kill(coreID)
+}
 
-	return nil, nil
+type ContainerFindArguments struct {
+	Tags []string `json:"tags"`
+}
+
+func (m *containerManager) find(cmd *core.Command) (interface{}, error) {
+	var args ContainerFindArguments
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+
+	containers := m.getWithTags(args.Tags...)
+	result := make(map[uint16]ContainerInfo)
+	for _, c := range containers {
+		name := fmt.Sprintf("core-%d", c.id)
+		runner, ok := pm.GetManager().Runners()[name]
+		if !ok {
+			continue
+		}
+		ps := runner.Process()
+		var state process.ProcessStats
+		if ps != nil {
+			if stater, ok := ps.(process.Stater); ok {
+				state = *(stater.Stats())
+			}
+		}
+
+		result[c.id] = ContainerInfo{
+			ProcessStats: state,
+			Container:    c,
+		}
+	}
+
+	return result, nil
+}
+
+func (m *containerManager) getWithTags(tags ...string) []*container {
+	m.conM.RLock()
+	defer m.conM.RUnlock()
+
+	var result []*container
+loop:
+	for _, c := range m.containers {
+		for _, tag := range tags {
+			if !utils.InString(c.Arguments.Tags, tag) {
+				continue loop
+			}
+		}
+		result = append(result, c)
+	}
+
+	return result
+}
+
+func (m *containerManager) getOneWithTags(tags ...string) *container {
+	result := m.getWithTags(tags...)
+	if len(result) > 0 {
+		return result[0]
+	}
+
+	return nil
 }
