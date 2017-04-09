@@ -120,7 +120,7 @@ func (fs *filesystem) mode(m string) (int, error) {
 		case 'r':
 			rwax += 1
 			readable = true
-		case 'w':
+		case 'x':
 			rwax += 1
 			writable = true
 			mode |= os.O_CREATE | os.O_EXCL
