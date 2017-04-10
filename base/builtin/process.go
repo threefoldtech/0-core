@@ -81,7 +81,7 @@ func getProcessInfo(ps *process.Process) *Process {
 		res.Cpu = CPUStats{
 			GuestNice: cpu.GuestNice,
 			Idle:      cpu.Idle,
-			IoWait:    cpu.Idle,
+			IoWait:    cpu.Iowait,
 			Irq:       cpu.Irq,
 			Nice:      cpu.Nice,
 			SoftIrq:   cpu.Softirq,
