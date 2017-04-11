@@ -53,6 +53,7 @@ const (
 	kvmResetCommand       = "kvm.reset"
 	kvmPauseCommand       = "kvm.pause"
 	kvmResumeCommand      = "kvm.resume"
+	kvmInfoCommand        = "kvm.info"
 	kvmAttachDiskCommand  = "kvm.attach_disk"
 	kvmDetachDiskCommand  = "kvm.detach_disk"
 	kvmAddNicCommand      = "kvm.add_nic"
@@ -80,6 +81,7 @@ func KVMSubsystem(conmgr containers.ContainerManager) error {
 	pm.CmdMap[kvmResetCommand] = process.NewInternalProcessFactory(mgr.reset)
 	pm.CmdMap[kvmPauseCommand] = process.NewInternalProcessFactory(mgr.pause)
 	pm.CmdMap[kvmResumeCommand] = process.NewInternalProcessFactory(mgr.resume)
+	pm.CmdMap[kvmInfoCommand] = process.NewInternalProcessFactory(mgr.info)
 	pm.CmdMap[kvmAttachDiskCommand] = process.NewInternalProcessFactory(mgr.attachDisk)
 	pm.CmdMap[kvmDetachDiskCommand] = process.NewInternalProcessFactory(mgr.detachDisk)
 	pm.CmdMap[kvmAddNicCommand] = process.NewInternalProcessFactory(mgr.addNic)
@@ -183,6 +185,37 @@ type LimitDiskIOParams struct {
 	SizeIopsSec               uint64 `json:"sizeiopssec"`
 	GroupNameSet              bool   `json:"groupnameset"`
 	GroupName                 string `json:"groupname"`
+}
+
+type DomainStats struct {
+	Vcpu  []DomainStatsVcpu  `json"vcpu"`
+	Net   []DomainStatsNet   `json"net"`
+	Block []DomainStatsBlock `json"block"`
+}
+
+type DomainStatsVcpu struct {
+	State int    `json"state"`
+	Time  uint64 `json"time"`
+}
+
+type DomainStatsNet struct {
+	Name    string `json"name"`
+	RxBytes uint64 `json"rxbytes"`
+	RxPkts  uint64 `json"rxpkts"`
+	RxErrs  uint64 `json"rxerrs"`
+	RxDrop  uint64 `json"rxdrop"`
+	TxBytes uint64 `json"txbytes"`
+	TxPkts  uint64 `json"txpkts"`
+	TxErrs  uint64 `json"txerrs"`
+	TxDrop  uint64 `json"txdrop"`
+}
+
+type DomainStatsBlock struct {
+	Name    string `json"name"`
+	RdBytes uint64 `json"rdbytes"`
+	RdTimes uint64 `json"rdtimes"`
+	WrBytes uint64 `json"wrbytes"`
+	WrTimes uint64 `json"wrtimes"`
 }
 
 func StateToString(state libvirt.DomainState) string {
@@ -569,6 +602,56 @@ func (m *kvmManager) resume(cmd *core.Command) (interface{}, error) {
 	}
 
 	return nil, nil
+}
+
+func (m *kvmManager) info(cmd *core.Command) (interface{}, error) {
+	domain, _, err := m.getDomain(cmd)
+	if err != nil {
+		return nil, err
+	}
+	infos, err := m.conn.GetAllDomainStats([]*libvirt.Domain{domain}, libvirt.DOMAIN_STATS_STATE|libvirt.DOMAIN_STATS_VCPU|libvirt.DOMAIN_STATS_INTERFACE|libvirt.DOMAIN_STATS_BLOCK,
+		libvirt.CONNECT_GET_ALL_DOMAINS_STATS_ACTIVE|libvirt.CONNECT_GET_ALL_DOMAINS_STATS_INACTIVE)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get machine info: %s", err)
+	}
+	info := infos[0]
+	cpus := make([]DomainStatsVcpu, len(info.Vcpu))
+	for i, vcpu := range info.Vcpu {
+		cpus[i] = DomainStatsVcpu{
+			State: int(vcpu.State),
+			Time:  vcpu.Time,
+		}
+	}
+	nets := make([]DomainStatsNet, len(info.Net))
+	for i, net := range info.Net {
+		nets[i] = DomainStatsNet{
+			Name:    net.Name,
+			RxBytes: net.RxBytes,
+			RxPkts:  net.RxPkts,
+			RxErrs:  net.RxErrs,
+			RxDrop:  net.RxDrop,
+			TxBytes: net.TxBytes,
+			TxPkts:  net.TxPkts,
+			TxErrs:  net.TxErrs,
+			TxDrop:  net.TxDrop,
+		}
+	}
+	blocks := make([]DomainStatsBlock, len(info.Block))
+	for i, block := range info.Block {
+		blocks[i] = DomainStatsBlock{
+			Name:    block.Name,
+			RdBytes: block.RdBytes,
+			RdTimes: block.RdTimes,
+			WrBytes: block.WrBytes,
+			WrTimes: block.WrTimes,
+		}
+	}
+	stat := DomainStats{
+		Vcpu:  cpus,
+		Net:   nets,
+		Block: blocks,
+	}
+	return stat, nil
 }
 
 func (m *kvmManager) attachDevice(uuid, xml string) error {
