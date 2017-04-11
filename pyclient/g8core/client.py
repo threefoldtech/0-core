@@ -1482,7 +1482,7 @@ class KvmManager:
 
         self._client.sync('kvm.resume', args)
 
-    def attachDisk(self, uuid, media):
+    def attach_disk(self, uuid, media):
         """
         Attach a disk to a mchine
         :param uuid: uuid of the kvm container (same as the used in create)
@@ -1497,9 +1497,9 @@ class KvmManager:
         }
         self._man_disk_action_chk.check(args)
 
-        self._client.sync('kvm.attachDisk', args)
+        self._client.sync('kvm.attach_disk', args)
 
-    def detachDisk(self, uuid, media):
+    def detach_disk(self, uuid, media):
         """
         Detach a disk from a machine
         :param uuid: uuid of the kvm container (same as the used in create)
@@ -1514,9 +1514,9 @@ class KvmManager:
         }
         self._man_disk_action_chk.check(args)
 
-        self._client.sync('kvm.detachDisk', args)
+        self._client.sync('kvm.detach_disk', args)
 
-    def addNic(self, uuid, bridge):
+    def add_nic(self, uuid, bridge):
         """
         Add a nic to a machine
         :param uuid: uuid of the kvm container (same as the used in create)
@@ -1529,9 +1529,9 @@ class KvmManager:
         }
         self._man_nic_action_chk.check(args)
 
-        self._client.sync('kvm.addNic', args)
+        self._client.sync('kvm.add_nic', args)
 
-    def removeNic(self, uuid, bridge):
+    def remove_nic(self, uuid, bridge):
         """
         Remove a nic from a machine
         :param uuid: uuid of the kvm container (same as the used in create)
@@ -1544,9 +1544,9 @@ class KvmManager:
         }
         self._man_nic_action_chk.check(args)
 
-        self._client.sync('kvm.removeNic', args)
+        self._client.sync('kvm.remove_nic', args)
 
-    def limitDiskIO(self, uuid, targetname, totalbytessecset=False, totalbytessec=0, readbytessecset=False, readbytessec=0, writebytessecset=False,
+    def limit_disk_io(self, uuid, targetname, totalbytessecset=False, totalbytessec=0, readbytessecset=False, readbytessec=0, writebytessecset=False,
                     writebytessec=0, totaliopssecset=False, totaliopssec=0, readiopssecset=False, readiopssec=0, writeiopssecset=False, writeiopssec=0,
                     totalbytessecmaxset=False, totalbytessecmax=0, readbytessecmaxset=False, readbytessecmax=0, writebytessecmaxset=False, writebytessecmax=0,
                     totaliopssecmaxset=False, totaliopssecmax=0, readiopssecmaxset=False, readiopssecmax=0, writeiopssecmaxset=False, writeiopssecmax=0,
@@ -1606,7 +1606,7 @@ class KvmManager:
         }
         self._limit_disk_io_action_chk.check(args)
 
-        self._client.sync('kvm.limitDiskIO', args)
+        self._client.sync('kvm.limit_disk_io', args)
 
     def migrate(self, uuid, desturi):
         """
