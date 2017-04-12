@@ -48,6 +48,8 @@ if prev then
 
         v.m_total = 0
         v.m_nr = 0
+        v.m_last = v.m_avg
+        v.m_last_epoch = v.m_epoch
         v.m_max = value
         v.m_epoch = now_short_m
     end
@@ -60,6 +62,8 @@ if prev then
 
         v.h_total = 0
         v.h_nr = 0
+        v.h_last = v.h_avg
+        v.h_last_epoch = v.h_epoch
         v.h_max = value
         v.h_epoch = now_short_h
     end
@@ -69,7 +73,6 @@ if prev then
     v.epoch = now
 
     --remember current measurement, and calculate the avg/max for minute value
-    v.m_last = stat
     v.m_total = v.m_total + stat
     v.m_nr = v.m_nr + 1
     v.m_avg = v.m_total / v.m_nr
