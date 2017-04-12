@@ -178,5 +178,6 @@ func updateHostname(hostname string) error {
 }
 
 func linkMtab() error {
+	os.RemoveAll("/etc/mtab")
 	return os.Symlink("../proc/self/mounts", "/etc/mtab")
 }
