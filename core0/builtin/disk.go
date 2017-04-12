@@ -246,7 +246,7 @@ func (d *diskMgr) partInfo(disk, part string) (*DiskInfoResult, error) {
 	}
 	info.lsblkResult = *lsblk
 
-	bs, err := d.blockSize(part)
+	bs, err := d.blockSize(disk)
 	if err != nil {
 		return nil, err
 	}
