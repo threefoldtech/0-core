@@ -383,7 +383,7 @@ class FilesystemManager:
         :return:
         """
 
-        fd = self.open(remote, 'wx')
+        fd = self.open(remote, 'w')
         while True:
             chunk = reader.read(512*1024)
             if chunk == b'':
