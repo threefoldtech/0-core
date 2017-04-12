@@ -30,6 +30,7 @@ type Process struct {
 	PID        int32    `json:"pid"`
 	PPID       int32    `json:"ppid"`
 	Cmdline    string   `json:"cmdline"`
+	Name       string   `json:"name"`
 	CreateTime int64    `json:"createtime"`
 	Cpu        CPUStats `json:"cpu"`
 	RSS        uint64   `json:"rss"`
@@ -65,6 +66,9 @@ func getProcessInfo(ps *process.Process) *Process {
 	}
 	if cmd, err := ps.Cmdline(); err == nil {
 		res.Cmdline = cmd
+	}
+	if name, err := ps.Name(); err == nil {
+		res.Name = name
 	}
 	//
 	if ct, err := ps.CreateTime(); err == nil {
