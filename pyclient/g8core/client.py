@@ -1373,7 +1373,6 @@ class KvmManager:
 
     def create(self, name, media, cpu=2, memory=512, nics=None, port=None):
         """
-
         :param name: Name of the kvm domain
         :param media: array of media objects to attach to the machine, where the first object is the boot device
                       each media object is a dict of {url, and type} where type can be one of 'disk', or 'cdrom', or empty (default to disk)

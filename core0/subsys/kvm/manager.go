@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	BaseMACAddress = "00:28:06:82:%x:%x"
+	BaseMACAddress = "00:28:06:82:%02x:%02x"
 
 	BaseIPAddr = "172.19.%d.%d"
 )
@@ -121,6 +121,32 @@ type CreateParams struct {
 	Media  []Media     `json:"media"`
 	Nics   []Nic       `json:"nics"`
 	Port   map[int]int `json:"port"`
+}
+
+func (c *CreateParams) Valid() error {
+	brcounter := make(map[string]int)
+	for _, nic := range c.Nics {
+		switch nic.Type {
+		case "default":
+			brcounter[DefaultBridgeName]++
+			if brcounter[DefaultBridgeName] > 1 {
+				return fmt.Errorf("only one default network is allowed")
+			}
+		case "bridge":
+			if nic.ID == DefaultBridgeName {
+				return fmt.Errorf("cannot use bridge %s with nic type 'bridge', please use type default instead", DefaultBridgeName)
+			}
+			brcounter[nic.ID]++
+			if brcounter[nic.ID] > 1 {
+				return fmt.Errorf("connecting to bridge '%s' more than one time is not allowed", nic.ID)
+			}
+		case "vlan":
+		case "vxlan":
+		default:
+			return fmt.Errorf("invalid nic type '%s'", nic.Type)
+		}
+	}
+	return nil
 }
 
 type DomainUUID struct {
@@ -488,6 +514,10 @@ func (m *kvmManager) setPortForwards(uuid string, seq uint16, port map[int]int) 
 func (m *kvmManager) create(cmd *core.Command) (interface{}, error) {
 	var params CreateParams
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
+		return nil, err
+	}
+
+	if err := params.Valid(); err != nil {
 		return nil, err
 	}
 
