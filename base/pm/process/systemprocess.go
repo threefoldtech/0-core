@@ -7,6 +7,7 @@ import (
 	"github.com/g8os/core0/base/pm/stream"
 	psutils "github.com/shirou/gopsutil/process"
 	"io"
+	"os"
 	"os/exec"
 	"syscall"
 )
@@ -92,8 +93,11 @@ func (process *systemProcessImpl) Run() (<-chan *stream.Message, error) {
 		process.args.Args...)
 	cmd.Dir = process.args.Dir
 
-	for k, v := range process.args.Env {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%v=%v", k, v))
+	if len(process.args.Env) > 0 {
+		cmd.Env = append(cmd.Env, os.Environ()...)
+		for k, v := range process.args.Env {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%v=%v", k, v))
+		}
 	}
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
