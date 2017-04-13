@@ -178,6 +178,9 @@ func (c *container) postBridge(index int, n *Nic) error {
 						fmt.Sprintf("%v", c.id),
 						"udhcpc", "-q", "-i", dev, "-s", "/usr/share/udhcp/simple.script",
 					},
+					Env: map[string]string{
+						"ROOT": c.root(),
+					},
 				},
 			),
 		}
