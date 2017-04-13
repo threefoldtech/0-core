@@ -427,6 +427,10 @@ func (c *container) postDefaultNetwork(i int, net *Nic) error {
 		return err
 	}
 
+	if err := c.setPortForwards(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
