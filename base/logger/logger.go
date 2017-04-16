@@ -27,10 +27,16 @@ type Logger interface {
 	LogRecord(record *LogRecord)
 }
 
-func IsLoggable(defaults []int, cmd *core.Command, msg *stream.Message) bool {
+func IsLoggableCmd(cmd *core.Command, msg *stream.Message) bool {
 	if len(cmd.LogLevels) > 0 {
 		return utils.In(cmd.LogLevels, msg.Level)
-	} else if len(defaults) > 0 {
+	}
+
+	return true
+}
+
+func IsLoggable(defaults []int, msg *stream.Message) bool {
+	if len(defaults) > 0 {
 		return utils.In(defaults, msg.Level)
 	}
 
@@ -72,7 +78,7 @@ func NewDBLogger(coreID uint16, db *bolt.DB, defaults []int) (Logger, error) {
 }
 
 func (logger *DBLogger) Log(cmd *core.Command, msg *stream.Message) {
-	if !IsLoggable(logger.defaults, cmd, msg) {
+	if !IsLoggableCmd(cmd, msg) {
 		return
 	}
 
@@ -85,6 +91,10 @@ func (logger *DBLogger) Log(cmd *core.Command, msg *stream.Message) {
 
 // Log message
 func (logger *DBLogger) LogRecord(record *LogRecord) {
+	if !IsLoggable(logger.defaults, record.Message) {
+		return
+	}
+
 	go logger.db.Batch(func(tx *bolt.Tx) error {
 		logs := tx.Bucket([]byte("logs"))
 		jobBucket, err := logs.CreateBucketIfNotExists([]byte(record.Command))
@@ -119,12 +129,15 @@ func NewConsoleLogger(coreID uint16, defaults []int) Logger {
 }
 
 func (logger *ConsoleLogger) LogRecord(record *LogRecord) {
+	if !IsLoggable(logger.defaults, record.Message) {
+		return
+	}
 	log.Infof("[%d]%s %s", record.Core, record.Command, record.Message)
 }
 
 // Log messages
 func (logger *ConsoleLogger) Log(cmd *core.Command, msg *stream.Message) {
-	if !IsLoggable(logger.defaults, cmd, msg) {
+	if !IsLoggableCmd(cmd, msg) {
 		return
 	}
 
