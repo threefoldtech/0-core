@@ -4,11 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/g8os/core0/base/pm"
-	"github.com/g8os/core0/base/pm/core"
-	"github.com/g8os/core0/base/pm/process"
-	"github.com/patrickmn/go-cache"
-	"github.com/pborman/uuid"
 	"io"
 	"io/ioutil"
 	"os"
@@ -16,6 +11,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/g8os/core0/base/pm"
+	"github.com/g8os/core0/base/pm/core"
+	"github.com/g8os/core0/base/pm/process"
+	"github.com/patrickmn/go-cache"
+	"github.com/pborman/uuid"
 )
 
 const (
@@ -136,7 +137,7 @@ func (fs *filesystem) mode(m string) (int, error) {
 			readable = true
 			writable = true
 		default:
-			return 0, fmt.Errorf("unknown mode '%s'", chr)
+			return 0, fmt.Errorf("unknown mode '%c'", chr)
 		}
 	}
 
@@ -199,6 +200,8 @@ func (fs *filesystem) read(cmd *core.Command) (interface{}, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown file description '%s'", args.FD)
 	}
+	// refresh cache expiration
+	fs.cache.Set(args.FD, f, cache.DefaultExpiration)
 
 	fd, ok := f.(*os.File)
 	if !ok {
@@ -229,6 +232,8 @@ func (fs *filesystem) write(cmd *core.Command) (interface{}, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown file description '%s'", args.FD)
 	}
+	// refresh cache expiration
+	fs.cache.Set(args.FD, f, cache.DefaultExpiration)
 
 	fd, ok := f.(*os.File)
 	if !ok {
