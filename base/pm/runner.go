@@ -224,7 +224,7 @@ loop:
 		if result.State != core.StateSuccess && runner.command.MaxRestart > 0 {
 			runs++
 			if runs < runner.command.MaxRestart {
-				log.Infof("Restarting '%s' due to upnormal exit status, trials: %d/%d", runner.command, runs+1, runner.command.MaxRestart)
+				log.Debugf("Restarting '%s' due to upnormal exit status, trials: %d/%d", runner.command, runs+1, runner.command.MaxRestart)
 				restarting = true
 				restartIn = 1 * time.Second
 			}
@@ -236,7 +236,7 @@ loop:
 		}
 
 		if restarting {
-			log.Infof("Recurring '%s' in %s", runner.command, restartIn)
+			log.Debugf("Recurring '%s' in %s", runner.command, restartIn)
 			select {
 			case <-time.After(restartIn):
 			case <-runner.kill:
@@ -248,7 +248,6 @@ loop:
 			break
 		}
 	}
-
 }
 
 func (runner *runnerImpl) Terminate() {

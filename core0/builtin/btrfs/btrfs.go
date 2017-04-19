@@ -300,13 +300,8 @@ func (m *btrfsManager) SubvolQuota(cmd *core.Command) (interface{}, error) {
 		return nil, err
 	}
 
-	res, err := m.btrfs("qgroup", "show", "-f", args.Path)
-	if err != nil {
-		return nil, err
-	}
-	elems := strings.Fields(res.Streams[0])
-	qgroup := elems[len(elems)-3]
-	_, err = m.btrfs("qgroup", "limit", args.Limit, qgroup, args.Path)
+	_, err = m.btrfs("qgroup", "limit", args.Limit, args.Path)
+
 	if err != nil {
 		return nil, err
 	}
