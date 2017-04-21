@@ -704,16 +704,12 @@ class ContainerManager:
             'tags': tags,
         }
 
-        #validate input
+        # validate input
         self._create_chk.check(args)
 
         response = self._client.raw('corex.create', args)
 
-        result = response.get()
-        if result.state != 'SUCCESS':
-            raise RuntimeError('failed to create container %s' % result.data)
-
-        return json.loads(result.data)
+        return response
 
     def list(self):
         """
