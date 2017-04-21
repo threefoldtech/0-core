@@ -906,7 +906,7 @@ class DiskManager:
     def mktable(self, disk, table_type='gpt'):
         """
         Make partition table on block device.
-        :param disk: Full device path like /dev/sda
+        :param disk: device name (sda, sdb, etc...)
         :param table_type: Partition table type as accepted by parted
         """
         args = {
