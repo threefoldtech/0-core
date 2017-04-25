@@ -692,7 +692,9 @@ class ContainerManager:
 
         if nics == self.DefaultNetworking:
             nics = [{'type': 'default'}]
-
+        elif nics is None:
+            nics = []
+            
         args = {
             'root': root_url,
             'mount': mount,
