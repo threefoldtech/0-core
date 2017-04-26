@@ -694,7 +694,7 @@ class ContainerManager:
             nics = [{'type': 'default'}]
         elif nics is None:
             nics = []
-            
+
         args = {
             'root': root_url,
             'mount': mount,
@@ -945,7 +945,7 @@ class DiskManager:
         result = response.get()
 
         if result.state != 'SUCCESS':
-            raise RuntimeError('failed to get info: %s' % result.stderr)
+            raise RuntimeError('failed to get info: %s' % result.data)
 
         if result.level != 20:  # 20 is JSON output.
             raise RuntimeError('invalid response type from disk.getinfo command')
