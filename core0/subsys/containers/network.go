@@ -118,8 +118,12 @@ func (c *container) moveZTNic(idx int, netID string) error {
 			if fields[2] != netID {
 				continue
 			}
-			face = fields[7]
-			addr = fields[8]
+			if len(fields) >= 8 {
+				face = fields[7]
+			}
+			if len(fields) >= 9 {
+				addr = fields[8]
+			}
 			break
 		}
 
