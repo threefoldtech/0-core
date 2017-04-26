@@ -1390,6 +1390,10 @@ class KvmManager:
                      }
         :return: uuid of the virtual machine
         """
+
+        if nics is None:
+            nics = []
+
         args = {
             'name': name,
             'media': media,
