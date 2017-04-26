@@ -15,9 +15,11 @@ import (
 	"os"
 
 	_ "github.com/g8os/core0/base/builtin"
+	"github.com/g8os/core0/core0/assets"
 	_ "github.com/g8os/core0/core0/builtin"
 	_ "github.com/g8os/core0/core0/builtin/btrfs"
 	"github.com/g8os/core0/core0/options"
+	"github.com/g8os/core0/core0/screen"
 	"github.com/g8os/core0/core0/stats"
 	"github.com/g8os/core0/core0/subsys/containers"
 	"github.com/g8os/core0/core0/subsys/kvm"
@@ -49,6 +51,22 @@ func main() {
 	if options.Version() {
 		os.Exit(0)
 	}
+
+	if err := screen.New(2); err != nil {
+		log.Critical(err)
+	}
+
+	screen.Push(&screen.TextSection{
+		Attributes: screen.Attributes{screen.Bold},
+		Text:       string(assets.MustAsset("text/logo.txt")),
+	})
+	screen.Push(&screen.TextSection{})
+	screen.Push(&screen.TextSection{
+		Attributes: screen.Attributes{screen.Green},
+		Text:       core.Version().Short(),
+	})
+	screen.Push(&screen.TextSection{})
+	screen.Refresh()
 
 	setupLogging()
 
