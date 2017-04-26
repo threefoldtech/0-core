@@ -16,7 +16,6 @@ import (
 	"github.com/g8os/core0/base/pm/process"
 	"github.com/pborman/uuid"
 	"github.com/vishvananda/netlink"
-	"strings"
 	"time"
 )
 
@@ -100,42 +99,40 @@ func (c *container) zerotierDaemon() error {
 	return c.zterr
 }
 
+type ztNetorkInfo struct {
+	PortDeviceName    string   `json:"portDeviceName"`
+	AssignedAddresses []string `json:"assignedAddresses"`
+	NetID             string   `json:"nwid"`
+}
+
 func (c *container) moveZTNic(idx int, netID string) error {
 	home := c.zerotierHome()
 	var face string
-	var addr string
-	for i := 0; i < 30; i++ {
-		job, err := c.sync("zerotier-cli", fmt.Sprintf("-D%s", home), "listnetworks")
+	var addr []string
+	for { //we retry forever.
+		job, err := c.sync("zerotier-cli", "-j", fmt.Sprintf("-D%s", home), "listnetworks")
 		if err != nil {
 			return err
 		}
 
-		for _, line := range strings.Split(job.Streams[0], "\n") {
-			fields := strings.Fields(line)
-			if len(fields) < 3 {
-				continue
-			}
-			if fields[2] != netID {
-				continue
-			}
-			if len(fields) >= 8 {
-				face = fields[7]
-			}
-			if len(fields) >= 9 {
-				addr = fields[8]
-			}
-			break
+		var networks []ztNetorkInfo
+		if err := json.Unmarshal([]byte(job.Streams[0]), &networks); err != nil {
+			return err
 		}
 
-		if addr != "-" {
+		for _, network := range networks {
+			if network.NetID != netID {
+				continue
+			}
+			face = network.PortDeviceName
+			addr = network.AssignedAddresses
+		}
+
+		if len(addr) != 0 {
 			break
 		}
 
 		time.Sleep(1 * time.Second)
-	}
-
-	if addr == "-" {
-		return fmt.Errorf("failed to get zerotier ip")
 	}
 
 	link, err := netlink.LinkByName(face)
@@ -162,7 +159,7 @@ func (c *container) moveZTNic(idx int, netID string) error {
 		return err
 	}
 
-	for _, a := range strings.Split(addr, ",") {
+	for _, a := range addr {
 		_, err := c.sync("ip", "netns", "exec", fmt.Sprintf("%d", c.id),
 			"ip", "address", "add", a, "dev", newface)
 		if err != nil {
