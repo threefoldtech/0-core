@@ -209,7 +209,7 @@ func (b *Bootstrap) Bootstrap() {
 	b.registerExtensions(b.i.Extension)
 
 	progress := &screen.ProgressSection{
-		Text: "Bootstraping: Core Services",
+		Text: "Bootstrapping: Core Services",
 	}
 	screen.Push(progress)
 	screen.Refresh()
@@ -219,7 +219,7 @@ func (b *Bootstrap) Bootstrap() {
 
 	go b.screen()
 
-	progress.Text = "Bootstraping: Networking"
+	progress.Text = "Bootstrapping: Networking"
 	screen.Refresh()
 	for {
 		err := b.setupNetworking()
@@ -234,19 +234,19 @@ func (b *Bootstrap) Bootstrap() {
 		log.Infof("Retrying setting up network")
 	}
 
-	progress.Text = "Bootstraping: Network Services"
+	progress.Text = "Bootstrapping: Network Services"
 	screen.Refresh()
 
 	//start up all net services ([net, boot[ slice)
 	b.startupServices(settings.AfterNet, settings.AfterBoot)
 
-	progress.Text = "Bootstraping: Services"
+	progress.Text = "Bootstrapping: Services"
 	screen.Refresh()
 
 	//start up all boot services ([boot, end] slice)
 	b.startupServices(settings.AfterBoot, settings.ToTheEnd)
 
-	progress.Text = "Bootstraping: Done"
+	progress.Text = "Bootstrapping: Done"
 	progress.Stop(true)
 	screen.Refresh()
 }
