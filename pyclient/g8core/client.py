@@ -1374,7 +1374,7 @@ class KvmManager:
         """
         :param name: Name of the kvm domain
         :param media: array of media objects to attach to the machine, where the first object is the boot device
-                      each media object is a dict of {url, and type} where type can be one of 'disk', or 'cdrom', or empty (default to disk)
+                      each media object is a dict of {url, type} where type can be one of 'disk', or 'cdrom', or empty (default to disk)
                       example: [{'url': 'nbd+unix:///test?socket=/tmp/ndb.socket'}, {'type': 'cdrom': '/somefile.iso'}
         :param cpu: number of vcpu cores
         :param memory: memory in MiB
