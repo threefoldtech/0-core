@@ -659,12 +659,12 @@ class ContainerManager:
 
     def create(self, root_url, mount=None, host_network=False, nics=DefaultNetworking, port=None, hostname=None, storage=None, tags=None):
         """
-        Creater a new container with the given root plist, mount points and
+        Creater a new container with the given root flist, mount points and
         zerotier id, and connected to the given bridges
-        :param root_url: The root filesystem plist
+        :param root_url: The root filesystem flist
         :param mount: a dict with {host_source: container_target} mount points.
                       where host_source directory must exists.
-                      host_source can be a url to a plist to mount.
+                      host_source can be a url to a flist to mount.
         :param host_network: Specify if the container should share the same network stack as the host.
                              if True, container creation ignores both zerotier, bridge and ports arguments below. Not
                              giving errors if provided.
@@ -686,7 +686,7 @@ class ContainerManager:
         :param hostname: Specific hostname you want to give to the container.
                          if None it will automatically be set to core-x,
                          x beeing the ID of the container
-        :param storage: A Url to the ardb storage to use to mount the root plist (or any other mount that requires g8fs)
+        :param storage: A Url to the ardb storage to use to mount the root flist (or any other mount that requires g8fs)
                         if not provided, the default one from core0 configuration will be used.
         """
 
