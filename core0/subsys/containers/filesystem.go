@@ -209,6 +209,7 @@ func (c *container) mountPList(src string, target string, hooks ...pm.RunnerHook
 	storageUrl := c.Args.Storage
 	if storageUrl == "" {
 		storageUrl = settings.Settings.Globals.Get("storage", "ardb://home.maxux.net:26379")
+		c.Args.Storage = storageUrl
 	}
 
 	cache := settings.Settings.Globals.Get("cache", path.Join(BackendBaseDir, "cache"))
