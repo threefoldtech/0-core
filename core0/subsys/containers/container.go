@@ -23,12 +23,13 @@ var (
 )
 
 type container struct {
-	id    uint16
-	mgr   *containerManager
-	route core.Route
-	Args  ContainerCreateArguments `json:"arguments"`
-	Root  string                   `json:"root"`
-	PID   int                      `json:"pid"`
+	id     uint16
+	runner pm.Runner
+	mgr    *containerManager
+	route  core.Route
+	Args   ContainerCreateArguments `json:"arguments"`
+	Root   string                   `json:"root"`
+	PID    int                      `json:"pid"`
 
 	zt    pm.Runner
 	zterr error
@@ -131,14 +132,24 @@ func (c *container) Start() (err error) {
 	onexit := &pm.ExitHook{
 		Action: c.onexit,
 	}
-
-	_, err = mgr.NewRunner(extCmd, process.NewContainerProcess, onpid, onexit)
+	var runner pm.Runner
+	runner, err = mgr.NewRunner(extCmd, process.NewContainerProcess, onpid, onexit)
 	if err != nil {
 		log.Errorf("error in container runner: %s", err)
 		return
 	}
 
+	c.runner = runner
 	return
+}
+
+func (c *container) Terminate() error {
+	if c.runner == nil {
+		return fmt.Errorf("container was not started")
+	}
+	c.runner.Terminate()
+	c.runner.Wait()
+	return nil
 }
 
 func (c *container) preStart() error {

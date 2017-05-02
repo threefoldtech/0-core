@@ -417,9 +417,15 @@ func (m *containerManager) terminate(cmd *core.Command) (interface{}, error) {
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
+	m.conM.RLock()
+	container, ok := m.containers[args.Container]
+	m.conM.RUnlock()
 
-	coreID := fmt.Sprintf("core-%d", args.Container)
-	return nil, pm.GetManager().Kill(coreID)
+	if !ok {
+		return nil, fmt.Errorf("no container with id '%d'", args.Container)
+	}
+
+	return nil, container.Terminate()
 }
 
 type ContainerFindArguments struct {
