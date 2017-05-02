@@ -213,6 +213,12 @@ loop:
 			hook.Exit(result.State)
 		}
 
+		if runner.command.Protected {
+			//immediate restart
+			log.Debugf("Respawning protected service")
+			continue
+		}
+
 		if result.State == core.StateKilled {
 			//we never restart a killed process.
 			break

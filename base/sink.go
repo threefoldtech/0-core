@@ -7,10 +7,6 @@ import (
 	"github.com/g8os/core0/base/pm/core"
 )
 
-const (
-	ReconnectSleepTime = 10 * time.Second
-)
-
 type Sink interface {
 	Run()
 }
@@ -59,6 +55,7 @@ func (poll *sinkImpl) run() {
 		err := poll.client.GetNext(&command)
 		if err != nil {
 			log.Errorf("Failed to get next command from %s: %s", poll.client, err)
+			time.Sleep(200 * time.Millisecond)
 			continue
 		}
 

@@ -12,6 +12,7 @@ type Startup struct {
 	RunningMatch    string
 	RecurringPeriod int
 	MaxRestart      int
+	Protected       bool
 	Name            string
 	Args            map[string]interface{}
 
