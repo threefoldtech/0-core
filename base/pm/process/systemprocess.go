@@ -195,7 +195,7 @@ func (process *systemProcessImpl) Run() (<-chan *stream.Message, error) {
 
 		state := process.table.WaitPID(process.pid)
 
-		log.Infof("Process %s exited with state: %d", process.cmd, state.ExitStatus())
+		log.Debugf("Process %s exited with state: %d", process.cmd, state.ExitStatus())
 
 		if state.ExitStatus() == 0 {
 			channel <- stream.MessageExitSuccess
