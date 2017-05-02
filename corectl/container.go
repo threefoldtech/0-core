@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -55,16 +56,18 @@ func containers(t Transport, c *cli.Context) {
 	table.SetBorders(tablewriter.Border{})
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.SetHeader([]string{"ID", "FLIST", "HOSTNAME", "TAGS"})
-	ids := make([]string, 0, len(containers))
+	ids := make([]int, 0, len(containers))
 	for id := range containers {
-		ids = append(ids, id)
+		iid, _ := strconv.ParseInt(id, 10, 32)
+		ids = append(ids, int(iid))
 	}
-	sort.Strings(ids)
+	sort.Ints(ids)
 
 	for _, id := range ids {
-		container := containers[id]
+		sid := fmt.Sprintf("%d", id)
+		container := containers[sid]
 		table.Append([]string{
-			id,
+			sid,
 			container.Container.Arguments.Root,
 			container.Container.Arguments.Hostname,
 			strings.Join(container.Container.Arguments.Tags, ", "),
