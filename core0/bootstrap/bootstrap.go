@@ -1,17 +1,13 @@
 package bootstrap
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/g8os/core0/base/pm"
-	"github.com/g8os/core0/base/pm/core"
-	"github.com/g8os/core0/base/pm/process"
 	"github.com/g8os/core0/base/settings"
 	"github.com/g8os/core0/base/utils"
 	"github.com/g8os/core0/core0/bootstrap/network"
 	"github.com/g8os/core0/core0/screen"
 	"github.com/op/go-logging"
-	"github.com/pborman/uuid"
 	"github.com/vishvananda/netlink"
 	"net/http"
 	"strings"
@@ -160,53 +156,6 @@ func (b *Bootstrap) setupNetworking() error {
 	return fmt.Errorf("couldn't reach internet")
 }
 
-type ztNetorkInfo struct {
-	PortDeviceName    string   `json:"portDeviceName"`
-	AssignedAddresses []string `json:"assignedAddresses"`
-	Mac               string   `json:"mac"`
-}
-
-func (b *Bootstrap) ztNetworks() (sections []screen.Section) {
-	runner, err := pm.GetManager().RunCmd(&core.Command{
-		ID:      uuid.New(),
-		Command: process.CommandSystem,
-		Arguments: core.MustArguments(process.SystemCommandArguments{
-			Name: "zerotier-cli",
-			Args: []string{"-j", "-D/tmp/core-0-zt", "listnetworks"},
-		}),
-	})
-	if err != nil {
-		return
-	}
-	job := runner.Wait()
-	if job.State != core.StateSuccess {
-		return
-	}
-	var result []ztNetorkInfo
-	if err := json.Unmarshal([]byte(job.Streams[0]), &result); err != nil {
-		return
-	}
-
-	for _, res := range result {
-		var ips []string
-		for _, ip := range res.AssignedAddresses {
-			if strings.Index(ip, ":") >= 0 {
-				continue
-			}
-			ips = append(ips, ip)
-		}
-		sections = append(sections,
-			&screen.TextSection{
-				Text: fmt.Sprintf(screenStateLine, res.PortDeviceName, res.Mac,
-					strings.Join(ips, ","),
-				),
-			},
-		)
-	}
-
-	return
-}
-
 func (b *Bootstrap) screen() {
 	section := &screen.GroupSection{
 		Sections: []screen.Section{},
@@ -224,7 +173,7 @@ func (b *Bootstrap) screen() {
 		section.Sections = []screen.Section{}
 
 		for _, link := range links {
-			if link.Attrs().Name == "lo" || !utils.InString([]string{"device"}, link.Type()) {
+			if link.Attrs().Name == "lo" || !utils.InString([]string{"device", "tun", "tap"}, link.Type()) {
 				continue
 			}
 
@@ -233,7 +182,6 @@ func (b *Bootstrap) screen() {
 				Text: fmt.Sprintf(screenStateLine, link.Attrs().Name, link.Attrs().HardwareAddr, b.ipsAsString(ips)),
 			})
 		}
-		section.Sections = append(section.Sections, b.ztNetworks()...)
 
 		section.Sections = append(section.Sections, progress)
 		screen.Refresh()
