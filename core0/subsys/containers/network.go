@@ -49,7 +49,7 @@ func (c *container) zerotierDaemon() error {
 				log.Info("checking for zt availability")
 				var err error
 				for i := 0; i < 10; i++ {
-					_, err = c.sync("zerotier-cli", fmt.Sprintf("-D%s", home), "listnetworks")
+					_, err = c.sync("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "listnetworks")
 					if err == nil {
 						break
 					}
@@ -76,9 +76,9 @@ func (c *container) zerotierDaemon() error {
 			Command: process.CommandSystem,
 			Arguments: core.MustArguments(
 				process.SystemCommandArguments{
-					Name: "zerotier-one",
+					Name: "ip",
 					Args: []string{
-						"-p0", home,
+						"netns", "exec", fmt.Sprint(c.ID()), "zerotier-one", "-p0", home,
 					},
 				},
 			),
@@ -105,84 +105,14 @@ type ztNetorkInfo struct {
 	NetID             string   `json:"nwid"`
 }
 
-func (c *container) moveZTNic(idx int, netID string) error {
-	home := c.zerotierHome()
-	var face string
-	var addr []string
-	for { //we retry forever.
-		job, err := c.sync("zerotier-cli", "-j", fmt.Sprintf("-D%s", home), "listnetworks")
-		if err != nil {
-			return err
-		}
-
-		var networks []ztNetorkInfo
-		if err := json.Unmarshal([]byte(job.Streams[0]), &networks); err != nil {
-			return err
-		}
-
-		for _, network := range networks {
-			if network.NetID != netID {
-				continue
-			}
-			face = network.PortDeviceName
-			addr = network.AssignedAddresses
-		}
-
-		if len(addr) != 0 {
-			break
-		}
-
-		time.Sleep(1 * time.Second)
-	}
-
-	link, err := netlink.LinkByName(face)
-	if err != nil {
-		return err
-	}
-
-	if err := netlink.LinkSetNsPid(link, int(c.PID)); err != nil {
-		return err
-	}
-
-	newface := fmt.Sprintf("eth%v", idx)
-	_, err = c.sync("ip", "netns", "exec", fmt.Sprintf("%d", c.id),
-		"ip", "link", "set", face, "name", newface)
-
-	if err != nil {
-		return err
-	}
-
-	_, err = c.sync("ip", "netns", "exec", fmt.Sprintf("%d", c.id),
-		"ip", "link", "set", newface, "up")
-
-	if err != nil {
-		return err
-	}
-
-	for _, a := range addr {
-		_, err := c.sync("ip", "netns", "exec", fmt.Sprintf("%d", c.id),
-			"ip", "address", "add", a, "dev", newface)
-		if err != nil {
-			log.Errorf("failed to setup zt ip: %s", err)
-		}
-	}
-
-	return nil
-}
-
 func (c *container) postZerotierNetwork(idx int, netID string) error {
 	if err := c.zerotierDaemon(); err != nil {
 		return err
 	}
 
 	home := c.zerotierHome()
-	_, err := c.sync("zerotier-cli", fmt.Sprintf("-D%s", home), "join", netID)
-	if err != nil {
-		return fmt.Errorf("join zerotier network failed: %v", err)
-	}
-
-	go c.moveZTNic(idx, netID)
-	return nil
+	_, err := c.sync("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "join", netID)
+	return err
 }
 
 func (c *container) postBridge(index int, n *Nic) error {

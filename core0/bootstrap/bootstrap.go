@@ -78,7 +78,7 @@ func (b *Bootstrap) canReachInternet() bool {
 	log.Debugf("Testing internet reachability to %s", InternetTestAddress)
 	resp, err := http.Get(InternetTestAddress)
 	if err != nil {
-		log.Warning("HTTP: %v", err)
+		log.Warningf("HTTP: %v", err)
 		return false
 	}
 	resp.Body.Close()
