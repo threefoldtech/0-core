@@ -1698,7 +1698,7 @@ class Experimental:
 
 
 class Client(BaseClient):
-    def __init__(self, host, port=6379, password="", db=0, timeout=None, testConnection=True, testConnectionAttempts=10):
+    def __init__(self, host, port=6379, password="", db=0, timeout=None, testConnectionAttempts=10):
         super().__init__(timeout=timeout)
 
         self._redis = redis.Redis(host=host, port=port, password=password, db=db)
@@ -1712,8 +1712,8 @@ class Client(BaseClient):
         self._logger = Logger(self)
         self._config = Config(self)
 
-        if testConnection:
-            for _ in range(10):
+        if testConnectionAttempts:
+            for _ in range(testConnectionAttempts):
                 try:
                     self.ping()
                 except:
