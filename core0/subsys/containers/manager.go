@@ -15,6 +15,7 @@ import (
 	"github.com/g8os/core0/base/pm/process"
 	"github.com/g8os/core0/base/utils"
 	"github.com/g8os/core0/core0/screen"
+	"github.com/g8os/core0/core0/subsys/cgroups"
 	"github.com/garyburd/redigo/redis"
 	"github.com/op/go-logging"
 	"github.com/pborman/uuid"
@@ -64,6 +65,7 @@ type ContainerCreateArguments struct {
 	HostNetwork bool              `json:"host_network"` //share host networking stack
 	Nics        []Nic             `json:"nics"`         //network setup (only respected if HostNetwork is false)
 	Port        map[int]int       `json:"port"`         //port forwards (only if default networking is enabled)
+	Privileged  bool              `json:"privileged"`   //Apply cgroups and capabilities limitations on the container
 	Hostname    string            `json:"hostname"`     //hostname
 	Storage     string            `json:"storage"`      //ardb storage needed for g8ufs mounts.
 	Tags        []string          `json:"tags"`         //for searching containers
@@ -149,7 +151,8 @@ type containerManager struct {
 	internal *internalRouter
 	sinks    map[string]base.SinkClient
 
-	cell *screen.RowCell
+	cell   *screen.RowCell
+	cgroup cgroups.Group
 }
 
 /*
@@ -174,6 +177,10 @@ type ContainerManager interface {
 }
 
 func ContainerSubsystem(sinks map[string]base.SinkClient, cell *screen.RowCell) (ContainerManager, error) {
+	if err := cgroups.Init(); err != nil {
+		return nil, err
+	}
+
 	containerMgr := &containerManager{
 		pool:       utils.NewRedisPool("unix", redisSocketSrc, ""),
 		containers: make(map[uint16]*container),
@@ -181,7 +188,15 @@ func ContainerSubsystem(sinks map[string]base.SinkClient, cell *screen.RowCell) 
 		internal:   newInternalRouter(),
 		cell:       cell,
 	}
+
 	cell.Text = "Containers: 0"
+
+	if err := containerMgr.setUpCGroups(); err != nil {
+		return nil, err
+	}
+	if err := containerMgr.setUpDefaultBridge(); err != nil {
+		return nil, err
+	}
 
 	pm.CmdMap[cmdContainerCreate] = process.NewInternalProcessFactory(containerMgr.create)
 	pm.CmdMap[cmdContainerList] = process.NewInternalProcessFactory(containerMgr.list)
@@ -189,13 +204,38 @@ func ContainerSubsystem(sinks map[string]base.SinkClient, cell *screen.RowCell) 
 	pm.CmdMap[cmdContainerTerminate] = process.NewInternalProcessFactory(containerMgr.terminate)
 	pm.CmdMap[cmdContainerFind] = process.NewInternalProcessFactory(containerMgr.find)
 
-	if err := containerMgr.setUpDefaultBridge(); err != nil {
-		return nil, err
-	}
-
 	go containerMgr.startForwarder()
 
 	return containerMgr, nil
+}
+
+func (m *containerManager) setUpCGroups() error {
+	devices, err := cgroups.GetGroup("corex", cgroups.DevicesSubsystem)
+	if err != nil {
+		return err
+	}
+
+	if devices, ok := devices.(cgroups.DevicesGroup); ok {
+		devices.Deny("a")
+		for _, spec := range []string{
+			"c 1:5 rwm",
+			"c 1:3 rwm",
+			"c 1:9 rwm",
+			"c 1:7 rwm",
+			"c 1:8 rwm",
+			"c 5:0 rwm",
+			"c 5:1 rwm",
+			"c 5:2 rwm",
+			"c *:* m",
+		} {
+			devices.Allow(spec)
+		}
+	} else {
+		return fmt.Errorf("failed to setup devices cgroups")
+	}
+
+	m.cgroup = devices
+	return nil
 }
 
 func (m *containerManager) setUpDefaultBridge() error {
@@ -261,7 +301,7 @@ func (m *containerManager) startForwarder() {
 	for {
 		if err := m.forwardNext(); err != nil {
 			log.Warningf("Failed to forward command result: %s", err)
-			time.Sleep(2 * time.Second)
+			<-time.After(2 * time.Second)
 		}
 	}
 }

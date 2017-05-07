@@ -5,6 +5,7 @@ import (
 	"github.com/g8os/core0/base/pm"
 	"github.com/g8os/core0/base/settings"
 	"github.com/g8os/core0/base/utils"
+	"github.com/g8os/core0/coreX/options"
 	"github.com/op/go-logging"
 	"github.com/shirou/gopsutil/process"
 	"github.com/vishvananda/netlink"
@@ -109,6 +110,12 @@ func (b *Bootstrap) Bootstrap(hostname string) error {
 	log.Debugf("linkin mtab")
 	if err := linkMtab(); err != nil {
 		return err
+	}
+
+	if options.Options.Unprivileged() {
+		if err := b.revokePrivileges(); err != nil {
+			return err
+		}
 	}
 
 	log.Debugf("startup services")

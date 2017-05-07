@@ -101,6 +101,17 @@ func (c *container) Start() (err error) {
 		return
 	}
 
+	args := []string{
+		"-core-id", fmt.Sprintf("%d", c.id),
+		"-redis-socket", "/redis.socket",
+		"-reply-to", coreXResponseQueue,
+		"-hostname", c.Args.Hostname,
+	}
+
+	if !c.Args.Privileged {
+		args = append(args, "-unprivileged")
+	}
+
 	mgr := pm.GetManager()
 	extCmd := &core.Command{
 		ID:    coreID,
@@ -111,12 +122,7 @@ func (c *container) Start() (err error) {
 				Chroot:      c.root(),
 				Dir:         "/",
 				HostNetwork: c.Args.HostNetwork,
-				Args: []string{
-					"-core-id", fmt.Sprintf("%d", c.id),
-					"-redis-socket", "/redis.socket",
-					"-reply-to", coreXResponseQueue,
-					"-hostname", c.Args.Hostname,
-				},
+				Args:        args,
 				Env: map[string]string{
 					"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 					"HOME": "/",
@@ -166,6 +172,10 @@ func (c *container) preStart() error {
 
 func (c *container) onpid(pid int) {
 	c.PID = pid
+	if !c.Args.Privileged {
+		c.mgr.cgroup.Task(pid)
+	}
+
 	if err := c.postStart(); err != nil {
 		log.Errorf("Container post start error: %s", err)
 		//TODO. Should we shut the container down?

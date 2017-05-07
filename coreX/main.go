@@ -85,11 +85,15 @@ func main() {
 
 	bs := bootstrap.NewBootstrap()
 
-	handleSignal(bs)
+	if opt.Unprivileged() {
+		mgr.SetUnprivileged()
+	}
 
 	if err := bs.Bootstrap(opt.Hostname()); err != nil {
 		log.Fatalf("Failed to bootstrap corex: %s", err)
 	}
+
+	handleSignal(bs)
 
 	sinkID := fmt.Sprintf("%d", opt.CoreID())
 
