@@ -196,10 +196,14 @@ func (b *bridgeMgr) bridgeStaticNetworking(bridge *netlink.Bridge, network *Brid
 
 	//we still dnsmasq also for the default bridge for dns resolving.
 
+	leases := fmt.Sprintf("/var/lib/misc/%s.leases", bridge.Name)
+	os.RemoveAll(leases)
+
 	args := []string{
 		"--no-hosts",
 		"--keep-in-foreground",
 		fmt.Sprintf("--pid-file=/var/run/dnsmasq/%s.pid", bridge.Name),
+		fmt.Sprintf("--dhcp-leasefile=%s", leases),
 		fmt.Sprintf("--listen-address=%s", addr.IP),
 		fmt.Sprintf("--interface=%s", bridge.Name),
 		"--bind-interfaces",
@@ -272,10 +276,14 @@ func (b *bridgeMgr) bridgeDnsMasqNetworking(bridge *netlink.Bridge, network *Bri
 	os.RemoveAll(hostsFile)
 	os.MkdirAll(hostsFile, 0755)
 
+	leases := fmt.Sprintf("/var/lib/misc/%s.leases", bridge.Name)
+	os.RemoveAll(leases)
+
 	args := []string{
 		"--no-hosts",
 		"--keep-in-foreground",
 		fmt.Sprintf("--pid-file=/var/run/dnsmasq/%s.pid", bridge.Name),
+		fmt.Sprintf("--dhcp-leasefile=%s", leases),
 		fmt.Sprintf("--listen-address=%s", addr.IP),
 		fmt.Sprintf("--interface=%s", bridge.Name),
 		fmt.Sprintf("--dhcp-range=%s,%s,%s", settings.Start, settings.End, net.IP(addr.Mask)),
