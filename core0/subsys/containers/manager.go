@@ -227,6 +227,8 @@ func (m *containerManager) setUpCGroups() error {
 			"c 5:1 rwm",
 			"c 5:2 rwm",
 			"c *:* m",
+			"c 136:* rwm",
+			"c 10:200 rwm",
 		} {
 			devices.Allow(spec)
 		}
