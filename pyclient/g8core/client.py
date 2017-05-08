@@ -1150,7 +1150,7 @@ class BtrfsManager:
 
         self._device_chk.check(args)
 
-        self._client.raw('btrfs.device_remove', args)
+        self._client.sync('btrfs.device_remove', args)
 
     def subvol_create(self, path):
         """
