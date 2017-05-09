@@ -1529,7 +1529,7 @@ class KvmManager:
 
     def attach_disk(self, uuid, media):
         """
-        Attach a disk to a mchine
+        Attach a disk to a machine
         :param uuid: uuid of the kvm container (same as the used in create)
         :param media: the media object to attach to the machine
                       media object is a dict of {url, and type} where type can be one of 'disk', or 'cdrom', or empty (default to disk)
