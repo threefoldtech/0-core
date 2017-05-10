@@ -1,11 +1,8 @@
 package settings
 
 import (
-	"fmt"
 	"github.com/g8os/core0/base/utils"
 	"github.com/op/go-logging"
-	"net/url"
-	"strings"
 )
 
 var (
@@ -59,12 +56,6 @@ type Security struct {
 	ClientCertificateKey string
 }
 
-//Controller url and certificates
-type SinkConfig struct {
-	URL      string `json:"url"`
-	Password string `json:"password"`
-}
-
 type Globals map[string]string
 
 func (g Globals) Get(key string, def ...string) string {
@@ -85,10 +76,9 @@ type AppSettings struct {
 		LogLevel string   `json:"log_level"`
 	} `json:"main"`
 
-	Globals   Globals               `json:"globals"`
-	Sink      map[string]SinkConfig `json:"sink"`
-	Extension map[string]Extension  `json:"extension"`
-	Logging   map[string]Logger     `json:"logger"`
+	Globals   Globals              `json:"globals"`
+	Extension map[string]Extension `json:"extension"`
+	Logging   map[string]Logger    `json:"logger"`
 
 	Stats struct {
 		//Interval is deprecated
@@ -108,18 +98,7 @@ func (s *AppSettings) Validate() []error {
 		s.Main.LogLevel = "info"
 	}
 
-	errors := make([]error, 0)
-	for name, con := range s.Sink {
-		if u, err := url.Parse(con.URL); err != nil {
-			verr := fmt.Errorf("[sink.%s] `url`: %s", name, err)
-			errors = append(errors, verr)
-		} else if !utils.InString([]string{"redis"}, strings.ToLower(u.Scheme)) {
-			verr := fmt.Errorf("[sink.%s] `url` has unknown schema (%s), only redis is allowed atm", name, u.Scheme)
-			errors = append(errors, verr)
-		}
-	}
-
-	return errors
+	return nil
 }
 
 //GetSettings loads main settings from a filename

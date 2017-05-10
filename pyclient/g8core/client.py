@@ -19,6 +19,8 @@ logger = logging.getLogger('g8core')
 class Timeout(Exception):
     pass
 
+class JobNotFound(Exception):
+    pass
 
 class Return:
     def __init__(self, payload):
@@ -99,6 +101,12 @@ class Response:
     def id(self):
         return self._id
 
+    @property
+    def exists(self):
+        r = self._client._redis
+        flag = '{}:flag'.format(self._queue)
+        return r.rpoplpush(flag, flag) is not None
+
     def get(self, timeout=None):
         if timeout is None:
             timeout = self._client.timeout
@@ -106,8 +114,10 @@ class Response:
         start = time.time()
         maxwait = timeout
         while maxwait > 0:
+            if not self.exists:
+                raise JobNotFound(self.id)
             v = r.brpoplpush(self._queue, self._queue, 10)
-            if not v is None:
+            if v is not None:
                 payload = json.loads(v.decode())
                 r = Return(payload)
                 logger.debug('%s << %s, stdout="%s", stderr="%s", data="%s"', self._id, r.state, r.stdout, r.stderr, r.data[:1000])
@@ -477,7 +487,7 @@ class BaseClient:
     def filesystem(self):
         return self._filesystem
 
-    def raw(self, command, arguments, queue=None):
+    def raw(self, command, arguments, queue=None, max_time=None):
         """
         Implements the low level command call, this needs to build the command structure
         and push it on the correct queue.
@@ -580,7 +590,8 @@ class ContainerClient(BaseClient):
         'command': {
             'command': str,
             'arguments': typchk.Any(),
-            'queue': typchk.Or(str, typchk.IsNone())
+            'queue': typchk.Or(str, typchk.IsNone()),
+            'max_time': typchk.Or(int, typchk.IsNone()),
         }
     })
 
@@ -594,7 +605,7 @@ class ContainerClient(BaseClient):
     def container(self):
         return self._container
 
-    def raw(self, command, arguments, queue=None):
+    def raw(self, command, arguments, queue=None, max_time=None):
         """
         Implements the low level command call, this needs to build the command structure
         and push it on the correct queue.
@@ -610,6 +621,7 @@ class ContainerClient(BaseClient):
                 'command': command,
                 'arguments': arguments,
                 'queue': queue,
+                'max_time': max_time,
             },
         }
 
@@ -1788,7 +1800,7 @@ class Client(BaseClient):
     def config(self):
         return self._config
 
-    def raw(self, command, arguments, queue=None):
+    def raw(self, command, arguments, queue=None, max_time=None):
         """
         Implements the low level command call, this needs to build the command structure
         and push it on the correct queue.
@@ -1805,9 +1817,13 @@ class Client(BaseClient):
             'command': command,
             'arguments': arguments,
             'queue': queue,
+            'max_time': max_time,
         }
 
+        flag = 'result:{}:flag'.format(id)
         self._redis.rpush('core:default', json.dumps(payload))
+        if self._redis.brpoplpush(flag, flag, DefaultTimeout) is None:
+            Timeout('failed to queue job {}'.format(id))
         logger.debug('%s >> g8core.%s(%s)', id, command, ', '.join(("%s=%s" % (k,v) for k, v in arguments.items())))
 
         return Response(self, id)

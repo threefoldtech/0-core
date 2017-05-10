@@ -1,28 +1,26 @@
 package main
 
 import (
-	"time"
-
+	"fmt"
 	"github.com/g8os/core0/base"
 	"github.com/g8os/core0/base/pm"
 	pmcore "github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/settings"
+	"github.com/g8os/core0/core0/assets"
 	"github.com/g8os/core0/core0/bootstrap"
 	"github.com/g8os/core0/core0/logger"
-	"github.com/op/go-logging"
-
-	"fmt"
-	"os"
-
-	_ "github.com/g8os/core0/base/builtin"
-	"github.com/g8os/core0/core0/assets"
-	_ "github.com/g8os/core0/core0/builtin"
-	_ "github.com/g8os/core0/core0/builtin/btrfs"
 	"github.com/g8os/core0/core0/options"
 	"github.com/g8os/core0/core0/screen"
 	"github.com/g8os/core0/core0/stats"
 	"github.com/g8os/core0/core0/subsys/containers"
 	"github.com/g8os/core0/core0/subsys/kvm"
+	"github.com/op/go-logging"
+	"os"
+	"time"
+
+	_ "github.com/g8os/core0/base/builtin"
+	_ "github.com/g8os/core0/core0/builtin"
+	_ "github.com/g8os/core0/core0/builtin/btrfs"
 )
 
 var (
@@ -82,10 +80,6 @@ func main() {
 		log.Fatalf("\nConfig validation error, please fix and try again.")
 	}
 
-	if settings.Settings.Sink == nil {
-		settings.Settings.Sink = make(map[string]settings.SinkConfig)
-	}
-
 	var config = settings.Settings
 
 	var loglevel string
@@ -121,23 +115,6 @@ func main() {
 	bs := bootstrap.NewBootstrap()
 	bs.Bootstrap()
 
-	// start logs forwarder
-	logger.StartForwarder()
-
-	sinkID := fmt.Sprintf("default")
-
-	//build list with ACs that we will poll from.
-	sinks := make(map[string]core.SinkClient)
-	for key, sinkCfg := range config.Sink {
-		cl, err := core.NewSinkClient(&sinkCfg, sinkID)
-		if err != nil {
-			log.Warning("Can't reach sink %s: %s", sinkCfg.URL, err)
-			continue
-		}
-
-		sinks[key] = cl
-	}
-
 	log.Infof("Setting up stats aggregator clients")
 	if config.Stats.Redis.Enabled {
 		aggregator, err := stats.NewRedisStatsAggregator(config.Stats.Redis.Address, "", 1000, time.Duration(config.Stats.Redis.FlushInterval)*time.Second)
@@ -155,8 +132,12 @@ func main() {
 	}
 	screen.Push(row)
 
-	//start/register containers commands and process
-	contMgr, err := containers.ContainerSubsystem(sinks, &row.Cells[0])
+	sink, err := core.NewSink("default", mgr, core.SinkConfig{URL: "redis://127.0.0.1:6379"})
+	if err != nil {
+		log.Errorf("failed to start command sink: %s", err)
+	}
+
+	contMgr, err := containers.ContainerSubsystem(sink, &row.Cells[0])
 	if err != nil {
 		log.Fatal("failed to intialize container subsystem", err)
 	}
@@ -165,7 +146,6 @@ func main() {
 		log.Errorf("failed to initialize kvm subsystem", err)
 	}
 
-	//start local transport
 	log.Infof("Starting local transport")
 	local, err := NewLocal(contMgr, "/var/run/core.sock")
 	if err != nil {
@@ -176,7 +156,8 @@ func main() {
 
 	//start jobs sinks.
 	log.Infof("Starting Sinks")
-	core.StartSinks(pm.GetManager(), sinks)
+
+	sink.Start()
 	screen.Refresh()
 
 	//wait

@@ -1,82 +1,96 @@
 package core
 
 import (
-	"time"
-
+	"fmt"
 	"github.com/g8os/core0/base/pm"
 	"github.com/g8os/core0/base/pm/core"
+	"time"
 )
 
-type Sink interface {
-	Run()
+const (
+	SinkRoute = core.Route("sink")
+)
+
+type Sink struct {
+	key string
+	mgr *pm.PM
+	ch  *channel
 }
 
-type SinkClient interface {
-	GetNext(command *core.Command) error
-	Respond(result *core.JobResult) error
+type SinkConfig struct {
+	URL      string `json:"url"`
+	Password string `json:"password"`
 }
 
-type sinkImpl struct {
-	key    string
-	mgr    *pm.PM
-	client SinkClient
-}
-
-func getKeys(m map[string]SinkClient) []string {
-	keys := make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
+func NewSink(key string, mgr *pm.PM, config SinkConfig) (*Sink, error) {
+	public, err := newChannel(config.URL, config.Password)
+	if err != nil {
+		return nil, err
 	}
 
-	return keys
-}
-
-func NewSink(key string, mgr *pm.PM, client SinkClient) Sink {
-	poll := &sinkImpl{
-		key:    key,
-		mgr:    mgr,
-		client: client,
+	sink := &Sink{
+		key: key,
+		mgr: mgr,
+		ch:  public,
 	}
 
-	return poll
+	return sink, nil
 }
 
-func (poll *sinkImpl) handler(cmd *core.Command, result *core.JobResult) {
-	if err := poll.client.Respond(result); err != nil {
+func (sink *Sink) DefaultQueue() string {
+	return fmt.Sprintf("core:%v",
+		sink.key,
+	)
+}
+
+func (sink *Sink) handlePublic(cmd *core.Command, result *core.JobResult) {
+	//yes, we unflag the command on the private redis not the public, it's were we
+	//keep the flags.
+	sink.ch.UnFlag(cmd.ID)
+	if err := sink.ch.Respond(result); err != nil {
 		log.Errorf("Failed to respond to command %s: %s", cmd, err)
 	}
 }
 
-func (poll *sinkImpl) run() {
-	poll.mgr.AddRouteResultHandler(core.Route(poll.key), poll.handler)
+func (sink *Sink) run() {
+	sink.mgr.AddRouteResultHandler(SinkRoute, sink.handlePublic)
 
+	queue := sink.DefaultQueue()
 	for {
 		var command core.Command
-		err := poll.client.GetNext(&command)
+		err := sink.ch.GetNext(queue, &command)
 		if err != nil {
-			log.Errorf("Failed to get next command from %s: %s", poll.client, err)
+			log.Errorf("Failed to get next command from %s(%s): %s", sink.key, queue, err)
 			<-time.After(200 * time.Millisecond)
 			continue
 		}
 
-		command.Route = core.Route(poll.key)
+		if command.ID == "" {
+			log.Warningf("receiving a command with no ID, dropping")
+			continue
+		}
 
+		sink.ch.Flag(command.ID)
+		command.Route = SinkRoute
 		log.Debugf("Starting command %s", &command)
 
-		poll.mgr.PushCmd(&command)
+		sink.mgr.PushCmd(&command)
 	}
 }
 
-func (poll *sinkImpl) Run() {
-	go poll.run()
+func (sink *Sink) Forward(queue string, cmd *core.Command) error {
+	defer sink.ch.Flag(cmd.ID)
+	return sink.ch.Push(queue, cmd)
 }
 
-/*
-StartSinks starts the long polling routines and feed the manager with received commands
-*/
-func StartSinks(mgr *pm.PM, sinks map[string]SinkClient) {
-	for key, sinkCl := range sinks {
-		poll := NewSink(key, mgr, sinkCl)
-		poll.Run()
+func (sink *Sink) Start() {
+	go sink.run()
+}
+
+func (sink *Sink) Result(job string, timeout int) (*core.JobResult, error) {
+	if sink.ch.Flagged(job) {
+		return sink.ch.GetResponse(job, timeout)
+	} else {
+		return nil, fmt.Errorf("unknown job id '%s' (may be it has expired)", job)
 	}
 }

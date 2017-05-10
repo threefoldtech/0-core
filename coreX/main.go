@@ -8,7 +8,6 @@ import (
 	"github.com/g8os/core0/base/logger"
 	"github.com/g8os/core0/base/pm"
 	pmcore "github.com/g8os/core0/base/pm/core"
-	"github.com/g8os/core0/base/settings"
 	"github.com/g8os/core0/coreX/bootstrap"
 	"github.com/g8os/core0/coreX/options"
 	"github.com/op/go-logging"
@@ -95,22 +94,6 @@ func main() {
 
 	handleSignal(bs)
 
-	sinkID := fmt.Sprintf("%d", opt.CoreID())
-
-	sinkCfg := settings.SinkConfig{
-		URL:      fmt.Sprintf("redis://%s", opt.RedisSocket()),
-		Password: opt.RedisPassword(),
-	}
-
-	cl, err := core.NewSinkClient(&sinkCfg, sinkID, opt.ReplyTo())
-	if err != nil {
-		log.Fatal("Failed to get connection to redis at %s", sinkCfg.URL)
-	}
-
-	sinks := map[string]core.SinkClient{
-		"main": cl,
-	}
-
 	log.Infof("Configure redis logger")
 
 	mgr.AddMessageHandler(rl.Log)
@@ -120,8 +103,13 @@ func main() {
 		fmt.Printf("10::core-%d.%s:%f|%s|%s\n", opt.CoreID(), key, value, op, tags)
 	})
 
-	//start jobs sinks.
-	core.StartSinks(pm.GetManager(), sinks)
+	sinkID := fmt.Sprintf("%d", opt.CoreID())
+
+	sink, err := core.NewSink(sinkID, mgr, core.SinkConfig{URL: fmt.Sprintf("redis://%s", opt.RedisSocket())})
+	if err != nil {
+		log.Errorf("failed to start command sink: %s", err)
+	}
+	sink.Start()
 
 	//wait
 	select {}
