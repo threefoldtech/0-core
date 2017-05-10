@@ -1063,7 +1063,7 @@ type Machine struct {
 	UUID  string `json:"uuid"`
 	Name  string `json:"name"`
 	State string `json:"state"`
-	VNC   int    `json:"vnc"`
+	Vnc   int    `json:"vnc"`
 }
 
 func (m *kvmManager) list(cmd *core.Command) (interface{}, error) {
@@ -1107,7 +1107,7 @@ func (m *kvmManager) list(cmd *core.Command) (interface{}, error) {
 			UUID:  uuid,
 			Name:  name,
 			State: StateToString(state),
-			VNC:   port,
+			Vnc:   port,
 		})
 	}
 
