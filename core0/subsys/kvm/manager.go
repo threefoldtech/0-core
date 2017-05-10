@@ -805,6 +805,12 @@ func (m *kvmManager) attachDisk(cmd *core.Command) (interface{}, error) {
 	}
 	count := len(domainstruct.Devices.Disks)
 	disk := m.mkDisk(count, params.Media)
+	disks := domainstruct.Devices.Disks
+	for _, d := range disks {
+		if d.Source == disk.Source {
+			return nil, fmt.Errorf("The disk you tried is already attached to the vm")
+		}
+	}
 	diskxml, err := xml.MarshalIndent(disk, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal disk to xml")
@@ -857,11 +863,21 @@ func (m *kvmManager) addNic(cmd *core.Command) (interface{}, error) {
 		HWAddress: params.HWAddress,
 	}
 
+	domainstruct, err := m.getDomainStruct(params.UUID)
+	if err != nil {
+		return nil, err
+	}
+
 	switch nic.Type {
 	case "default":
-		// TODO: support adding default network
-		// inf, err = m.prepareDefaultNetwork(domain.UUID, seq, args.Port)
-		err = fmt.Errorf("default network hot plugging is not supported at the moment")
+		for _, nic := range domainstruct.Devices.Interfaces {
+			if nic.Source.Bridge == DefaultBridgeName {
+				return nil, fmt.Errorf("The default nic is already attached to the vm")
+			}
+		}
+		seq := m.getNextSequence()
+		// TODO: use the ports that the domain was created with initially
+		inf, err = m.prepareDefaultNetwork(params.UUID, seq, map[int]int{})
 	case "bridge":
 		if nic.ID == DefaultBridgeName {
 			err = fmt.Errorf("the default bridge for the vm should not be added manually")
@@ -879,14 +895,12 @@ func (m *kvmManager) addNic(cmd *core.Command) (interface{}, error) {
 		return nil, err
 	}
 
-	domainstruct, err := m.getDomainStruct(params.UUID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, nic := range domainstruct.Devices.Interfaces {
-		if nic.Source == inf.Source {
-			return nil, fmt.Errorf("This Nic is already attached to the vm")
+	// We check for the default network upfront
+	if nic.Type != "default" {
+		for _, nic := range domainstruct.Devices.Interfaces {
+			if nic.Source == inf.Source {
+				return nil, fmt.Errorf("This nic is already attached to the vm")
+			}
 		}
 	}
 
@@ -901,6 +915,7 @@ func (m *kvmManager) removeNic(cmd *core.Command) (interface{}, error) {
 	var (
 		params ManNicParams
 		inf    *InterfaceDevice
+		tmp    *InterfaceDevice
 		source InterfaceDeviceSource
 		err    error
 	)
@@ -923,13 +938,11 @@ func (m *kvmManager) removeNic(cmd *core.Command) (interface{}, error) {
 			Bridge: nic.ID,
 		}
 	case "vlan":
-		source = InterfaceDeviceSource{
-			Network: OVSBackPlane,
-		}
+		tmp, err = m.prepareVLanNetwork(&nic)
+		source = tmp.Source
 	case "vxlan":
-		source = InterfaceDeviceSource{
-			Network: OVSVXBackend,
-		}
+		tmp, err = m.prepareVXLanNetwork(&nic)
+		source = tmp.Source
 	default:
 		err = fmt.Errorf("unsupported network mode: %s", nic.Type)
 	}
