@@ -1,5 +1,9 @@
 # Creating Flists
 
+Also see: https://docs.greenitglobe.com/gig_products/vdc_gig_g8os/src/master/docs/container_flist_creation.md
+
+@todo: integrate the above here
+
 The easiest way to create a flist is using our [Hub](hub.md), but if you want to create it manually, read the following.
 
 To create a flist you need [JumpScale](https://github.com/Jumpscale/jumpscale_core8#how-to-install-from-master).
