@@ -1,5 +1,9 @@
 # Creating Containers
 
+Also see: https://docs.greenitglobe.com/gig_products/vdc_gig_g8os/src/master/docs/container_flist_creation.md
+
+@todo: integrate step 2 of the above here
+
 Pre-requirements:
 
 - Make sure you have a working G8OS instance running
