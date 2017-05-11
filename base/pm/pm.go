@@ -410,6 +410,9 @@ func (pm *PM) Killall() {
 	defer pm.runnersMux.Unlock()
 
 	for _, v := range pm.runners {
+		if v.Command().Protected {
+			continue
+		}
 		v.Terminate()
 	}
 }
