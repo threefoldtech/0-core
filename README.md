@@ -2,29 +2,38 @@
 [![Build Status](https://travis-ci.org/g8os/core0.svg?branch=master)](https://travis-ci.org/g8os/core0)
 [![codecov](https://codecov.io/gh/g8os/core0/branch/master/graph/badge.svg)](https://codecov.io/gh/g8os/core0)
 
-# Core
+# Core0
 
-Systemd replacement for G8OS
+Core0 is a `systemd` replacement for G8OS.
 
-## Releases:
+## Branches
+
 - [0.9.0](https://github.com/g8os/core0/tree/0.9.0)
 - [0.10.0](https://github.com/g8os/core0/tree/0.10.0)
 - [0.11.0](https://github.com/g8os/core0/tree/0.11.0)
-- [1.0.0](https://github.com/g8os/core0/tree/1.0.0) - last release
+- [1.0.0](https://github.com/g8os/core0/tree/1.0.0)
+- [1.1.0-alpha](https://github.com/g8os/core0/tree/1.1.0-alpha) - last release
+
+## Releases
+
+See the release schedule in the [G8OS home repository](https://github.com/g8os/home).
 
 ## Development setup
-To run core0 in a container, just run the following command (this will pull the needed image as well)
+
+To run Core0 in a container, just run the following command, which will pull the needed image as well:
+
 ```
 docker run --privileged -d --name core -p 6379:6379 g8os/g8os-dev:1.0
 ```
 
-To follow the container logs do
+To follow the container logs do:
 ```bash
 docker logs -f core
 ```
 
-## Using the client
-Before using the client make sure the `./pyclient` is in your *PYTHONPATH*
+## Using the Python client
+
+Before using the client make sure the `./pyclient` is in your `PYTHONPATH`.
 
 ```python
 import client
@@ -49,8 +58,9 @@ print(
 )
 ```
 
-# Features
-v0.9:
+## Features
+
+### v0.9
 - Boot the core0 as init process
 - Manage disks
 - Create containers
@@ -63,26 +73,27 @@ v0.9:
   - via Python client
   - via redis
 
-v0.10:
+### v0.10
 - change datastore for fuse filesystem from ipfs to [G8OS Store](https://github.com/g8os/stor).
 
-v0.11:
+### v0.11
 - include of the monitoring of all processes running on the g8os.
   It produces aggregated statistics on the processes that can be dump into a time series database and displayed used something like grafana.
 
-v1.0.0:
+### v1.0.0
 - New Flist format, the Flist used in the G8OSFS is now a distributed as a rocksdb database.
 - Creation of the [G8OS Hub](https://github.com/g8os/core0/tree/1.0.0), see https://github.com/g8os/hub
 - Improvement of the builtin commands of core0 and coreX
 
-# Documentation
-The full documentation, examples and walkthrough is now located in the [Home repo](https://github.com/g8os/home) of this github account.
+### Next
 
-# Available Commands
-[Commands Documentation](docs/commands.md)
+See the milestones in the [G8OS home repository](https://github.com/g8os/home): [G8OS Milestones](https://github.com/g8os/home/tree/master/milestones)
 
-# Schema
+## Schema
 ![Schema Plan](specs/schema.png)
 
-# Examples
-You can find example usage [here](docs/examples/index.md)
+## Documentation
+
+All documentation is in the [`/docs`](./docs) directory, including a [table of contents](/docs/SUMMARY.md).
+
+In [Getting Started with Core0](/docs/gettingstarted/gettingstarted.md) you find the recommended path to quickly get up and running.
