@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 const (
@@ -36,6 +38,10 @@ func Redirect(p string) error {
 func Rotate(p string) error {
 	if output != nil {
 		output.Close()
+		os.Rename(
+			output.Name(),
+			fmt.Sprintf("%s.%v", output.Name(), time.Now().Format("20060102-0405")),
+		)
 	}
 
 	return Redirect(p)
