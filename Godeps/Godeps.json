@@ -16,6 +16,11 @@
 			"Rev": "c1c3bd7e847a231b2b1f9592fa86182a121ad734"
 		},
 		{
+			"ImportPath": "github.com/codegangsta/cli",
+			"Comment": "v1.18.0-47-g168c954",
+			"Rev": "168c95418e66e019fe17b8f4f5c45aa62ff80e23"
+		},
+		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
 			"Comment": "v1.0.0-9-g346938d",
 			"Rev": "346938d642f2ec3594ed81d874461961cd0faa76"
@@ -39,6 +44,16 @@
 			"Rev": "97ac8b05c02bbb755d36549e7e607433dfbef4b2"
 		},
 		{
+			"ImportPath": "github.com/libvirt/libvirt-go",
+			"Comment": "v3.2.0-13-gd1dd72b",
+			"Rev": "d1dd72b576736b3726d7f754bedcdd287c377e15"
+		},
+		{
+			"ImportPath": "github.com/mattn/go-runewidth",
+			"Comment": "v0.0.1",
+			"Rev": "d6bea18f789704b5f83375793155289da36a3c7f"
+		},
+		{
 			"ImportPath": "github.com/naoina/go-stringutil",
 			"Rev": "6b638e95a32d0c1131db0e7fe83775cbea4a0d0b"
 		},
@@ -51,6 +66,10 @@
 			"ImportPath": "github.com/naoina/toml/ast",
 			"Comment": "v0.1.0",
 			"Rev": "751171607256bb66e64c9f0220c00662420c38e9"
+		},
+		{
+			"ImportPath": "github.com/olekukonko/tablewriter",
+			"Rev": "febf2d34b54a69ce7530036c7503b1c9fbfdf0bb"
 		},
 		{
 			"ImportPath": "github.com/op/go-logging",
@@ -71,38 +90,38 @@
 		},
 		{
 			"ImportPath": "github.com/shirou/gopsutil/cpu",
-			"Comment": "v2.0.0-1-g5daf090",
-			"Rev": "5daf090513cd856198b04a3f65dd7539c7602112"
+			"Comment": "v2.17.03",
+			"Rev": "e49a95f3d5f824c3f9875ca49e54e4fef17f82cf"
 		},
 		{
 			"ImportPath": "github.com/shirou/gopsutil/disk",
-			"Comment": "v2.0.0-1-g5daf090",
-			"Rev": "5daf090513cd856198b04a3f65dd7539c7602112"
+			"Comment": "v2.17.03",
+			"Rev": "e49a95f3d5f824c3f9875ca49e54e4fef17f82cf"
 		},
 		{
 			"ImportPath": "github.com/shirou/gopsutil/host",
-			"Comment": "v2.0.0-1-g5daf090",
-			"Rev": "5daf090513cd856198b04a3f65dd7539c7602112"
+			"Comment": "v2.17.03",
+			"Rev": "e49a95f3d5f824c3f9875ca49e54e4fef17f82cf"
 		},
 		{
 			"ImportPath": "github.com/shirou/gopsutil/internal/common",
-			"Comment": "v2.0.0-1-g5daf090",
-			"Rev": "5daf090513cd856198b04a3f65dd7539c7602112"
+			"Comment": "v2.17.03",
+			"Rev": "e49a95f3d5f824c3f9875ca49e54e4fef17f82cf"
 		},
 		{
 			"ImportPath": "github.com/shirou/gopsutil/mem",
-			"Comment": "v2.0.0-1-g5daf090",
-			"Rev": "5daf090513cd856198b04a3f65dd7539c7602112"
+			"Comment": "v2.17.03",
+			"Rev": "e49a95f3d5f824c3f9875ca49e54e4fef17f82cf"
 		},
 		{
 			"ImportPath": "github.com/shirou/gopsutil/net",
-			"Comment": "v2.0.0-1-g5daf090",
-			"Rev": "5daf090513cd856198b04a3f65dd7539c7602112"
+			"Comment": "v2.17.03",
+			"Rev": "e49a95f3d5f824c3f9875ca49e54e4fef17f82cf"
 		},
 		{
 			"ImportPath": "github.com/shirou/gopsutil/process",
-			"Comment": "v2.0.0-1-g5daf090",
-			"Rev": "5daf090513cd856198b04a3f65dd7539c7602112"
+			"Comment": "v2.17.03",
+			"Rev": "e49a95f3d5f824c3f9875ca49e54e4fef17f82cf"
 		},
 		{
 			"ImportPath": "github.com/shirou/w32",
@@ -115,15 +134,33 @@
 		},
 		{
 			"ImportPath": "github.com/vishvananda/netlink",
-			"Rev": "adb0f53af689dd38f1443eba79489feaacf0b22e"
+			"Rev": "aec6f885c2544dafc5baedfc95fdd15e75a1b1b4"
 		},
 		{
 			"ImportPath": "github.com/vishvananda/netlink/nl",
-			"Rev": "adb0f53af689dd38f1443eba79489feaacf0b22e"
+			"Rev": "aec6f885c2544dafc5baedfc95fdd15e75a1b1b4"
+		},
+		{
+			"ImportPath": "github.com/vishvananda/netns",
+			"Rev": "54f0e4339ce73702a0607f49922aaa1e749b418d"
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
-			"Rev": "833a04a10549a95dc34458c195cbad61bbb6cb4d"
+			"Rev": "f3918c30c5c2cb527c0b071a27c35120a6c0719a"
+		},
+		{
+			"ImportPath": "gopkg.in/yaml.v2",
+			"Rev": "a5b47d31c556af34a302ce5d659e6fea44d90de0"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/vendor/github.com/davecgh/go-spew/spew",
+			"Comment": "v1.1.4-4-g976c720",
+			"Rev": "976c720a22c8eb4eb6a0b4348ad85ad12491a506"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/vendor/github.com/pmezard/go-difflib/difflib",
+			"Comment": "v1.1.4-4-g976c720",
+			"Rev": "976c720a22c8eb4eb6a0b4348ad85ad12491a506"
 		}
 	]
 }

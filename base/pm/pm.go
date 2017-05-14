@@ -3,7 +3,6 @@ package pm
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"strconv"
@@ -32,6 +31,8 @@ var (
 	DuplicateIDErr    = errors.New("duplicate job id")
 )
 
+type PreProcessor func(cmd *core.Command)
+
 //MeterHandler represents a callback type
 type MeterHandler func(cmd *core.Command, p *psutil.Process)
 
@@ -45,7 +46,6 @@ type StatsHandler func(operation string, key string, value float64, tags string)
 
 //PM is the main process manager.
 type PM struct {
-	midMux  sync.Mutex
 	cmds    chan *core.Command
 	runners map[string]Runner
 
@@ -53,6 +53,7 @@ type PM struct {
 	maxJobs    int
 	jobsCond   *sync.Cond
 
+	preProcessors       []PreProcessor
 	msgHandlers         []MessageHandler
 	resultHandlers      []ResultHandler
 	routeResultHandlers map[core.Route][]ResultHandler
@@ -61,6 +62,8 @@ type PM struct {
 
 	pids    map[int]chan syscall.WaitStatus
 	pidsMux sync.Mutex
+
+	unprivileged bool
 }
 
 var pm *PM
@@ -91,37 +94,26 @@ func GetManager() *PM {
 	return pm
 }
 
-func loadMid(midfile string) uint32 {
-	content, err := ioutil.ReadFile(midfile)
-	if err != nil {
-		log.Errorf("%s", err)
-		return 0
-	}
-	v, err := strconv.ParseUint(string(content), 10, 32)
-	if err != nil {
-		log.Errorf("%s", err)
-		return 0
-	}
-	return uint32(v)
-}
-
-func saveMid(midfile string, mid uint32) {
-	ioutil.WriteFile(midfile, []byte(fmt.Sprintf("%d", mid)), 0644)
-}
-
-//RunCmd runs and manage command
+//PushCmd schedules a command to run, might block if no free slots available
+//it also runs all the preprocessors
 func (pm *PM) PushCmd(cmd *core.Command) {
-	pm.cmds <- cmd
+	for _, processor := range pm.preProcessors {
+		processor(cmd)
+	}
+
+	if cmd.Queue == "" {
+		pm.cmds <- cmd
+	} else {
+		pm.pushCmdToQueue(cmd)
+	}
 }
 
-/*
-RunCmdQueued Same as RunCmdAsync put will queue the command for later execution when there are no
-other commands runs on the same queue.
-
-The queue name is retrieved from cmd.Args[queue]
-*/
-func (pm *PM) PushCmdToQueue(cmd *core.Command) {
+func (pm *PM) pushCmdToQueue(cmd *core.Command) {
 	pm.queueMgr.Push(cmd)
+}
+
+func (pm *PM) AddPreProcessor(processor PreProcessor) {
+	pm.preProcessors = append(pm.preProcessors, processor)
 }
 
 //AddMessageHandler adds handlers for messages that are captured from sub processes. Logger can use this to
@@ -144,6 +136,10 @@ func (pm *PM) AddStatsHandler(handler StatsHandler) {
 	pm.statsFlushHandlers = append(pm.statsFlushHandlers, handler)
 }
 
+func (pm *PM) SetUnprivileged() {
+	pm.unprivileged = true
+}
+
 func (pm *PM) NewRunner(cmd *core.Command, factory process.ProcessFactory, hooks ...RunnerHook) (Runner, error) {
 	pm.runnersMux.Lock()
 	defer pm.runnersMux.Unlock()
@@ -156,22 +152,31 @@ func (pm *PM) NewRunner(cmd *core.Command, factory process.ProcessFactory, hooks
 	runner := NewRunner(pm, cmd, factory, hooks...)
 	pm.runners[cmd.ID] = runner
 
-	go runner.Run()
+	go runner.start(pm.unprivileged)
 
 	return runner, nil
 }
 
-func (pm *PM) RunCmd(cmd *core.Command, hooks ...RunnerHook) (Runner, error) {
+//RunCmd runs a command immediately (no pre-processors)
+func (pm *PM) RunCmd(cmd *core.Command, hooks ...RunnerHook) (runner Runner, err error) {
 	factory := GetProcessFactory(cmd)
+	defer func() {
+		if err != nil {
+			pm.queueMgr.Notify(cmd)
+			pm.jobsCond.Broadcast()
+		}
+	}()
+
 	if factory == nil {
 		log.Errorf("Unknow command '%s'", cmd.Command)
 		errResult := core.NewBasicJobResult(cmd)
 		errResult.State = core.StateUnknownCmd
 		pm.resultCallback(cmd, errResult)
-		return nil, UnknownCommandErr
+		err = UnknownCommandErr
+		return
 	}
 
-	runner, err := pm.NewRunner(cmd, factory, hooks...)
+	runner, err = pm.NewRunner(cmd, factory, hooks...)
 
 	if err == DuplicateIDErr {
 		log.Errorf("Duplicate job id '%s'", cmd.ID)
@@ -179,16 +184,16 @@ func (pm *PM) RunCmd(cmd *core.Command, hooks ...RunnerHook) (Runner, error) {
 		errResult.State = core.StateDuplicateID
 		errResult.Data = err.Error()
 		pm.resultCallback(cmd, errResult)
-		return nil, err
+		return
 	} else if err != nil {
 		errResult := core.NewBasicJobResult(cmd)
 		errResult.State = core.StateError
 		errResult.Data = err.Error()
 		pm.resultCallback(cmd, errResult)
-		return nil, err
+		return
 	}
 
-	return runner, nil
+	return
 }
 
 func (pm *PM) processCmds() {
@@ -325,6 +330,7 @@ func (pm *PM) RunSlice(slice settings.StartupSlice) {
 			Command:         startup.Name,
 			RecurringPeriod: startup.RecurringPeriod,
 			MaxRestart:      startup.MaxRestart,
+			Protected:       startup.Protected,
 			Arguments:       core.MustArguments(startup.Args),
 		}
 
@@ -332,44 +338,48 @@ func (pm *PM) RunSlice(slice settings.StartupSlice) {
 			log.Debugf("Waiting for %s to run %s", up.After, cmd)
 			canRun := state.Wait(up.After...)
 
-			if canRun {
-				log.Infof("Starting %s", c)
-				var hooks []RunnerHook
+			if !canRun {
+				log.Errorf("Can't start %s because one of the dependencies failed", c)
+				state.Release(c.ID, false)
+				return
+			}
 
-				if up.RunningMatch != "" {
-					//NOTE: If runner match is provided it take presence over the delay
-					hooks = append(hooks, &MatchHook{
-						Match: up.RunningMatch,
-						Action: func(msg *stream.Message) {
-							log.Infof("Got '%s' from '%s' signal running", msg.Message, c.ID)
-							state.Release(c.ID, true)
-						},
-					})
-				} else if up.RunningDelay >= 0 {
-					d := 2 * time.Second
-					if up.RunningDelay > 0 {
-						d = time.Duration(up.RunningDelay) * time.Second
-					}
+			log.Infof("Starting %s", c)
+			var hooks []RunnerHook
 
-					hook := &DelayHook{
-						Delay: d,
-						Action: func() {
-							state.Release(c.ID, true)
-						},
-					}
-					hooks = append(hooks, hook)
-				}
-
-				hooks = append(hooks, &ExitHook{
-					Action: func(s bool) {
-						state.Release(c.ID, s)
+			if up.RunningMatch != "" {
+				//NOTE: If runner match is provided it take presence over the delay
+				hooks = append(hooks, &MatchHook{
+					Match: up.RunningMatch,
+					Action: func(msg *stream.Message) {
+						log.Infof("Got '%s' from '%s' signal running", msg.Message, c.ID)
+						state.Release(c.ID, true)
 					},
 				})
+			} else if up.RunningDelay >= 0 {
+				d := 2 * time.Second
+				if up.RunningDelay > 0 {
+					d = time.Duration(up.RunningDelay) * time.Second
+				}
 
-				pm.RunCmd(c, hooks...)
+				hook := &DelayHook{
+					Delay: d,
+					Action: func() {
+						state.Release(c.ID, true)
+					},
+				}
+				hooks = append(hooks, hook)
+			}
 
-			} else {
-				log.Errorf("Can't start %s because one of the dependencies failed", c)
+			hooks = append(hooks, &ExitHook{
+				Action: func(s bool) {
+					state.Release(c.ID, s)
+				},
+			})
+
+			_, err := pm.RunCmd(c, hooks...)
+			if err != nil {
+				//failed to dispatch command to process manager.
 				state.Release(c.ID, false)
 			}
 		}(startup, cmd)
@@ -400,6 +410,9 @@ func (pm *PM) Killall() {
 	defer pm.runnersMux.Unlock()
 
 	for _, v := range pm.runners {
+		if v.Command().Protected {
+			continue
+		}
 		v.Terminate()
 	}
 }

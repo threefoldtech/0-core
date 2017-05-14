@@ -1,54 +1,70 @@
 package main
 
 import (
+	"fmt"
+	"os"
+	"time"
+
 	"github.com/g8os/core0/base"
 	"github.com/g8os/core0/base/pm"
 	pmcore "github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/settings"
+	"github.com/g8os/core0/core0/assets"
 	"github.com/g8os/core0/core0/bootstrap"
 	"github.com/g8os/core0/core0/logger"
+	"github.com/g8os/core0/core0/options"
+	"github.com/g8os/core0/core0/screen"
+	"github.com/g8os/core0/core0/stats"
+	"github.com/g8os/core0/core0/subsys/containers"
+	"github.com/g8os/core0/core0/subsys/kvm"
 	"github.com/op/go-logging"
-	"time"
 
-	"fmt"
 	_ "github.com/g8os/core0/base/builtin"
 	_ "github.com/g8os/core0/core0/builtin"
 	_ "github.com/g8os/core0/core0/builtin/btrfs"
-	"github.com/g8os/core0/core0/containers"
-	"github.com/g8os/core0/core0/kvm"
-	"github.com/g8os/core0/core0/options"
-	"github.com/g8os/core0/core0/stats"
-	"os"
+	"github.com/g8os/core0/core0/transport"
+	"os/signal"
+	"syscall"
 )
 
 var (
 	log = logging.MustGetLogger("main")
 )
 
-func setupLogging() {
-	l, err := os.Create("/var/log/core.log")
-	if err != nil {
-		panic(err)
-	}
-
+func init() {
+	signal.Ignore(syscall.SIGABRT, syscall.SIGHUP, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGQUIT)
 	formatter := logging.MustStringFormatter("%{time}: %{color}%{module} %{level:.1s} > %{message} %{color:reset}")
 	logging.SetFormatter(formatter)
-
-	logging.SetBackend(
-		logging.NewLogBackend(os.Stdout, "", 0),
-		logging.NewLogBackend(l, "", 0),
-	)
-
 }
 
 func main() {
+	if err := Redirect(LogPath); err != nil {
+		log.Errorf("failed to redirect output streams: %s", err)
+	}
+
+	HandleRotation()
+
 	var options = options.Options
 	fmt.Println(core.Version())
 	if options.Version() {
 		os.Exit(0)
 	}
 
-	setupLogging()
+	if err := screen.New(2); err != nil {
+		log.Critical(err)
+	}
+
+	screen.Push(&screen.TextSection{
+		Attributes: screen.Attributes{screen.Bold},
+		Text:       string(assets.MustAsset("text/logo.txt")),
+	})
+	screen.Push(&screen.TextSection{})
+	screen.Push(&screen.TextSection{
+		Attributes: screen.Attributes{screen.Green},
+		Text:       core.Version().Short(),
+	})
+	screen.Push(&screen.TextSection{})
+	screen.Refresh()
 
 	if err := settings.LoadSettings(options.Config()); err != nil {
 		log.Fatal(err)
@@ -62,15 +78,18 @@ func main() {
 		log.Fatalf("\nConfig validation error, please fix and try again.")
 	}
 
-	if settings.Settings.Sink == nil {
-		settings.Settings.Sink = make(map[string]settings.SinkConfig)
-	}
-
 	var config = settings.Settings
 
-	level, err := logging.LogLevel(config.Main.LogLevel)
+	var loglevel string
+	if options.Kernel.Is("verbose") {
+		loglevel = "DEBUG"
+	} else {
+		loglevel = config.Main.LogLevel
+	}
+
+	level, err := logging.LogLevel(loglevel)
 	if err != nil {
-		log.Fatal("invalid log level: %s", settings.Settings.Main.LogLevel)
+		log.Fatal("invalid log level: %s", loglevel)
 	}
 
 	logging.SetLevel(level, "")
@@ -82,7 +101,7 @@ func main() {
 	mgr := pm.GetManager()
 
 	mgr.AddResultHandler(func(cmd *pmcore.Command, result *pmcore.JobResult) {
-		log.Infof("Job result for command '%s' is '%s'", cmd, result.State)
+		log.Debugf("Job result for command '%s' is '%s'", cmd, result.State)
 	})
 
 	mgr.Run()
@@ -91,34 +110,8 @@ func main() {
 	log.Infof("Configure logging")
 	logger.InitLogging()
 
-	//start local transport
-	log.Infof("Starting local transport")
-	local, err := core.NewLocal("/var/run/core.sock")
-	if err != nil {
-		log.Errorf("Failed to start local transport: %s", err)
-	} else {
-		go local.Serve()
-	}
-
 	bs := bootstrap.NewBootstrap()
 	bs.Bootstrap()
-
-	// start logs forwarder
-	logger.StartForwarder()
-
-	sinkID := fmt.Sprintf("default")
-
-	//build list with ACs that we will poll from.
-	sinks := make(map[string]core.SinkClient)
-	for key, sinkCfg := range config.Sink {
-		cl, err := core.NewSinkClient(&sinkCfg, sinkID)
-		if err != nil {
-			log.Warning("Can't reach sink %s: %s", sinkCfg.URL, err)
-			continue
-		}
-
-		sinks[key] = cl
-	}
 
 	log.Infof("Setting up stats aggregator clients")
 	if config.Stats.Redis.Enabled {
@@ -130,18 +123,40 @@ func main() {
 		}
 	}
 
-	//start/register containers commands and process
-	if err := containers.ContainerSubsystem(sinks); err != nil {
-		log.Errorf("failed to intialize container subsystem", err)
+	screen.Push(&screen.SplitterSection{Title: "System Information"})
+
+	row := &screen.RowSection{
+		Cells: make([]screen.RowCell, 2),
+	}
+	screen.Push(row)
+
+	sink, err := transport.NewSink(mgr, transport.SinkConfig{URL: "redis://127.0.0.1:6379"})
+	if err != nil {
+		log.Errorf("failed to start command sink: %s", err)
 	}
 
-	if err := kvm.KVMSubsystem(); err != nil {
+	contMgr, err := containers.ContainerSubsystem(sink, &row.Cells[0])
+	if err != nil {
+		log.Fatal("failed to intialize container subsystem", err)
+	}
+
+	if err := kvm.KVMSubsystem(contMgr, &row.Cells[1]); err != nil {
 		log.Errorf("failed to initialize kvm subsystem", err)
+	}
+
+	log.Infof("Starting local transport")
+	local, err := NewLocal(contMgr, "/var/run/core.sock")
+	if err != nil {
+		log.Errorf("Failed to start local transport: %s", err)
+	} else {
+		local.Start()
 	}
 
 	//start jobs sinks.
 	log.Infof("Starting Sinks")
-	core.StartSinks(pm.GetManager(), sinks)
+
+	sink.Start()
+	screen.Refresh()
 
 	//wait
 	select {}

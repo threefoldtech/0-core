@@ -1,31 +1,26 @@
-[startup.ovs-init]
+[startup."ovs.init"]
 name = "bash"
-#must_exit =true to force services running after
-#this one to only run after this one exits
-must_exit = true
-after = ["init"]
-data = """
-mkdir /run/openvswitch/
-modprobe tun
-modprobe openvswitch
+running_delay = -1
+
+[startup."ovs.init".args]
+script = """
+mkdir -p /run/openvswitch/
+mkdir -p /var/run/openvswitch/
+/usr/bin/ovsdb-tool create /etc/openvswitch/conf.db
 """
 
 [startup.ovsdb]
-name = "execute"
-after = ["ovs-init"]
+name = "core.system"
+after = ["ovs.init"]
 
 [startup.ovsdb.args]
-max_restart = 10
-domain = "core"
 name = "/usr/sbin/ovsdb-server"
 args = ["--remote=punix:/var/run/openvswitch/db.sock", "--pidfile=/run/openvswitch/ovsdb-server.pid"]
 
 [startup.ovs]
-name = "execute"
+name = "core.system"
 after = ["ovsdb"]
 
 [startup.ovs.args]
-max_restart = 10
-domain = "core"
 name = "/usr/sbin/ovs-vswitchd"
 args = ["--pidfile=/run/openvswitch/ovs-vswitchd.pid"]

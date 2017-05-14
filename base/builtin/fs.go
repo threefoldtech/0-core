@@ -4,11 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/g8os/core0/base/pm"
-	"github.com/g8os/core0/base/pm/core"
-	"github.com/g8os/core0/base/pm/process"
-	"github.com/patrickmn/go-cache"
-	"github.com/pborman/uuid"
 	"io"
 	"io/ioutil"
 	"os"
@@ -16,6 +11,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/g8os/core0/base/pm"
+	"github.com/g8os/core0/base/pm/core"
+	"github.com/g8os/core0/base/pm/process"
+	"github.com/patrickmn/go-cache"
+	"github.com/pborman/uuid"
 )
 
 const (
@@ -111,21 +112,45 @@ func (fs *filesystem) evicted(_ string, f interface{}) {
 //mode parses python open file modes (
 func (fs *filesystem) mode(m string) (int, error) {
 	var mode int
+	rwax := 0
+	readable := false
+	writable := false
+
 	for _, chr := range m {
 		switch chr {
 		case 'r':
-			mode |= os.O_RDONLY
-		case 'w':
-			mode |= os.O_WRONLY
-		case '+':
-			mode |= os.O_RDWR
+			rwax += 1
+			readable = true
 		case 'x':
-			mode |= os.O_CREATE
+			rwax += 1
+			writable = true
+			mode |= os.O_CREATE | os.O_EXCL
+		case 'w':
+			rwax += 1
+			writable = true
+			mode |= os.O_CREATE | os.O_TRUNC
 		case 'a':
-			mode |= os.O_APPEND
+			rwax += 1
+			writable = true
+			mode |= os.O_CREATE | os.O_APPEND
+		case '+':
+			readable = true
+			writable = true
 		default:
-			return 0, fmt.Errorf("unknown mode '%s'", chr)
+			return 0, fmt.Errorf("unknown mode '%c'", chr)
 		}
+	}
+
+	if rwax != 1 {
+		return 0, fmt.Errorf("rwax modes has to be used once and only once")
+	}
+
+	if readable && writable {
+		mode |= os.O_RDWR
+	} else if writable {
+		mode |= os.O_WRONLY
+	} else {
+		mode |= os.O_RDONLY
 	}
 
 	return mode, nil
@@ -175,6 +200,8 @@ func (fs *filesystem) read(cmd *core.Command) (interface{}, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown file description '%s'", args.FD)
 	}
+	// refresh cache expiration
+	fs.cache.Set(args.FD, f, cache.DefaultExpiration)
 
 	fd, ok := f.(*os.File)
 	if !ok {
@@ -205,6 +232,8 @@ func (fs *filesystem) write(cmd *core.Command) (interface{}, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown file description '%s'", args.FD)
 	}
+	// refresh cache expiration
+	fs.cache.Set(args.FD, f, cache.DefaultExpiration)
 
 	fd, ok := f.(*os.File)
 	if !ok {

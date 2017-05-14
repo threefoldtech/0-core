@@ -5,6 +5,7 @@ import (
 	"github.com/g8os/core0/base/utils"
 	"io/ioutil"
 	"path"
+	"sync"
 )
 
 type After string
@@ -45,6 +46,8 @@ var (
 type IncludedSettings struct {
 	Extension map[string]Extension
 	Startup   map[string]Startup
+
+	o sync.Once `toml:"-"`
 }
 
 func (s *AppSettings) include(partial *IncludedSettings, include string) (errors []error) {
@@ -92,7 +95,6 @@ func (s *AppSettings) include(partial *IncludedSettings, include string) (errors
 		}
 
 		for key, startup := range partialCfg.Startup {
-			startup.key = key
 			partial.Startup[key] = startup
 		}
 	}

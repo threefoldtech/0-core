@@ -2,6 +2,7 @@
 [startup.zerotier]
 name = "core.system"
 after = ["net"]
+protected = true
 
 [startup.zerotier.args]
 name = "zerotier-one"

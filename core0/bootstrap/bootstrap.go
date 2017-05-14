@@ -4,14 +4,20 @@ import (
 	"fmt"
 	"github.com/g8os/core0/base/pm"
 	"github.com/g8os/core0/base/settings"
-	"github.com/g8os/core0/core0/network"
+	"github.com/g8os/core0/base/utils"
+	"github.com/g8os/core0/core0/bootstrap/network"
+	"github.com/g8os/core0/core0/screen"
 	"github.com/op/go-logging"
+	"github.com/vishvananda/netlink"
 	"net/http"
+	"strings"
 	"time"
 )
 
 const (
-	InternetTestAddress = "http://www.google.com"
+	InternetTestAddress = "https://bootstrap.gig.tech/"
+
+	screenStateLine = "->%15s: %s %s"
 )
 
 var (
@@ -65,14 +71,23 @@ func (b *Bootstrap) startupServices(s, e settings.After) {
 }
 
 func (b *Bootstrap) canReachInternet() bool {
-	log.Infof("Testing internet reachability to %s", InternetTestAddress)
+	log.Debugf("Testing internet reachability to %s", InternetTestAddress)
 	resp, err := http.Get(InternetTestAddress)
 	if err != nil {
-		log.Warning("HTTP: %v", err)
+		log.Warningf("HTTP: %v", err)
 		return false
 	}
 	resp.Body.Close()
 	return true
+}
+
+func (b *Bootstrap) ipsAsString(ips []netlink.Addr) string {
+	var s []string
+	for _, ip := range ips {
+		s = append(s, ip.IPNet.String())
+	}
+
+	return strings.Join(s, ", ")
 }
 
 func (b *Bootstrap) setupNetworking() error {
@@ -98,6 +113,7 @@ func (b *Bootstrap) setupNetworking() error {
 	//apply the interfaces settings as configured.
 	for _, inf := range interfaces {
 		log.Infof("Setting up interface '%s'", inf.Name())
+
 		inf.Clear()
 		if err := inf.Configure(); err != nil {
 			log.Errorf("%s", err)
@@ -140,6 +156,50 @@ func (b *Bootstrap) setupNetworking() error {
 	return fmt.Errorf("couldn't reach internet")
 }
 
+func (b *Bootstrap) screen() {
+	section := &screen.GroupSection{
+		Sections: []screen.Section{},
+	}
+
+	screen.Push(section)
+
+	progress := &screen.ProgressSection{}
+	for {
+		links, err := netlink.LinkList()
+		if err != nil {
+			<-time.After(10 * time.Second)
+			continue
+		}
+		section.Sections = []screen.Section{}
+
+		for _, link := range links {
+			if link.Attrs().Name == "lo" || !utils.InString([]string{"device", "tun", "tap"}, link.Type()) {
+				continue
+			}
+
+			ips, _ := netlink.AddrList(link, netlink.FAMILY_V4)
+			section.Sections = append(section.Sections, &screen.TextSection{
+				Text: fmt.Sprintf(screenStateLine, link.Attrs().Name, link.Attrs().HardwareAddr, b.ipsAsString(ips)),
+			})
+		}
+
+		section.Sections = append(section.Sections, progress)
+		screen.Refresh()
+		progress.Stop(false)
+		progress.Text = fmt.Sprintf(screenStateLine, "Connectivity", "", "")
+
+		if b.canReachInternet() {
+			progress.Text = fmt.Sprintf(screenStateLine, "Connectivity", "OK", "")
+		} else {
+			progress.Text = fmt.Sprintf(screenStateLine, "Connectivity", "NOT OK", "")
+		}
+
+		progress.Stop(true)
+		screen.Refresh()
+		<-time.After(5 * time.Second)
+	}
+}
+
 //Bootstrap registers extensions and startup system services.
 func (b *Bootstrap) Bootstrap() {
 	//register core extensions
@@ -148,9 +208,19 @@ func (b *Bootstrap) Bootstrap() {
 	//register included extensions
 	b.registerExtensions(b.i.Extension)
 
+	progress := &screen.ProgressSection{
+		Text: "Bootstrapping: Core Services",
+	}
+	screen.Push(progress)
+	screen.Refresh()
+
 	//start up all init services ([init, net[ slice)
 	b.startupServices(settings.AfterInit, settings.AfterNet)
 
+	go b.screen()
+
+	progress.Text = "Bootstrapping: Networking"
+	screen.Refresh()
 	for {
 		err := b.setupNetworking()
 		if err == nil {
@@ -160,13 +230,23 @@ func (b *Bootstrap) Bootstrap() {
 		log.Errorf("Failed to configure networking: %s", err)
 		log.Infof("Retrying in 2 seconds")
 
-		time.Sleep(2 * time.Second)
+		<-time.After(2 * time.Second)
 		log.Infof("Retrying setting up network")
 	}
+
+	progress.Text = "Bootstrapping: Network Services"
+	screen.Refresh()
 
 	//start up all net services ([net, boot[ slice)
 	b.startupServices(settings.AfterNet, settings.AfterBoot)
 
+	progress.Text = "Bootstrapping: Services"
+	screen.Refresh()
+
 	//start up all boot services ([boot, end] slice)
 	b.startupServices(settings.AfterBoot, settings.ToTheEnd)
+
+	progress.Text = "Bootstrapping: Done"
+	progress.Stop(true)
+	screen.Refresh()
 }

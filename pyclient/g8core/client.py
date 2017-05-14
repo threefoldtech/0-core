@@ -5,17 +5,27 @@ import textwrap
 import shlex
 import base64
 import signal
+import socket
+import logging
+import time
 from g8core import typchk
 
 
 DefaultTimeout = 10  # seconds
+
+logger = logging.getLogger('g8core')
 
 
 class Timeout(Exception):
     pass
 
 
+class JobNotFound(Exception):
+    pass
+
+
 class Return:
+
     def __init__(self, payload):
         self._payload = payload
 
@@ -85,6 +95,7 @@ class Return:
 
 
 class Response:
+
     def __init__(self, client, id):
         self._client = client
         self._id = id
@@ -94,18 +105,35 @@ class Response:
     def id(self):
         return self._id
 
+    @property
+    def exists(self):
+        r = self._client._redis
+        flag = '{}:flag'.format(self._queue)
+        return r.rpoplpush(flag, flag) is not None
+
     def get(self, timeout=None):
         if timeout is None:
             timeout = self._client.timeout
         r = self._client._redis
-        v = r.brpoplpush(self._queue, self._queue, timeout)
-        if v is None:
-            raise Timeout()
-        payload = json.loads(v.decode())
-        return Return(payload)
+        start = time.time()
+        maxwait = timeout
+        while maxwait > 0:
+            if not self.exists:
+                raise JobNotFound(self.id)
+            v = r.brpoplpush(self._queue, self._queue, 10)
+            if v is not None:
+                payload = json.loads(v.decode())
+                r = Return(payload)
+                logger.debug('%s << %s, stdout="%s", stderr="%s", data="%s"',
+                             self._id, r.state, r.stdout, r.stderr, r.data[:1000])
+                return r
+            logger.debug('%s still waiting (%ss)', self._id, int(time.time() - start))
+            maxwait -= 10
+        raise Timeout()
 
 
 class InfoManager:
+
     def __init__(self, client):
         self._client = client
 
@@ -125,8 +153,8 @@ class InfoManager:
         return self._client.json('info.os', {})
 
 
-class ProcessManager:
-    _process_chk = typchk.Checker({
+class JobManager:
+    _job_chk = typchk.Checker({
         'id': str,
     })
 
@@ -140,31 +168,71 @@ class ProcessManager:
 
     def list(self, id=None):
         """
-        List all running process (the ones that were started by the core itself)
+        List all running jobs
 
-        :param id: optional ID for the process to list
+        :param id: optional ID for the job to list
         """
         args = {'id': id}
-        self._process_chk.check(args)
-        return self._client.json('process.list', args)
+        self._job_chk.check(args)
+        return self._client.json('job.list', args)
 
     def kill(self, id, signal=signal.SIGTERM):
         """
-        Kill a process with given id
+        Kill a job with given id
 
         :WARNING: beware of what u kill, if u killed redis for example core0 or coreX won't be reachable
 
-
-        :param id: process id to kill
+        :param id: job id to kill
         """
         args = {
             'id': id,
             'signal': int(signal),
         }
         self._kill_chk.check(args)
+        return self._client.json('job.kill', args)
+
+
+class ProcessManager:
+    _process_chk = typchk.Checker({
+        'pid': int,
+    })
+
+    _kill_chk = typchk.Checker({
+        'pid': int,
+        'signal': int,
+    })
+
+    def __init__(self, client):
+        self._client = client
+
+    def list(self, id=None):
+        """
+        List all running processes
+
+        :param id: optional PID for the process to list
+        """
+        args = {'pid': id}
+        self._process_chk.check(args)
+        return self._client.json('process.list', args)
+
+    def kill(self, pid, signal=signal.SIGTERM):
+        """
+        Kill a process with given pid
+
+        :WARNING: beware of what u kill, if u killed redis for example core0 or coreX won't be reachable
+
+        :param pid: PID to kill
+        """
+        args = {
+            'pid': pid,
+            'signal': int(signal),
+        }
+        self._kill_chk.check(args)
         return self._client.json('process.kill', args)
 
+
 class FilesystemManager:
+
     def __init__(self, client):
         self._client = client
 
@@ -178,7 +246,7 @@ class FilesystemManager:
 
         mode:
           'r' read only
-          'w' write only
+          'w' write only (truncate)
           '+' read/write
           'x' create if not exist
           'a' append
@@ -344,9 +412,9 @@ class FilesystemManager:
         :return:
         """
 
-        fd = self.open(remote, 'wx')
+        fd = self.open(remote, 'w')
         while True:
-            chunk = reader.read(512*1024)
+            chunk = reader.read(512 * 1024)
             if chunk == b'':
                 break
             self.write(fd, chunk)
@@ -388,6 +456,7 @@ class FilesystemManager:
         file = open(local, 'wb')
         self.download(remote, file)
 
+
 class BaseClient:
     _system_chk = typchk.Checker({
         'name': str,
@@ -406,12 +475,17 @@ class BaseClient:
         if timeout is None:
             self.timeout = DefaultTimeout
         self._info = InfoManager(self)
+        self._job = JobManager(self)
         self._process = ProcessManager(self)
         self._filesystem = FilesystemManager(self)
 
     @property
     def info(self):
         return self._info
+
+    @property
+    def job(self):
+        return self._job
 
     @property
     def process(self):
@@ -421,7 +495,7 @@ class BaseClient:
     def filesystem(self):
         return self._filesystem
 
-    def raw(self, command, arguments):
+    def raw(self, command, arguments, queue=None, max_time=None):
         """
         Implements the low level command call, this needs to build the command structure
         and push it on the correct queue.
@@ -524,6 +598,8 @@ class ContainerClient(BaseClient):
         'command': {
             'command': str,
             'arguments': typchk.Any(),
+            'queue': typchk.Or(str, typchk.IsNone()),
+            'max_time': typchk.Or(int, typchk.IsNone()),
         }
     })
 
@@ -533,7 +609,11 @@ class ContainerClient(BaseClient):
         self._client = client
         self._container = container
 
-    def raw(self, command, arguments):
+    @property
+    def container(self):
+        return self._container
+
+    def raw(self, command, arguments, queue=None, max_time=None):
         """
         Implements the low level command call, this needs to build the command structure
         and push it on the correct queue.
@@ -548,10 +628,12 @@ class ContainerClient(BaseClient):
             'command': {
                 'command': command,
                 'arguments': arguments,
+                'queue': queue,
+                'max_time': max_time,
             },
         }
 
-        #check input
+        # check input
         self._raw_chk.check(args)
 
         response = self._client.raw('corex.dispatch', args)
@@ -572,105 +654,115 @@ class ContainerManager:
             typchk.IsNone()
         ),
         'host_network': bool,
-        'network': {
-            'zerotier': typchk.Or(
-                str,
-                typchk.IsNone()
-            ),
-            'bridge': typchk.Or(
-                [typchk.Length((str,), 2)],
-                typchk.IsNone()
-            ),  # list of tuples each of length 2 or None
-        },
+        'nics': [{
+            'type': typchk.Enum('default', 'bridge', 'zerotier', 'vlan', 'vxlan'),
+            'id': typchk.Or(str, typchk.Missing()),
+            'hwaddr': typchk.Or(str, typchk.Missing()),
+            'config': typchk.Or(
+                typchk.Missing,
+                {
+                    'dhcp': typchk.Or(bool, typchk.Missing()),
+                    'cidr': typchk.Or(str, typchk.Missing()),
+                    'gateway': typchk.Or(str, typchk.Missing()),
+                    'dns': typchk.Or([str], typchk.Missing()),
+                }
+            )
+        }],
         'port': typchk.Or(
             typchk.Map(int, int),
             typchk.IsNone()
         ),
+        'privileged': bool,
         'hostname': typchk.Or(
             str,
             typchk.IsNone()
         ),
         'storage': typchk.Or(str, typchk.IsNone()),
+        'tags': typchk.Or([str], typchk.IsNone())
     })
 
     _terminate_chk = typchk.Checker({
         'container': int
     })
 
+    DefaultNetworking = object()
+
     def __init__(self, client):
         self._client = client
 
-    def create(self, root_url, mount=None, host_network=False, zerotier=None, bridge=None, port=None, hostname=None, storage=None):
+    def create(self, root_url, mount=None, host_network=False, nics=DefaultNetworking, port=None, hostname=None, privileged=True, storage=None, tags=None):
         """
-        Creater a new container with the given root plist, mount points and
+        Creater a new container with the given root flist, mount points and
         zerotier id, and connected to the given bridges
-        :param root_url: The root filesystem plist
+        :param root_url: The root filesystem flist
         :param mount: a dict with {host_source: container_target} mount points.
                       where host_source directory must exists.
-                      host_source can be a url to a plist to mount.
+                      host_source can be a url to a flist to mount.
         :param host_network: Specify if the container should share the same network stack as the host.
                              if True, container creation ignores both zerotier, bridge and ports arguments below. Not
                              giving errors if provided.
-        :param zerotier: An optional zerotier netowrk ID to join
-        :param bridge: A list of tuples as ('bridge_name': 'network_setup')
-                       where :network_setup: can be one of the following
-                       '' or 'none':
-                            no IP is gonna be set on the link
-                       'dhcp':
-                            Run `udhcpc` on the container link, of course this will
-                            only work if the `bridge` is created with `dnsmasq` networking
-                       'CIDR':
-                            Assign static IP to the link
-
-                       Examples:
-                        `bridge=[('br0', '127.0.0.100/24'), ('br1', 'dhcp')]`
-        :param port: A dict of host_port: container_port pairs
+        :param nics: Configure the attached nics to the container
+                     each nic object is a dict of the format
+                     {
+                        'type': nic_type # default, bridge, zerotier, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
+                        'id': id # depends on the type, bridge name, zerotier network id, the vlan tag or the vxlan id
+                        'config': { # config is only honored for vlan, and vxlan types
+                            'dhcp': bool,
+                            'cidr': static_ip # ip/mask
+                            'gateway': gateway
+                            'dns': [dns]
+                        }
+                     }
+        :param port: A dict of host_port: container_port pairs (only if default networking is enabled)
                        Example:
                         `port={8080: 80, 7000:7000}`
         :param hostname: Specific hostname you want to give to the container.
                          if None it will automatically be set to core-x,
                          x beeing the ID of the container
-        :param storage: A Url to the ardb storage to use to mount the root plist (or any other mount that requires g8fs)
+        :param privileged: If true, container runs in privileged mode.
+        :param storage: A Url to the ardb storage to use to mount the root flist (or any other mount that requires g8fs)
                         if not provided, the default one from core0 configuration will be used.
         """
 
+        if nics == self.DefaultNetworking:
+            nics = [{'type': 'default'}]
+        elif nics is None:
+            nics = []
 
         args = {
             'root': root_url,
             'mount': mount,
             'host_network': host_network,
-            'network': {
-                'zerotier': zerotier,
-                'bridge': bridge,
-            },
+            'nics': nics,
             'port': port,
             'hostname': hostname,
+            'privileged': privileged,
             'storage': storage,
+            'tags': tags,
         }
 
-        #validate input
+        # validate input
         self._create_chk.check(args)
 
         response = self._client.raw('corex.create', args)
 
-        result = response.get()
-        if result.state != 'SUCCESS':
-            raise RuntimeError('failed to create container %s' % result.data)
-
-        return json.loads(result.data)
+        return response
 
     def list(self):
         """
         List running containers
         :return: a dict with {container_id: <container info object>}
         """
-        response = self._client.raw('corex.list', {})
+        return self._client.json('corex.list', {})
 
-        result = response.get()
-        if result.state != 'SUCCESS':
-            raise RuntimeError('failed to list containers: %s' % result.data)
-
-        return json.loads(result.data)
+    def find(self, *tags):
+        """
+        Find containers that matches set of tags
+        :param tags:
+        :return:
+        """
+        tags = list(map(str, tags))
+        return self._client.json('corex.find', {'tags': tags})
 
     def terminate(self, container):
         """
@@ -723,7 +815,8 @@ class BridgeManager:
         :param name: name of the bridge (must be unique)
         :param hwaddr: MAC address of the bridge. If none, a one will be created for u
         :param network: Networking mode, options are none, static, and dnsmasq
-        :param nat: If true, SNAT will be enabled on this bridge.
+        :param nat: If true, SNAT will be enabled on this bridge. (IF and ONLY IF an IP is set on the bridge
+                    via the settings, otherwise flag will be ignored) (the cidr attribute of either static, or dnsmasq modes)
         :param settings: Networking setting, depending on the selected mode.
                         none:
                             no settings, bridge won't get any ip settings
@@ -850,7 +943,7 @@ class DiskManager:
     def mktable(self, disk, table_type='gpt'):
         """
         Make partition table on block device.
-        :param disk: Full device path like /dev/sda
+        :param disk: device name (sda, sdb, etc...)
         :param table_type: Partition table type as accepted by parted
         """
         args = {
@@ -887,7 +980,7 @@ class DiskManager:
         result = response.get()
 
         if result.state != 'SUCCESS':
-            raise RuntimeError('failed to get info: %s' % result.stderr)
+            raise RuntimeError('failed to get info: %s' % result.data)
 
         if result.level != 20:  # 20 is JSON output.
             raise RuntimeError('invalid response type from disk.getinfo command')
@@ -951,7 +1044,7 @@ class DiskManager:
         """
 
         if len(options) == 0:
-            options = ['auto']
+            options = ['']
 
         args = {
             'options': ','.join(options),
@@ -1089,7 +1182,7 @@ class BtrfsManager:
 
         self._device_chk.check(args)
 
-        self._client.raw('btrfs.device_remove', args)
+        self._client.sync('btrfs.device_remove', args)
 
     def subvol_create(self, path):
         """
@@ -1127,7 +1220,7 @@ class BtrfsManager:
     def subvol_quota(self, path, limit):
         """
         Apply a quota to a btrfs subvolume in the specified path
-        :param path:  path to delete
+        :param path:  path to apply the quota for (it has to be the path of the subvol)
         :param limit: the limit to Apply
         """
         args = {
@@ -1217,71 +1310,396 @@ class ZerotierManager:
 
 
 class KvmManager:
+    _iotune_dict = {
+        'totalbytessecset': bool,
+        'totalbytessec': int,
+        'readbytessecset': bool,
+        'readbytessec': int,
+        'writebytessecset': bool,
+        'writebytessec': int,
+        'totaliopssecset': bool,
+        'totaliopssec': int,
+        'readiopssecset': bool,
+        'readiopssec': int,
+        'writeiopssecset': bool,
+        'writeiopssec': int,
+        'totalbytessecmaxset': bool,
+        'totalbytessecmax': int,
+        'readbytessecmaxset': bool,
+        'readbytessecmax': int,
+        'writebytessecmaxset': bool,
+        'writebytessecmax': int,
+        'totaliopssecmaxset': bool,
+        'totaliopssecmax': int,
+        'readiopssecmaxset': bool,
+        'readiopssecmax': int,
+        'writeiopssecmaxset': bool,
+        'writeiopssecmax': int,
+        'totalbytessecmaxlengthset': bool,
+        'totalbytessecmaxlength': int,
+        'readbytessecmaxlengthset': bool,
+        'readbytessecmaxlength': int,
+        'writebytessecmaxlengthset': bool,
+        'writebytessecmaxlength': int,
+        'totaliopssecmaxlengthset': bool,
+        'totaliopssecmaxlength': int,
+        'readiopssecmaxlengthset': bool,
+        'readiopssecmaxlength': int,
+        'writeiopssecmaxlengthset': bool,
+        'writeiopssecmaxlength': int,
+        'sizeiopssecset': bool,
+        'sizeiopssec': int,
+        'groupnameset': bool,
+        'groupname': str,
+    }
+    _media_dict = {
+        'type': typchk.Or(
+            typchk.Enum('disk', 'cdrom'),
+            typchk.Missing()
+        ),
+        'url': str,
+        'iotune': typchk.Or(
+            _iotune_dict,
+            typchk.Missing
+        )
+    }
     _create_chk = typchk.Checker({
         'name': str,
-        'media': [{
-            'type': typchk.Or(
-                typchk.Enum('disk', 'cdrom'),
-                typchk.Missing()
-            ),
-            'url': str,
-        }],
+        'media': [_media_dict],
         'cpu': int,
         'memory': int,
-        'bridge': typchk.Or([str], typchk.IsNone()),
+        'nics': [{
+            'type': typchk.Enum('default', 'bridge', 'vxlan', 'vlan'),
+            'id': typchk.Or(str, typchk.Missing()),
+            'hwaddr': typchk.Or(str, typchk.Missing()),
+        }],
         'port': typchk.Or(
             typchk.Map(int, int),
             typchk.IsNone()
         ),
     })
 
-    _destroy_chk = typchk.Checker({
-        'name': str,
+    _domain_action_chk = typchk.Checker({
+        'uuid': str,
     })
+
+    _man_disk_action_chk = typchk.Checker({
+        'uuid': str,
+        'media': _media_dict,
+    })
+
+    _man_nic_action_chk = typchk.Checker({
+        'uuid': str,
+        'type': typchk.Enum('default', 'bridge', 'vxlan', 'vlan'),
+        'id': typchk.Or(str, typchk.Missing()),
+        'hwaddr': typchk.Or(str, typchk.Missing()),
+    })
+
+    _migrate_action_chk = typchk.Checker({
+        'uuid': str,
+        'desturi': str,
+    })
+
+    _limit_disk_io_dict = {
+        'uuid': str,
+        'media': _media_dict,
+    }
+
+    _limit_disk_io_dict.update(_iotune_dict)
+
+    _limit_disk_io_action_chk = typchk.Checker(_limit_disk_io_dict)
 
     def __init__(self, client):
         self._client = client
 
-    def create(self, name, media, cpu=2, memory=512, port=None, bridge=None):
+    def create(self, name, media, cpu=2, memory=512, nics=None, port=None):
         """
-
         :param name: Name of the kvm domain
         :param media: array of media objects to attach to the machine, where the first object is the boot device
-                      each media object is a dict of {url, and type} where type can be one of 'disk', or 'cdrom', or empty (default to disk)
+                      each media object is a dict of {url, type} where type can be one of 'disk', or 'cdrom', or empty (default to disk)
                       example: [{'url': 'nbd+unix:///test?socket=/tmp/ndb.socket'}, {'type': 'cdrom': '/somefile.iso'}
         :param cpu: number of vcpu cores
         :param memory: memory in MiB
         :param port: A dict of host_port: container_port pairs
                        Example:
                         `port={8080: 80, 7000:7000}`
-        :param bridge: array of extra bridges to connect the domain with. the bridges must exist on the host
-                       By default, vm is automatically added to a default bridge.
-        :return:
+                     Only supported if default network is used
+        :param nics: Configure the attached nics to the container
+                     each nic object is a dict of the format
+                     {
+                        'type': nic_type # default, bridge, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
+                        'id': id # depends on the type, bridge name (bridge type) zerotier network id (zertier type), the vlan tag or the vxlan id
+                     }
+        :return: uuid of the virtual machine
         """
+
+        if nics is None:
+            nics = []
+
         args = {
             'name': name,
             'media': media,
             'cpu': cpu,
             'memory': memory,
-            'bridge': bridge,
+            'nics': nics,
             'port': port,
         }
         self._create_chk.check(args)
 
-        self._client.sync('kvm.create', args)
+        return self._client.sync('kvm.create', args)
 
-    def destroy(self, name):
+    def destroy(self, uuid):
         """
-        Destroy a kvm domain by name
-        :param name: name of the kvm container (same as the used in create)
+        Destroy a kvm domain by uuid
+        :param uuid: uuid of the kvm container (same as the used in create)
         :return:
         """
         args = {
-            'name': name,
+            'uuid': uuid,
         }
-        self._destroy_chk.check(args)
+        self._domain_action_chk.check(args)
 
         self._client.sync('kvm.destroy', args)
+
+    def shutdown(self, uuid):
+        """
+        Shutdown a kvm domain by uuid
+        :param uuid: uuid of the kvm container (same as the used in create)
+        :return:
+        """
+        args = {
+            'uuid': uuid,
+        }
+        self._domain_action_chk.check(args)
+
+        self._client.sync('kvm.shutdown', args)
+
+    def reboot(self, uuid):
+        """
+        Reboot a kvm domain by uuid
+        :param uuid: uuid of the kvm container (same as the used in create)
+        :return:
+        """
+        args = {
+            'uuid': uuid,
+        }
+        self._domain_action_chk.check(args)
+
+        self._client.sync('kvm.reboot', args)
+
+    def reset(self, uuid):
+        """
+        Reset (Force reboot) a kvm domain by uuid
+        :param uuid: uuid of the kvm container (same as the used in create)
+        :return:
+        """
+        args = {
+            'uuid': uuid,
+        }
+        self._domain_action_chk.check(args)
+
+        self._client.sync('kvm.reset', args)
+
+    def pause(self, uuid):
+        """
+        Pause a kvm domain by uuid
+        :param uuid: uuid of the kvm container (same as the used in create)
+        :return:
+        """
+        args = {
+            'uuid': uuid,
+        }
+        self._domain_action_chk.check(args)
+
+        self._client.sync('kvm.pause', args)
+
+    def resume(self, uuid):
+        """
+        Resume a kvm domain by uuid
+        :param uuid: uuid of the kvm container (same as the used in create)
+        :return:
+        """
+        args = {
+            'uuid': uuid,
+        }
+        self._domain_action_chk.check(args)
+
+        self._client.sync('kvm.resume', args)
+
+    def info(self, uuid):
+        """
+        Get info about a kvm domain by uuid
+        :param uuid: uuid of the kvm container (same as the used in create)
+        :return:
+        """
+        args = {
+            'uuid': uuid,
+        }
+        self._domain_action_chk.check(args)
+
+        return self._client.json('kvm.info', args)
+
+    def infops(self, uuid):
+        """
+        Get info per second about a kvm domain by uuid
+        :param uuid: uuid of the kvm container (same as the used in create)
+        :return:
+        """
+        args = {
+            'uuid': uuid,
+        }
+        self._domain_action_chk.check(args)
+
+        return self._client.json('kvm.infops', args)
+
+    def attach_disk(self, uuid, media):
+        """
+        Attach a disk to a machine
+        :param uuid: uuid of the kvm container (same as the used in create)
+        :param media: the media object to attach to the machine
+                      media object is a dict of {url, and type} where type can be one of 'disk', or 'cdrom', or empty (default to disk)
+                      examples: {'url': 'nbd+unix:///test?socket=/tmp/ndb.socket'}, {'type': 'cdrom': '/somefile.iso'}
+        :return:
+        """
+        args = {
+            'uuid': uuid,
+            'media': media,
+        }
+        self._man_disk_action_chk.check(args)
+
+        self._client.sync('kvm.attach_disk', args)
+
+    def detach_disk(self, uuid, media):
+        """
+        Detach a disk from a machine
+        :param uuid: uuid of the kvm container (same as the used in create)
+        :param media: the media object to attach to the machine
+                      media object is a dict of {url, and type} where type can be one of 'disk', or 'cdrom', or empty (default to disk)
+                      examples: {'url': 'nbd+unix:///test?socket=/tmp/ndb.socket'}, {'type': 'cdrom': '/somefile.iso'}
+        :return:
+        """
+        args = {
+            'uuid': uuid,
+            'media': media,
+        }
+        self._man_disk_action_chk.check(args)
+
+        self._client.sync('kvm.detach_disk', args)
+
+    def add_nic(self, uuid, type, id=None, hwaddr=None):
+        """
+        Add a nic to a machine
+        :param uuid: uuid of the kvm container (same as the used in create)
+        :param type: nic_type # default, bridge, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
+         param id: id # depends on the type, bridge name (bridge type) zerotier network id (zertier type), the vlan tag or the vxlan id
+         param hwaddr: the hardware address of the nic
+        :return:
+        """
+        args = {
+            'uuid': uuid,
+            'type': type,
+            'id': id,
+            'hwaddr': hwaddr,
+        }
+        self._man_nic_action_chk.check(args)
+
+        return self._client.json('kvm.add_nic', args)
+
+    def remove_nic(self, uuid, type, id=None, hwaddr=None):
+        """
+        Remove a nic from a machine
+        :param uuid: uuid of the kvm container (same as the used in create)
+        :param type: nic_type # default, bridge, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
+         param id: id # depends on the type, bridge name (bridge type) zerotier network id (zertier type), the vlan tag or the vxlan id
+         param hwaddr: the hardware address of the nic
+        :return:
+        """
+        args = {
+            'uuid': uuid,
+            'type': type,
+            'id': id,
+            'hwaddr': hwaddr,
+        }
+        self._man_nic_action_chk.check(args)
+
+        return self._client.json('kvm.remove_nic', args)
+
+    def limit_disk_io(self, uuid, media, totalbytessecset=False, totalbytessec=0, readbytessecset=False, readbytessec=0, writebytessecset=False,
+                      writebytessec=0, totaliopssecset=False, totaliopssec=0, readiopssecset=False, readiopssec=0, writeiopssecset=False, writeiopssec=0,
+                      totalbytessecmaxset=False, totalbytessecmax=0, readbytessecmaxset=False, readbytessecmax=0, writebytessecmaxset=False, writebytessecmax=0,
+                      totaliopssecmaxset=False, totaliopssecmax=0, readiopssecmaxset=False, readiopssecmax=0, writeiopssecmaxset=False, writeiopssecmax=0,
+                      totalbytessecmaxlengthset=False, totalbytessecmaxlength=0, readbytessecmaxlengthset=False, readbytessecmaxlength=0,
+                      writebytessecmaxlengthset=False, writebytessecmaxlength=0, totaliopssecmaxlengthset=False, totaliopssecmaxlength=0,
+                      readiopssecmaxlengthset=False, readiopssecmaxlength=0, writeiopssecmaxlengthset=False, writeiopssecmaxlength=0, sizeiopssecset=False,
+                      sizeiopssec=0, groupnameset=False, groupname=''):
+        """
+        Remove a nic from a machine
+        :param uuid: uuid of the kvm container (same as the used in create)
+        :param media: the media to limit the diskio
+        :return:
+        """
+        args = {
+            'uuid': uuid,
+            'media': media,
+            'totalbytessecset': totalbytessecset,
+            'totalbytessec': totalbytessec,
+            'readbytessecset': readbytessecset,
+            'readbytessec': readbytessec,
+            'writebytessecset': writebytessecset,
+            'writebytessec': writebytessec,
+            'totaliopssecset': totaliopssecset,
+            'totaliopssec': totaliopssec,
+            'readiopssecset': readiopssecset,
+            'readiopssec': readiopssec,
+            'writeiopssecset': writeiopssecset,
+            'writeiopssec': writeiopssec,
+            'totalbytessecmaxset': totalbytessecmaxset,
+            'totalbytessecmax': totalbytessecmax,
+            'readbytessecmaxset': readbytessecmaxset,
+            'readbytessecmax': readbytessecmax,
+            'writebytessecmaxset': writebytessecmaxset,
+            'writebytessecmax': writebytessecmax,
+            'totaliopssecmaxset': totaliopssecmaxset,
+            'totaliopssecmax': totaliopssecmax,
+            'readiopssecmaxset': readiopssecmaxset,
+            'readiopssecmax': readiopssecmax,
+            'writeiopssecmaxset': writeiopssecmaxset,
+            'writeiopssecmax': writeiopssecmax,
+            'totalbytessecmaxlengthset': totalbytessecmaxlengthset,
+            'totalbytessecmaxlength': totalbytessecmaxlength,
+            'readbytessecmaxlengthset': readbytessecmaxlengthset,
+            'readbytessecmaxlength': readbytessecmaxlength,
+            'writebytessecmaxlengthset': writebytessecmaxlengthset,
+            'writebytessecmaxlength': writebytessecmaxlength,
+            'totaliopssecmaxlengthset': totaliopssecmaxlengthset,
+            'totaliopssecmaxlength': totaliopssecmaxlength,
+            'readiopssecmaxlengthset': readiopssecmaxlengthset,
+            'readiopssecmaxlength': readiopssecmaxlength,
+            'writeiopssecmaxlengthset': writeiopssecmaxlengthset,
+            'writeiopssecmaxlength': writeiopssecmaxlength,
+            'sizeiopssecset': sizeiopssecset,
+            'sizeiopssec': sizeiopssec,
+            'groupnameset': groupnameset,
+            'groupname': groupname,
+        }
+        self._limit_disk_io_action_chk.check(args)
+
+        self._client.sync('kvm.limit_disk_io', args)
+
+    def migrate(self, uuid, desturi):
+        """
+        Migrate a vm to another node
+        :param uuid: uuid of the kvm container (same as the used in create)
+        :param desturi: the uri of the destination node
+        :return:
+        """
+        args = {
+            'uuid': uuid,
+            'desturi': desturi,
+        }
+        self._migrate_action_chk.check(args)
+
+        self._client.sync('kvm.migrate', args)
 
     def list(self):
         """
@@ -1292,26 +1710,83 @@ class KvmManager:
         return self._client.json('kvm.list', {})
 
 
-class Experimental:
-    def __init__(self, client):
-        self._kvm = KvmManager(client)
+class Logger:
+    _level_chk = typchk.Checker({
+        'level': typchk.Enum("CRITICAL", "ERROR", "WARNING", "NOTICE", "INFO", "DEBUG"),
+    })
 
-    @property
-    def kvm(self):
-        return self._kvm
+    def __init__(self, client):
+        self._client = client
+
+    def set_level(self, level):
+        """
+        Set the log level of the g8os
+        :param level: the level to be set can be one of ("CRITICAL", "ERROR", "WARNING", "NOTICE", "INFO", "DEBUG")
+        """
+        args = {
+            'level': level,
+        }
+        self._level_chk.check(args)
+
+        return self._client.json('logger.set_level', args)
+
+    def reopen(self):
+        """
+        Reopen log file
+        """
+        return self._client.json('logger.reopen', {})
+
+
+class Config:
+
+    def __init__(self, client):
+        self._client = client
+
+    def get(self):
+        """
+        Get the config of g8os
+        """
+        return self._client.json('config.get', {})
+
+
+class Experimental:
+
+    def __init__(self, client):
+        pass
 
 
 class Client(BaseClient):
-    def __init__(self, host, port=6379, password="", db=0, timeout=None):
+
+    def __init__(self, host, port=6379, password="", db=0, timeout=None, testConnectionAttempts=3):
         super().__init__(timeout=timeout)
 
-        self._redis = redis.Redis(host=host, port=port, password=password, db=db)
+        socket_timeout = (timeout + 5) if timeout else 15
+        self._redis = redis.Redis(host=host, port=port, password=password, db=db,
+                                  socket_timeout=socket_timeout,
+                                  socket_keepalive=True, socket_keepalive_options={
+                                      socket.TCP_KEEPIDLE: 1,
+                                      socket.TCP_KEEPINTVL: 1,
+                                      socket.TCP_KEEPCNT: 10
+                                  })
         self._container_manager = ContainerManager(self)
         self._bridge_manager = BridgeManager(self)
         self._disk_manager = DiskManager(self)
         self._btrfs_manager = BtrfsManager(self)
         self._zerotier = ZerotierManager(self)
         self._experimntal = Experimental(self)
+        self._kvm = KvmManager(self)
+        self._logger = Logger(self)
+        self._config = Config(self)
+
+        if testConnectionAttempts:
+            for _ in range(testConnectionAttempts):
+                try:
+                    self.ping()
+                except:
+                    pass
+                else:
+                    return
+            raise RuntimeError("Could not connect to remote host %s" % host)
 
     @property
     def experimental(self):
@@ -1337,7 +1812,19 @@ class Client(BaseClient):
     def zerotier(self):
         return self._zerotier
 
-    def raw(self, command, arguments):
+    @property
+    def kvm(self):
+        return self._kvm
+
+    @property
+    def logger(self):
+        return self._logger
+
+    @property
+    def config(self):
+        return self._config
+
+    def raw(self, command, arguments, queue=None, max_time=None):
         """
         Implements the low level command call, this needs to build the command structure
         and push it on the correct queue.
@@ -1353,9 +1840,15 @@ class Client(BaseClient):
             'id': id,
             'command': command,
             'arguments': arguments,
+            'queue': queue,
+            'max_time': max_time,
         }
 
+        flag = 'result:{}:flag'.format(id)
         self._redis.rpush('core:default', json.dumps(payload))
+        if self._redis.brpoplpush(flag, flag, DefaultTimeout) is None:
+            Timeout('failed to queue job {}'.format(id))
+        logger.debug('%s >> g8core.%s(%s)', id, command, ', '.join(("%s=%s" % (k, v) for k, v in arguments.items())))
 
         return Response(self, id)
 

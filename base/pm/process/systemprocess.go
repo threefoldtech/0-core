@@ -7,6 +7,7 @@ import (
 	"github.com/g8os/core0/base/pm/stream"
 	psutils "github.com/shirou/gopsutil/process"
 	"io"
+	"os"
 	"os/exec"
 	"syscall"
 )
@@ -59,7 +60,7 @@ func (process *systemProcessImpl) Stats() *ProcessStats {
 	if ps == nil {
 		return &stats
 	}
-	ps.CPUAffinity()
+
 	cpu, err := ps.Percent(0)
 	if err == nil {
 		stats.CPU = cpu
@@ -92,8 +93,11 @@ func (process *systemProcessImpl) Run() (<-chan *stream.Message, error) {
 		process.args.Args...)
 	cmd.Dir = process.args.Dir
 
-	for k, v := range process.args.Env {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%v=%v", k, v))
+	if len(process.args.Env) > 0 {
+		cmd.Env = append(cmd.Env, os.Environ()...)
+		for k, v := range process.args.Env {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%v=%v", k, v))
+		}
 	}
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -191,7 +195,7 @@ func (process *systemProcessImpl) Run() (<-chan *stream.Message, error) {
 
 		state := process.table.WaitPID(process.pid)
 
-		log.Infof("Process %s exited with state: %d", process.cmd, state.ExitStatus())
+		log.Debugf("Process %s exited with state: %d", process.cmd, state.ExitStatus())
 
 		if state.ExitStatus() == 0 {
 			channel <- stream.MessageExitSuccess

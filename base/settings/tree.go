@@ -56,7 +56,18 @@ func (t *treeImpl) Slice(s, e int64) StartupSlice {
 	return slice
 }
 
+func (i *IncludedSettings) prepare() {
+	i.o.Do(func() {
+		for key, startup := range i.Startup {
+			startup.key = key
+			i.Startup[key] = startup
+		}
+	})
+}
+
 func (i *IncludedSettings) GetStartupTree() (StartupTree, []error) {
+	i.prepare()
+
 	var errors []error
 	tree := &treeImpl{
 		startups: make([]Startup, 0, len(i.Startup)),
