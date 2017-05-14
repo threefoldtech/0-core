@@ -85,6 +85,16 @@ print(
 - Creation of the [G8OS Hub](https://github.com/g8os/core0/tree/1.0.0), see https://github.com/g8os/hub
 - Improvement of the builtin commands of core0 and coreX
 
+### v1.1.0-alpha2
+- Lots and lots of bug fixes
+- Containers plugins
+- Unprivileged containers (still in beta)
+- Libvirt bindings
+- Processes API
+- Support multiple zerotier in container networking
+- Support OpenVSwitch networking for both containers and kvm domains
+- `corectl` command line tool to manage core0 from within the node
+
 ### Next
 
 See the milestones in the [G8OS home repository](https://github.com/g8os/home): [G8OS Milestones](https://github.com/g8os/home/tree/master/milestones)
