@@ -7,8 +7,9 @@ import (
 	"github.com/g8os/core0/base/pm"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/process"
-	"github.com/g8os/core0/core0/logger"
-	logging "github.com/op/go-logging"
+	"github.com/op/go-logging"
+	"os"
+	"syscall"
 )
 
 type logMgr struct{}
@@ -42,9 +43,5 @@ func (l *logMgr) setLevel(cmd *core.Command) (interface{}, error) {
 }
 
 func (l *logMgr) reopen(cmd *core.Command) (interface{}, error) {
-	logging.Reset()
-	logger.SetupLogging()
-
-	return nil, nil
-
+	return nil, syscall.Kill(os.Getpid(), syscall.SIGUSR1)
 }

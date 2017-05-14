@@ -23,13 +23,27 @@ import (
 	_ "github.com/g8os/core0/core0/builtin"
 	_ "github.com/g8os/core0/core0/builtin/btrfs"
 	"github.com/g8os/core0/core0/transport"
+	"os/signal"
+	"syscall"
 )
 
 var (
 	log = logging.MustGetLogger("main")
 )
 
+func init() {
+	signal.Ignore(syscall.SIGABRT, syscall.SIGHUP, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGQUIT)
+	formatter := logging.MustStringFormatter("%{time}: %{color}%{module} %{level:.1s} > %{message} %{color:reset}")
+	logging.SetFormatter(formatter)
+}
+
 func main() {
+	if err := Redirect(LogPath); err != nil {
+		log.Errorf("failed to redirect output streams: %s", err)
+	}
+
+	HandleRotation()
+
 	var options = options.Options
 	fmt.Println(core.Version())
 	if options.Version() {
@@ -51,8 +65,6 @@ func main() {
 	})
 	screen.Push(&screen.TextSection{})
 	screen.Refresh()
-
-	logger.SetupLogging()
 
 	if err := settings.LoadSettings(options.Config()); err != nil {
 		log.Fatal(err)
