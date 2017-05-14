@@ -1757,7 +1757,7 @@ class Experimental:
 
 class Client(BaseClient):
 
-    def __init__(self, host, port=6379, password="", db=0, timeout=None, testConnectionAttempts=10):
+    def __init__(self, host, port=6379, password="", db=0, timeout=None, testConnectionAttempts=3):
         super().__init__(timeout=timeout)
 
         socket_timeout = (timeout + 5) if timeout else 15
