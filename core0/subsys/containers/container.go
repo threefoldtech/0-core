@@ -1,6 +1,7 @@
 package containers
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/g8os/core0/base/pm"
 	"github.com/g8os/core0/base/pm/core"
@@ -34,6 +35,8 @@ type container struct {
 	zt    pm.Runner
 	zterr error
 	zto   sync.Once
+
+	channel process.Channel
 }
 
 func newContainer(mgr *containerManager, id uint16, route core.Route, args ContainerCreateArguments) *container {
@@ -49,6 +52,11 @@ func newContainer(mgr *containerManager, id uint16, route core.Route, args Conta
 
 func (c *container) ID() uint16 {
 	return c.id
+}
+
+func (c *container) dispatch(cmd *core.Command) error {
+	enc := json.NewEncoder(c.channel)
+	return enc.Encode(cmd)
 }
 
 func (c *container) Arguments() ContainerCreateArguments {
@@ -102,9 +110,6 @@ func (c *container) Start() (err error) {
 	}
 
 	args := []string{
-		"-core-id", fmt.Sprintf("%d", c.id),
-		"-redis-socket", "/redis.socket",
-		"-reply-to", coreXResponseQueue,
 		"-hostname", c.Args.Hostname,
 	}
 
@@ -132,11 +137,11 @@ func (c *container) Start() (err error) {
 	}
 
 	onpid := &pm.PIDHook{
-		Action: c.onpid,
+		Action: c.onStart,
 	}
 
 	onexit := &pm.ExitHook{
-		Action: c.onexit,
+		Action: c.onExit,
 	}
 	var runner pm.Runner
 	runner, err = mgr.NewRunner(extCmd, process.NewContainerProcess, onpid, onexit)
@@ -170,7 +175,17 @@ func (c *container) preStart() error {
 	return nil
 }
 
-func (c *container) onpid(pid int) {
+func (c *container) onStart(pid int) {
+	//get channel
+	ps := c.runner.Process()
+	if ps, ok := ps.(process.ContainerProcess); !ok {
+		log.Errorf("not a valid container process")
+		c.runner.Terminate()
+		return
+	} else {
+		c.channel = ps.Channel()
+	}
+
 	c.PID = pid
 	if !c.Args.Privileged {
 		c.mgr.cgroup.Task(pid)
@@ -180,9 +195,11 @@ func (c *container) onpid(pid int) {
 		log.Errorf("Container post start error: %s", err)
 		//TODO. Should we shut the container down?
 	}
+
+	go c.communicate()
 }
 
-func (c *container) onexit(state bool) {
+func (c *container) onExit(state bool) {
 	log.Debugf("Container %v exited with state %v", c.id, state)
 	c.cleanup()
 }
@@ -190,6 +207,10 @@ func (c *container) onexit(state bool) {
 func (c *container) cleanup() {
 	log.Debugf("cleaning up container-%d", c.id)
 	defer c.mgr.unset_container(c.id)
+
+	if c.channel != nil {
+		c.channel.Close()
+	}
 
 	c.destroyNetwork()
 

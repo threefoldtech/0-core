@@ -3,13 +3,13 @@ package containers
 import (
 	"encoding/json"
 	"fmt"
-	base "github.com/g8os/core0/base"
 	"github.com/g8os/core0/base/pm"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/process"
 	"github.com/g8os/core0/base/utils"
 	"github.com/g8os/core0/core0/screen"
 	"github.com/g8os/core0/core0/subsys/cgroups"
+	"github.com/g8os/core0/core0/transport"
 	"github.com/garyburd/redigo/redis"
 	"github.com/op/go-logging"
 	"github.com/pborman/uuid"
@@ -149,7 +149,7 @@ type containerManager struct {
 	cell   *screen.RowCell
 	cgroup cgroups.Group
 
-	sink *base.Sink
+	sink *transport.Sink
 }
 
 /*
@@ -173,7 +173,7 @@ type ContainerManager interface {
 	Of(id uint16) Container
 }
 
-func ContainerSubsystem(sink *base.Sink, cell *screen.RowCell) (ContainerManager, error) {
+func ContainerSubsystem(sink *transport.Sink, cell *screen.RowCell) (ContainerManager, error) {
 	if err := cgroups.Init(); err != nil {
 		return nil, err
 	}
@@ -300,7 +300,6 @@ func (m *containerManager) create(cmd *core.Command) (interface{}, error) {
 
 	id := m.getNextSequence()
 	c := newContainer(m, id, cmd.Route, args)
-
 	m.set_container(id, c)
 
 	if err := c.Start(); err != nil {
@@ -346,8 +345,9 @@ func (m *containerManager) getCoreXQueue(id uint16) string {
 	return fmt.Sprintf("core:%v", id)
 }
 
-func (m *containerManager) pushToContainer(container uint16, cmd *core.Command) error {
-	return m.sink.Forward(m.getCoreXQueue(container), cmd)
+func (m *containerManager) pushToContainer(container *container, cmd *core.Command) error {
+	m.sink.Flag(cmd.ID)
+	return container.dispatch(cmd)
 }
 
 func (m *containerManager) dispatch(cmd *core.Command) (interface{}, error) {
@@ -361,33 +361,39 @@ func (m *containerManager) dispatch(cmd *core.Command) (interface{}, error) {
 	}
 
 	m.conM.RLock()
-	_, ok := m.containers[args.Container]
+	cont, ok := m.containers[args.Container]
 	m.conM.RUnlock()
 
 	if !ok {
 		return nil, fmt.Errorf("container does not exist")
 	}
 
-	id := uuid.New()
-	args.Command.ID = id
-	args.Command.Tags = string(cmd.Route)
+	args.Command.ID = uuid.New()
 
-	if err := m.pushToContainer(args.Container, &args.Command); err != nil {
+	if err := m.pushToContainer(cont, &args.Command); err != nil {
 		return nil, err
 	}
 
-	return id, nil
+	return args.Command.ID, nil
 }
 
 //Dispatch command to container with ID (id)
 func (m *containerManager) Dispatch(id uint16, cmd *core.Command) (*core.JobResult, error) {
 	cmd.ID = uuid.New()
 
-	if err := m.pushToContainer(id, cmd); err != nil {
+	m.conM.RLock()
+	cont, ok := m.containers[id]
+	m.conM.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("container does not exist")
+	}
+
+	if err := m.pushToContainer(cont, cmd); err != nil {
 		return nil, err
 	}
 
-	return m.sink.Result(cmd.ID, base.ReturnExpire)
+	return m.sink.Result(cmd.ID, transport.ReturnExpire)
 }
 
 type ContainerTerminateArguments struct {
