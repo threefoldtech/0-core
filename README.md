@@ -12,7 +12,7 @@ Core0 is a `systemd` replacement for G8OS.
 - [0.10.0](https://github.com/g8os/core0/tree/0.10.0)
 - [0.11.0](https://github.com/g8os/core0/tree/0.11.0)
 - [1.0.0](https://github.com/g8os/core0/tree/1.0.0)
-- [1.1.0-alpha](https://github.com/g8os/core0/tree/1.1.0-alpha) - last release
+- [1.1.0-alpha2](https://github.com/g8os/core0/tree/1.1.0-alpha) - last release
 
 ## Releases
 
