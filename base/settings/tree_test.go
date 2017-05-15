@@ -10,27 +10,21 @@ var (
 	settings IncludedSettings = IncludedSettings{
 		Startup: map[string]Startup{
 			"ovc": Startup{
-				key:   "ovc",
 				After: []string{"mongo", "influx"},
 			},
 			"fstab": Startup{
-				key:   "fstab",
 				After: []string{string(AfterInit), "udev"},
 			},
 			"mongo": Startup{
-				key:   "mongo",
 				After: []string{string(AfterBoot)},
 			},
 			"sshd": Startup{
-				key:   "sshd",
 				After: []string{string(AfterNet)},
 			},
 			"influx": Startup{
-				key:   "influx",
 				After: []string{string(AfterBoot)},
 			},
 			"udev": Startup{
-				key:   "udev",
 				After: []string{string(AfterInit)},
 			},
 		},
@@ -155,15 +149,12 @@ func TestGetTreeDefaultWeight(t *testing.T) {
 	settings := IncludedSettings{
 		Startup: map[string]Startup{
 			"mount": Startup{
-				key:   "mount",
 				After: []string{string(AfterInit)},
 			},
 			"mongo": Startup{
-				key:   "mongo",
 				After: []string{},
 			},
 			"influx": Startup{
-				key:   "influx",
 				After: []string{},
 			},
 		},
@@ -193,11 +184,9 @@ func TestGetTreeMissingDependency(t *testing.T) {
 	settings := IncludedSettings{
 		Startup: map[string]Startup{
 			"mongo": Startup{
-				key:   "mongo",
 				After: []string{string(AfterBoot)},
 			},
 			"ovc": Startup{
-				key:   "ovc",
 				After: []string{"mongo", "influx"},
 			},
 		},
@@ -217,19 +206,15 @@ func TestGetTreeCyclicDependency(t *testing.T) {
 	settings := IncludedSettings{
 		Startup: map[string]Startup{
 			"independent": Startup{
-				key:   "independent",
 				After: []string{},
 			},
 			"influx": Startup{
-				key:   "influx",
 				After: []string{},
 			},
 			"mongo": Startup{
-				key:   "mongo",
 				After: []string{"ovc"},
 			},
 			"ovc": Startup{
-				key:   "ovc",
 				After: []string{"mongo", "influx"},
 			},
 		},
@@ -241,6 +226,25 @@ func TestGetTreeCyclicDependency(t *testing.T) {
 	}
 
 	if ok := assert.Len(t, tree.Services(), 2); !ok {
+		t.Fatal()
+	}
+}
+
+func TestOVSDependencies(t *testing.T) {
+	settings := IncludedSettings{
+		Startup: map[string]Startup{
+			"ovs.init": Startup{},
+			"ovsdb": Startup{
+				After: []string{"ovs.init"},
+			},
+			"ovs": Startup{
+				After: []string{"ovsdb"},
+			},
+		},
+	}
+
+	_, errs := settings.GetStartupTree()
+	if ok := assert.Empty(t, errs); !ok {
 		t.Fatal()
 	}
 }

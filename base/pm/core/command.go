@@ -20,7 +20,8 @@ type Command struct {
 	LogLevels       []int            `json:"log_levels,omitempty"`
 	Tags            string           `json:"tags"`
 
-	Route Route `json:"-"`
+	Route     Route `json:"-"`
+	Protected bool  `json:"-"`
 }
 
 type M map[string]interface{}

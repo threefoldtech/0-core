@@ -47,7 +47,7 @@ func NewRedisLogger(coreID uint16, address string, password string, defaults []i
 }
 
 func (l *redisLogger) Log(cmd *core.Command, msg *stream.Message) {
-	if !IsLoggable(l.defaults, cmd, msg) {
+	if !IsLoggableCmd(cmd, msg) {
 		return
 	}
 
@@ -59,6 +59,9 @@ func (l *redisLogger) Log(cmd *core.Command, msg *stream.Message) {
 }
 
 func (l *redisLogger) LogRecord(record *LogRecord) {
+	if !IsLoggable(l.defaults, record.Message) {
+		return
+	}
 	l.ch <- record
 }
 

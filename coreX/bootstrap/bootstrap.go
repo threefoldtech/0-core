@@ -2,6 +2,10 @@ package bootstrap
 
 import (
 	"fmt"
+	"github.com/g8os/core0/base/pm"
+	"github.com/g8os/core0/base/settings"
+	"github.com/g8os/core0/base/utils"
+	"github.com/g8os/core0/coreX/options"
 	"github.com/op/go-logging"
 	"github.com/shirou/gopsutil/process"
 	"github.com/vishvananda/netlink"
@@ -50,6 +54,11 @@ func (o *Bootstrap) setupFS() error {
 	os.MkdirAll("/etc", 0755)
 	os.MkdirAll("/var/run", 0755)
 
+	os.MkdirAll("/sys", 0755)
+	if err := syscall.Mount("none", "/sys", "sysfs", 0, ""); err != nil {
+		return err
+	}
+
 	os.MkdirAll("/proc", 0755)
 	if err := syscall.Mount("none", "/proc", "proc", 0, ""); err != nil {
 		return err
@@ -67,6 +76,22 @@ func (o *Bootstrap) setupFS() error {
 	return nil
 }
 
+func (b *Bootstrap) startup() error {
+	var included settings.IncludedSettings
+	if err := utils.LoadTomlFile("/.startup.toml", &included); err != nil {
+		return err
+	}
+
+	tree, errs := included.GetStartupTree()
+	if errs != nil {
+		return fmt.Errorf("failed to build startup tree: %v", errs)
+	}
+
+	pm.GetManager().RunSlice(tree.Slice(settings.AfterInit.Weight(), settings.ToTheEnd.Weight()))
+
+	return nil
+}
+
 //Bootstrap registers extensions and startup system services.
 func (b *Bootstrap) Bootstrap(hostname string) error {
 	log.Debugf("setting up lo device")
@@ -80,6 +105,28 @@ func (b *Bootstrap) Bootstrap(hostname string) error {
 	log.Debugf("setting up hostname")
 	if err := updateHostname(hostname); err != nil {
 		return err
+	}
+
+	log.Debugf("linkin mtab")
+	if err := linkMtab(); err != nil {
+		return err
+	}
+
+	if options.Options.Unprivileged() {
+		pm.GetManager().SetUnprivileged()
+		if err := b.revokePrivileges(); err != nil {
+			return err
+		}
+	}
+
+	log.Debugf("startup services")
+
+	if err := b.plugins(); err != nil {
+		log.Errorf("failed to load plugins: %s", err)
+	}
+
+	if err := b.startup(); err != nil {
+		log.Errorf("failed to startup container services: %s", err)
 	}
 
 	return nil
@@ -136,4 +183,9 @@ func updateHostname(hostname string) error {
 	fmt.Fprint(fHosts, "127.0.0.1    localhost.localdomain localhost\n")
 
 	return syscall.Sethostname([]byte(hostname))
+}
+
+func linkMtab() error {
+	os.RemoveAll("/etc/mtab")
+	return os.Symlink("../proc/self/mounts", "/etc/mtab")
 }

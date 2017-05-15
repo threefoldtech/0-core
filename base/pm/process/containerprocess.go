@@ -6,7 +6,10 @@ import (
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/stream"
 	psutils "github.com/shirou/gopsutil/process"
+	"io"
+	"os"
 	"os/exec"
+	"sync"
 	"syscall"
 )
 
@@ -19,11 +22,54 @@ type ContainerCommandArguments struct {
 	Chroot      string            `json:"chroot"`
 }
 
+type Channel interface {
+	Writer() uintptr
+	Reader() uintptr
+	io.ReadWriteCloser
+}
+
+type channel struct {
+	r *os.File
+	w *os.File
+	o sync.Once
+}
+
+func (c *channel) Close() error {
+	c.o.Do(func() {
+		c.r.Close()
+		c.w.Close()
+	})
+
+	return nil
+}
+
+func (c *channel) Read(p []byte) (n int, err error) {
+	return c.r.Read(p)
+}
+
+func (c *channel) Write(p []byte) (n int, err error) {
+	return c.w.Write(p)
+}
+
+func (c *channel) Writer() uintptr {
+	return c.w.Fd()
+}
+
+func (c *channel) Reader() uintptr {
+	return c.r.Fd()
+}
+
+type ContainerProcess interface {
+	Process
+	Channel() Channel
+}
+
 type containerProcessImpl struct {
 	cmd     *core.Command
 	args    ContainerCommandArguments
 	pid     int
 	process *psutils.Process
+	ch      *channel
 
 	table PIDTable
 }
@@ -40,6 +86,10 @@ func NewContainerProcess(table PIDTable, cmd *core.Command) Process {
 
 func (process *containerProcessImpl) Command() *core.Command {
 	return process.cmd
+}
+
+func (process *containerProcessImpl) Channel() Channel {
+	return process.ch
 }
 
 func (process *containerProcessImpl) Signal(sig syscall.Signal) error {
@@ -82,16 +132,42 @@ func (process *containerProcessImpl) Stats() *ProcessStats {
 	return &stats
 }
 
+func (process *containerProcessImpl) setupChannel() (*os.File, *os.File, error) {
+	lr, lw, err := os.Pipe()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	rr, rw, err := os.Pipe()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	process.ch = &channel{
+		r: lr,
+		w: rw,
+	}
+
+	return rr, lw, nil
+}
+
 func (process *containerProcessImpl) Run() (<-chan *stream.Message, error) {
 	cmd := exec.Command(process.args.Name,
 		process.args.Args...)
 	cmd.Dir = process.args.Dir
 
-	var flags uintptr = syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS
+	var flags uintptr = syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWUTS
 
 	if !process.args.HostNetwork {
 		flags |= syscall.CLONE_NEWNET
 	}
+
+	r, w, err := process.setupChannel()
+	if err != nil {
+		return nil, err
+	}
+
+	cmd.ExtraFiles = []*os.File{r, w}
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Chroot:     process.args.Chroot,
@@ -103,7 +179,7 @@ func (process *containerProcessImpl) Run() (<-chan *stream.Message, error) {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%v=%v", k, v))
 	}
 
-	err := process.table.Register(func() (int, error) {
+	err = process.table.Register(func() (int, error) {
 		err := cmd.Start()
 		if err != nil {
 			return 0, err
@@ -129,8 +205,10 @@ func (process *containerProcessImpl) Run() (<-chan *stream.Message, error) {
 		defer close(channel)
 
 		state := process.table.WaitPID(process.pid)
-
-		log.Infof("Process %s exited with state: %d", process.cmd, state.ExitStatus())
+		if err := process.ch.Close(); err != nil {
+			log.Errorf("failed to close container channel: %s", err)
+		}
+		log.Debugf("Process %s exited with state: %d", process.cmd, state.ExitStatus())
 
 		if state.ExitStatus() == 0 {
 			channel <- stream.MessageExitSuccess
