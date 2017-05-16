@@ -6,6 +6,7 @@ import (
 	"github.com/g8os/core0/base/pm"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/process"
+	"github.com/g8os/core0/base/settings"
 	"github.com/g8os/core0/base/utils"
 	"github.com/g8os/core0/core0/screen"
 	"github.com/g8os/core0/core0/subsys/cgroups"
@@ -29,8 +30,9 @@ const (
 	coreXResponseQueue = "corex:results"
 	coreXBinaryName    = "coreX"
 
-	redisSocketSrc    = "/var/run/redis.socket"
-	DefaultBridgeName = "core0"
+	redisSocketSrc      = "/var/run/redis.socket"
+	DefaultBridgeName   = "core0"
+	ContainersHardLimit = 1000
 )
 
 var (
@@ -296,6 +298,18 @@ func (m *containerManager) create(cmd *core.Command) (interface{}, error) {
 
 	if err := args.Validate(); err != nil {
 		return nil, err
+	}
+
+	m.conM.RLock()
+	count := len(m.containers)
+	m.conM.RUnlock()
+	limit := settings.Settings.Containers.MaxCount
+	if limit == 0 {
+		limit = ContainersHardLimit
+	}
+
+	if count >= limit {
+		return nil, fmt.Errorf("reached the hard limit of %d containers", count)
 	}
 
 	id := m.getNextSequence()
