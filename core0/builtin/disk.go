@@ -10,7 +10,6 @@ import (
 	"github.com/g8os/core0/base/pm"
 	"github.com/g8os/core0/base/pm/core"
 	"github.com/g8os/core0/base/pm/process"
-	"github.com/pborman/uuid"
 )
 
 /*
@@ -118,34 +117,16 @@ func (d *diskMgr) readUInt64(p string) (uint64, error) {
 }
 
 func (d *diskMgr) lsblk(dev string) (*lsblkResult, error) {
-
-	runner, err := pm.GetManager().RunCmd(&core.Command{
-		ID:      uuid.New(),
-		Command: process.CommandSystem,
-		Arguments: core.MustArguments(process.SystemCommandArguments{
-			Name: "lsblk",
-			Args: []string{"-O", "-J", fmt.Sprintf("/dev/%s", dev)},
-		}),
-	})
+	result, err := pm.GetManager().System("lsblk", "-O", "-J", fmt.Sprintf("/dev/%s", dev))
 
 	if err != nil {
 		return nil, err
 	}
 
-	cmdResult := runner.Wait()
-	if cmdResult.State != core.StateSuccess {
-		return nil, fmt.Errorf("failed to set run lsblk command: %v", cmdResult.Streams)
-	}
-
-	stdout := ""
-	if len(cmdResult.Streams) > 1 {
-		stdout = cmdResult.Streams[0]
-	}
-
 	cmdOutput := struct {
 		BlockDevices []lsblkResult `json:"blockdevices"`
 	}{}
-	if err := json.Unmarshal([]byte(stdout), &cmdOutput); err != nil {
+	if err := json.Unmarshal([]byte(result.Streams.Stdout()), &cmdOutput); err != nil {
 		return nil, err
 	}
 
@@ -153,6 +134,7 @@ func (d *diskMgr) lsblk(dev string) (*lsblkResult, error) {
 		return &cmdOutput.BlockDevices[0], nil
 
 	}
+
 	return nil, fmt.Errorf("not device with the name /dev/%s", dev)
 
 }
@@ -162,37 +144,19 @@ func (d *diskMgr) blockSize(dev string) (uint64, error) {
 
 func (d *diskMgr) getTableInfo(disk string) (string, []DiskFreeBlock, error) {
 	blocks := make([]DiskFreeBlock, 0)
-	runner, err := pm.GetManager().RunCmd(&core.Command{
-		ID:      uuid.New(),
-		Command: process.CommandSystem,
-		Arguments: core.MustArguments(process.SystemCommandArguments{
-			Name: "parted",
-			Args: []string{fmt.Sprintf("/dev/%s", disk), "unit", "B", "print", "free"},
-		}),
-	})
+	result, err := pm.GetManager().System("parted", fmt.Sprintf("/dev/%s", disk), "unit", "B", "print", "free")
 
 	if err != nil {
 		return "", blocks, err
 	}
 
-	result := runner.Wait()
-	if result.State != core.StateSuccess {
-		return "", blocks, fmt.Errorf("failed to run parted: %v", result.Streams)
-	}
-
-	stdout := ""
-
-	if len(result.Streams) > 1 {
-		stdout = result.Streams[0]
-	}
-
 	table := ""
-	tableMatch := partTableRegex.FindStringSubmatch(stdout)
+	tableMatch := partTableRegex.FindStringSubmatch(result.Streams.Stdout())
 	if len(tableMatch) == 2 {
 		table = tableMatch[1]
 	}
 
-	matches := freeSpaceRegex.FindAllStringSubmatch(stdout, -1)
+	matches := freeSpaceRegex.FindAllStringSubmatch(result.Streams.Stdout(), -1)
 	for _, match := range matches {
 		bstart, _ := strconv.ParseUint(match[1], 10, 64)
 		bend, _ := strconv.ParseUint(match[2], 10, 64)
@@ -290,30 +254,13 @@ func (d *diskMgr) info(cmd *core.Command) (interface{}, error) {
 }
 
 func (d *diskMgr) list(cmd *core.Command) (interface{}, error) {
-	runner, err := pm.GetManager().RunCmd(&core.Command{
-		ID:      uuid.New(),
-		Command: process.CommandSystem,
-		Arguments: core.MustArguments(process.SystemCommandArguments{
-			Name: "lsblk",
-			Args: []string{"--json", "--output-all", "--bytes", "--exclude", "1,2"},
-		}),
-	})
+	result, err := pm.GetManager().System("lsblk", "--json", "--output-all", "--bytes", "--exclude", "1,2")
 	if err != nil {
 		return nil, err
 	}
 
-	result := runner.Wait()
-	if result.State != core.StateSuccess {
-		return nil, fmt.Errorf("failed to run lsblk: %v", result.Streams)
-	}
-
-	stdout := ""
-
-	if len(result.Streams) > 1 {
-		stdout = result.Streams[0]
-	}
 	var disks lsblkListResult
-	if err := json.Unmarshal([]byte(stdout), &disks); err != nil {
+	if err := json.Unmarshal([]byte(result.Streams.Stdout()), &disks); err != nil {
 		return nil, err
 	}
 	ret := []lsblkResult{}

@@ -32,28 +32,6 @@ const (
 	ContainerBaseRootDir = "/mnt"
 )
 
-type starterWrapper struct {
-	cmd *core.Command
-	run pm.Runner
-}
-
-func (s *starterWrapper) Start() error {
-	runner, err := pm.GetManager().RunCmd(s.cmd)
-	s.run = runner
-	return err
-}
-
-func (s *starterWrapper) Wait() error {
-	if s.run == nil {
-		return fmt.Errorf("not started")
-	}
-	r := s.run.Wait()
-	if r.State != core.StateSuccess {
-		return fmt.Errorf("exit error: %s", r.Streams[1])
-	}
-	return nil
-}
-
 func (c *container) name() string {
 	return fmt.Sprintf("container-%d", c.id)
 }
@@ -324,8 +302,8 @@ func (c *container) sandbox() error {
 
 	if fstype == "btrfs" {
 		//make sure we delete it if sub volume exists
-		c.sync("btrfs", "subvolume", "delete", path.Join(BackendBaseDir, c.name()))
-		c.sync("btrfs", "subvolume", "create", path.Join(BackendBaseDir, c.name()))
+		pm.GetManager().System("btrfs", "subvolume", "delete", path.Join(BackendBaseDir, c.name()))
+		pm.GetManager().System("btrfs", "subvolume", "create", path.Join(BackendBaseDir, c.name()))
 	}
 
 	root := c.root()

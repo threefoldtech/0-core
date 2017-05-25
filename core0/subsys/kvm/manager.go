@@ -487,27 +487,12 @@ func (m *kvmManager) mkNBDDisk(idx int, u *url.URL) DiskDevice {
 }
 
 func getDiskType(path string) string {
-	cmd := &core.Command{
-		ID:      uuid.New(),
-		Command: process.CommandSystem,
-		Arguments: core.MustArguments(
-			process.SystemCommandArguments{
-				Name: "qemu-img",
-				Args: []string{"info", "--output=json", path},
-			},
-		),
-	}
-
-	runner, err := pm.GetManager().RunCmd(cmd)
+	result, err := pm.GetManager().System("qemu-img", "info", "--output=json", path)
 	if err != nil {
 		return "raw"
 	}
-	result := runner.Wait()
-	if result.State != core.StateSuccess {
-		return "raw"
-	}
 	var params QemuImgInfoResult
-	if err := json.Unmarshal([]byte(result.Streams[0]), &params); err != nil {
+	if err := json.Unmarshal([]byte(result.Streams.Stdout()), &params); err != nil {
 		return "raw"
 	}
 	return params.Format
