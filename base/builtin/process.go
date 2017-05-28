@@ -3,9 +3,9 @@ package builtin
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/g8os/core0/base/pm"
-	"github.com/g8os/core0/base/pm/core"
-	ps "github.com/g8os/core0/base/pm/process"
+	"github.com/Zero-OS/0-Core/base/pm"
+	"github.com/Zero-OS/0-Core/base/pm/core"
+	ps "github.com/Zero-OS/0-Core/base/pm/process"
 	"github.com/shirou/gopsutil/process"
 	"io/ioutil"
 	"strings"

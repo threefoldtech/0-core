@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/g8os/core0/core0/options"
+	"github.com/Zero-OS/0-Core/core0/options"
 	"os"
 	"os/signal"
 	"syscall"

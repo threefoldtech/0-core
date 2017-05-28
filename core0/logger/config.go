@@ -1,11 +1,11 @@
 package logger
 
 import (
-	"github.com/g8os/core0/base/logger"
-	"github.com/g8os/core0/base/pm"
-	"github.com/g8os/core0/base/pm/core"
-	"github.com/g8os/core0/base/pm/stream"
-	"github.com/g8os/core0/base/settings"
+	"github.com/Zero-OS/0-Core/base/logger"
+	"github.com/Zero-OS/0-Core/base/pm"
+	"github.com/Zero-OS/0-Core/base/pm/core"
+	"github.com/Zero-OS/0-Core/base/pm/stream"
+	"github.com/Zero-OS/0-Core/base/settings"
 	"github.com/op/go-logging"
 	"github.com/siddontang/ledisdb/ledis"
 )

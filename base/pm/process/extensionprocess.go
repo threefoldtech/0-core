@@ -3,9 +3,9 @@ package process
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/g8os/core0/base/pm/core"
-	"github.com/g8os/core0/base/pm/stream"
-	"github.com/g8os/core0/base/utils"
+	"github.com/Zero-OS/0-Core/base/pm/core"
+	"github.com/Zero-OS/0-Core/base/pm/stream"
+	"github.com/Zero-OS/0-Core/base/utils"
 	"syscall"
 )
 

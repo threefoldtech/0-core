@@ -1,6 +1,6 @@
 package builtin
 
-import "github.com/g8os/core0/base/pm"
+import "github.com/Zero-OS/0-Core/base/pm"
 
 func init() {
 	pm.RegisterCmd("bash", "sh", "", []string{"-c", "{script}"}, nil)

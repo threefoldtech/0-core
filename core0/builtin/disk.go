@@ -7,9 +7,9 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/g8os/core0/base/pm"
-	"github.com/g8os/core0/base/pm/core"
-	"github.com/g8os/core0/base/pm/process"
+	"github.com/Zero-OS/0-Core/base/pm"
+	"github.com/Zero-OS/0-Core/base/pm/core"
+	"github.com/Zero-OS/0-Core/base/pm/process"
 )
 
 /*

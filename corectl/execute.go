@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/codegangsta/cli"
-	"github.com/g8os/core0/base/pm/core"
+	"github.com/Zero-OS/0-Core/base/pm/core"
 )
 
 func system(t Transport, c *cli.Context) {

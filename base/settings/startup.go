@@ -2,7 +2,7 @@ package settings
 
 import (
 	"fmt"
-	"github.com/g8os/core0/base/utils"
+	"github.com/Zero-OS/0-Core/base/utils"
 )
 
 //StartupCmd startup command config

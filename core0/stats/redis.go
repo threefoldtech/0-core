@@ -1,8 +1,8 @@
 package stats
 
 import (
-	"github.com/g8os/core0/base/utils"
-	"github.com/g8os/core0/core0/assets"
+	"github.com/Zero-OS/0-Core/base/utils"
+	"github.com/Zero-OS/0-Core/core0/assets"
 	"github.com/garyburd/redigo/redis"
 	"github.com/op/go-logging"
 	"strings"
