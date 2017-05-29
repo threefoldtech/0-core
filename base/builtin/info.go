@@ -117,7 +117,8 @@ func getTCPUDPInfo() ([]*Port, error) {
 		p := path.Join("/proc", "net", network)
 		content, err := ioutil.ReadFile(p)
 		if err != nil {
-			return nil, err
+			log.Debugf("failed to read %s", p)
+			continue
 		}
 		buf := bufio.NewBuffer(content)
 		for line, err := buf.ReadString('\n'); err == nil; line, err = buf.ReadString('\n') {
