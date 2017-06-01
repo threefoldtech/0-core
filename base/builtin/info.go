@@ -45,10 +45,15 @@ func init() {
 type Version struct {
 	Branch   string `json:"branch"`
 	Revision string `json:"revision"`
+	Dirty    bool   `json:"dirty"`
 }
 
 func getVersionInfo(cmd *core.Command) (interface{}, error) {
-	return Version{Branch: base.Branch, Revision: base.Revision}, nil
+	var dirty bool
+	if base.Dirty != "" {
+		dirty = true
+	}
+	return Version{Branch: base.Branch, Revision: base.Revision, Dirty: dirty}, nil
 }
 
 func getCPUInfo(cmd *core.Command) (interface{}, error) {
