@@ -49,11 +49,7 @@ type Version struct {
 }
 
 func getVersionInfo(cmd *core.Command) (interface{}, error) {
-	var dirty bool
-	if base.Dirty != "" {
-		dirty = true
-	}
-	return Version{Branch: base.Branch, Revision: base.Revision, Dirty: dirty}, nil
+	return Version{Branch: base.Branch, Revision: base.Revision, Dirty: base.Dirty != ""}, nil
 }
 
 func getCPUInfo(cmd *core.Command) (interface{}, error) {
