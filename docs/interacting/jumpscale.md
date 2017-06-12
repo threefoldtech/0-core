@@ -2,9 +2,9 @@
 
 The below code examples requires JumpScale 9. A quick and easy way to meet this requirement is running a Docker container with JumpScale 9.0 preinstalled, achieved by following the steps in https://github.com/Jumpscale/developer.
 
-- [Setup ZeroTier network](setup-the-zerotier-network)
+- [Setup ZeroTier network](#setup-the-zerotier-network)
 - [Using the Interactive JumpScale Shell](#using-the-interactive-jumpscale-shell)
-- [Using a Python script](#Using-a-python-script)
+- [Using a Python script](#using-a-python-script)
 
 ## Setup the ZeroTier network
 
