@@ -2,9 +2,9 @@
 
 The below code examples requires JumpScale 9. A quick and easy way to meet this requirement is running a Docker container with JumpScale 9.0 preinstalled, achieved by following the steps in https://github.com/Jumpscale/developer.
 
-- [Setup ZeroTier network](#setup-the-zerotier-network)
+- [Setup ZeroTier network](setup-the-zerotier-network)
 - [Using the Interactive JumpScale Shell](#using-the-interactive-jumpscale-shell)
-- [Using a Python script](#using-a-python-script)
+- [Using a Python script](#Using-a-python-script)
 
 ## Setup the ZeroTier network
 
@@ -93,22 +93,20 @@ c.info.nic()
 Install the SSH daemon and start it in the container:
 ```python
 rv = c.system('apt-get update').get(timeout=60)
-rv.state
-rv=c.system("apt install ssh -y").get(timeout=3600)
-rv.state
-rv=c.system('/etc/init.d/ssh start').get(timeout=3600)
+rv = c.system("apt install ssh -y").get(timeout=3600)
+rv = c.system('/etc/init.d/ssh start').get(timeout=3600)
 ```
 
 Copy your SSH into the `authorized_keys`:
 ```python
-rv = c6.system('mkdir -p /root/.ssh').get(timeout=3600)
-rv = c6.system('bash -c "echo \'%s\' > /root/.ssh/authorized_keys"' % SSHKEY)
-rv.get()
+rv = c.system('mkdir -p /root/.ssh').get(timeout=3600)
+rv = c.system('bash -c "echo \'%s\' > /root/.ssh/authorized_keys"' % SSHKEY).get(timeout=3600)
+rv.state
 ```
 
-Check the network infaces of you container:
+****NOTE**: If you want to be sure that the previous commands work, just run the next command after execute each one:
 ```python
-c6.info.nic()
+rv.state
 ```
 
 You should now be able to SSH into your container.
