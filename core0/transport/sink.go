@@ -2,11 +2,13 @@ package transport
 
 import (
 	"fmt"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/pm/core"
 	"github.com/siddontang/ledisdb/config"
 	"github.com/siddontang/ledisdb/ledis"
 	"github.com/siddontang/ledisdb/server"
+	"github.com/zero-os/0-core/base/pm"
+	"github.com/zero-os/0-core/base/pm/core"
+	"github.com/zero-os/0-core/core0/assets"
+	"github.com/zero-os/0-core/core0/options"
 	"time"
 )
 
@@ -36,6 +38,26 @@ func NewSink(mgr *pm.PM, c SinkConfig) (*Sink, error) {
 	cfg.DBName = "memory"
 	cfg.DataDir = "/var/core0"
 	cfg.Addr = fmt.Sprintf(":%d", c.Port)
+	if orgs, ok := options.Options.Kernel.Get("organization"); ok {
+		org := orgs[len(orgs)-1]
+		auth, err := AuthMethod(org, string(assets.MustAsset("text/itsyouonline.pub")))
+		if err != nil {
+			return nil, err
+		}
+		cfg.AuthMethod = auth
+	}
+
+	crt, key, err := generateCRT()
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.TLS = config.TLS{
+		Enabled:     true,
+		Certificate: crt,
+		Key:         key,
+	}
+
 	server, err := server.NewApp(cfg)
 	if err != nil {
 		return nil, err

@@ -737,6 +737,7 @@ class ContainerManager:
                         'type': nic_type # default, bridge, zerotier, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
                         'id': id # depends on the type, bridge name, zerotier network id, the vlan tag or the vxlan id
                         'name': name of the nic inside the container (ignored in zerotier type)
+                        'hwaddr': Mac address of nic.
                         'config': { # config is only honored for bridge, vlan, and vxlan types
                             'dhcp': bool,
                             'cidr': static_ip # ip/mask
@@ -1919,11 +1920,11 @@ class Experimental:
 
 class Client(BaseClient):
 
-    def __init__(self, host, port=6379, password="", db=0, timeout=None, testConnectionAttempts=3):
+    def __init__(self, host, port=6379, password="", db=0, ssl=True, timeout=None, testConnectionAttempts=3):
         super().__init__(timeout=timeout)
 
         socket_timeout = (timeout + 5) if timeout else 15
-        self._redis = redis.Redis(host=host, port=port, password=password, db=db,
+        self._redis = redis.Redis(host=host, port=port, password=password, db=db, ssl=ssl,
                                   socket_timeout=socket_timeout,
                                   socket_keepalive=True, socket_keepalive_options={
                                       socket.TCP_KEEPIDLE: 1,
