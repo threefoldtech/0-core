@@ -75,8 +75,8 @@ You will again need to go to `https://my.zerotier.com/network/$ZEROTIER_NETWORK_
 
 Check the result:
 ```python
-result = job.get(timeout=60)
-result
+job = job.get(timeout=3660)
+job
 ```
 
 List all containers:
@@ -92,7 +92,7 @@ c.info.nic()
 
 Install the SSH daemon and start it in the container:
 ```python
-rv = c.system('apt-get update').get(timeout=60)
+rv = c.system('apt-get update').get(timeout=3600)
 rv = c.system("apt install ssh -y").get(timeout=3600)
 rv = c.system('/etc/init.d/ssh start').get(timeout=3600)
 ```
