@@ -64,7 +64,7 @@ or
 cl.disk.mkpart("sda", 1, 400, "extended")
 ```
 
-- List all disks or partitions:
+- List all disks and partitions:
   ```python
   cl.disk.list()
   ```
