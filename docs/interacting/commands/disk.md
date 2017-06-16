@@ -31,7 +31,7 @@ Arguments:
 ```
 
 Values:
-- **disk**: Full device path like `sda`
+- **disk**: Device name, e.g. `sda`
 - **table_type**: Any value that is supported by `parted mktable`. See more details [here](https://www.gnu.org/software/parted/manual/html_node/mklabel.html#mklabel).
 
 
@@ -51,10 +51,10 @@ Arguments:
 ```
 
 Values:
-- **disk**: Full device path like `sda`.
+- **disk**: Device name, e.g. `sda`.
 - **start**: Partition start as accepted by `parted mkpart`, e.g. `1`
 - **end**: Partition end as accepted by `parted mkpart`, e.g. `100%`
-- **part-type**: e.g. `primary`,`extended` or `logical`
+- **part-type**: Partition type as accepted by `parted mkpart`, e.g. `primary`,`extended` or `logical`
 
 
 <a id="getinfo"></a>
@@ -71,8 +71,8 @@ Arguments:
 ```
 
 Values:
-- **disk**: e.g. `sda`
-- **partition**: e.g. `sda1, sdb2`
+- **disk**: Device name e.g. `sda`
+- **partition**: Partition name e.g. `sda1`, `sdb2`
 
 
 <a id="rmpart"></a>
@@ -89,7 +89,7 @@ Arguments:
 ```
 
 Values:
-- **disk**: e.g. `sda`
+- **disk**: Device name e.g. `sda`
 - **number**: Partition number, starting from `1`
 
 
