@@ -31,8 +31,8 @@ Arguments:
 ```
 
 Values:
-- **disk**: Full device path like `/dev/sda`
-- **table_type**: Any value that is supported by `parted mktable`
+- **disk**: Full device path like `sda`
+- **table_type**: Any value that is supported by `parted mktable`. See more details [here](https://www.gnu.org/software/parted/manual/html_node/mklabel.html#mklabel).
 
 
 <a id="mkpart"></a>
@@ -44,15 +44,17 @@ Arguments:
 ```javascript
 {
     "disk": "{disk}",
+    "start": "{start}"
+    "end":  "{end}"
     "part_type": "{part-type}",
 }
 ```
 
 Values:
-- **disk**: Full device path like `/dev/sda`.
-- **part-type**: Partition type as accepted by `parted mkpart`, e.g. `primary`
+- **disk**: Full device path like `sda`.
 - **start**: Partition start as accepted by `parted mkpart`, e.g. `1`
 - **end**: Partition end as accepted by `parted mkpart`, e.g. `100%`
+- **part-type**: e.g. `primary`,`extended` or `logical`
 
 
 <a id="getinfo"></a>
@@ -69,7 +71,7 @@ Arguments:
 ```
 
 Values:
-- **disk**: Full device path like `/dev/sda`.
+- **disk**: e.g. `sda`
 - **partition**: e.g. `sda1, sdb2`
 
 
@@ -87,7 +89,7 @@ Arguments:
 ```
 
 Values:
-- **disk**: Full device path, e.g. `/dev/disk`
+- **disk**: e.g. `sda`
 - **number**: Partition number, starting from `1`
 
 
