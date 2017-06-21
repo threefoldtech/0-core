@@ -34,7 +34,7 @@ The last value, `{target}` is actually the DNS name of your server, e.g. 'ns3588
 In the first script you will also have to provide a value for `{ZeroTier Network ID}`.
 
 Depending on whether you've JumpScale installed on your machine, you might prefer one of the two options to continue:
-- [Using the JumpScale](#using-jumpscale)
+- [Using JumpScale](#using-jumpscale)
 - [Using a plain Python script](#using-a-plain-python-script)
 
 ## Using JumpScale
