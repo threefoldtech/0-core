@@ -5,9 +5,9 @@ The easiest and recommended approach is to boot from an ISO image you get from t
 - **{BRANCH}** is the branch of the CoreOS, e.g. `1.1.0-alpha`, or `zero-os-master`
 - **{ZEROTIER-NETWORK}** is the ZeroTier network ID, create one on https://my.zerotier.com/network
 
-See the [ISO section in the Zero-OS Bootstrap Service documentation](../bootstrap/bootstrap.md#iso) for more details on this.
+See the [ISO section in the Zero-OS Bootstrap Service documentation](../bootstrap/README.md#iso) for more details on this.
 
-Alternatively you can build your own boot image and create your own boot disk as documented in [Building your Zero-OS Boot Image](../building/building.md).
+Alternatively you can build your own boot image and create your own boot disk as documented in [Building your Zero-OS Boot Image](../building/README.md).
 
 Once you got your boot image, continue following the next steps:
 
@@ -78,4 +78,4 @@ REDIS_PORT="6379"
 redis-cli -h $ZEROTIER_NETWORK -p $REDIS_PORT ping
 ```
 
-See [Interacting with Zero-OS](../interacting/interacting.md) for more examples on how to interact with Zero-OS.
+See [Interacting with Zero-OS](../interacting/README.md) for more examples on how to interact with Zero-OS.

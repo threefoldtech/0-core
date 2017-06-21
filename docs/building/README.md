@@ -134,7 +134,7 @@ network = "8056c2e21c000001"
 
 See [Startup Services](../config/startup.md) in order to understand how to configure the startup services.
 
-For all customization options see [Configuration](../config/config.md).
+For all customization options see [Configuration](../config/README.md).
 
 
 <a id="autobuild"></a>
@@ -170,4 +170,4 @@ If you have an EFI shell, just run the kernel like any EFI executable.
 
 If you don't have the shell or want to boot it automatically, save the kernel in `/EFI/BOOT/BOOTX64.EFI` in a FAT partition.
 
-See [Create a Bootable Zero-OS ISO File](booting/iso.md) and [Booting Zero-OS](../booting/booting.md) for all other options.
+See [Create a Bootable Zero-OS ISO File](booting/iso.md) and [Booting Zero-OS](../booting/README.md) for all other options.

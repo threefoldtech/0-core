@@ -1,5 +1,7 @@
 # Master template creation
 
+@TODO REVIEW
+
 To host a master template we first need to setup an [ARDB server](https://github.com/yinqiwen/ardb).
 
 After we have our ARDB server running we need to have the [NBD server](https://github.com/zero-os/0-disk/blob/master/nbdserver/readme.md).

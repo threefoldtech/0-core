@@ -21,16 +21,59 @@ POST: /*
 PUT: /*
 ```
 
-Copy the created keys in into the below script, replacing:
-
-```
+Copy the created keys in into the below scripts, replacing:
+```python
 - {Application Key}
-- {Application Key}
+- {Application Secret}
 - {Consumer Key}
 - {target}
 ```
 
 The last value, `{target}` is actually the DNS name of your server, e.g. 'ns3588821.ip-176-31-252.eu'
+
+In the first script you will also have to provide a value for `{ZeroTier Network ID}`.
+
+Depending on whether you've JumpScale installed on your machine, you might prefer one of the two options to continue:
+- [Using the JumpScale](#using-jumpscale)
+- [Using a plain Python script](#using-a-plain-python-script)
+
+## Using JumpScale
+
+```python
+appkey = "{Application Key}"
+appsecret = "{Application Secret}"
+consumerkey = "{Consumer Key}"
+branch = "{Zero-OS Branch}"
+ztnetwork = "{ZeroTier Network ID}"
+
+cl = j.clients.ovh.get(appkey, appsecret, consumerkey)
+
+serverlist = cl.serversGetList()
+serverid = j.tools.console.askChoice(serverlist, "Select server to boot Zero-OS, be careful!")
+
+pxescript = "https://bootstrap.gig.tech/ipxe/{0}/{1}".format(branch,ztnetwork)
+
+task = cl.zeroOSBoot(serverid, pxescript)
+
+print("[+] waiting for reboot")
+cl.waitServerReboot(serverid, task['taskId'])
+
+ip_pub = cl.serverGetDetail(serverid)["ip"]
+```
+
+Check the result in OVH Dashboard: https://eu.soyoustart.com/manager
+
+At this point you will now need to go to `https://my.zerotier.com/network/{ZeroTier Network ID}` in order to authorize the join request.
+
+Let's continue to get the ZeroTier network address via JumpScale, using the Zero-Tier client:
+
+```python
+zt = j.clients.zerotier.get(ztnetwork)
+member = zt.getNetworkMemberFromIPPub(ip_pub, networkId=ztnetwork, online=True)
+ipaddr_priv = member["ipaddr_priv"][0]
+```
+
+## Using a plain Python script
 
 Copy the below script to a new file `ovh-deploy.py`, and search and replace the strings as described above:
 ```python
@@ -162,7 +205,7 @@ if __name__ == '__main__':
     target = "{target}"
 
     print("[+] initializing client")
-    zos = ZeroOS_Ovh('{Application Key}', '{Application Key}', '{Consumer Key}')
+    zos = ZeroOS_Ovh('{Application Key}', '{Application Sedcret}', '{Consumer Key}')
 
     print("[+] setting up machine: %s" % target)
     zos.configure(target, "https://bootstrap.gig.tech/ipxe/master/17d709436c7366d8/debug")

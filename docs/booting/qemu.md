@@ -1,21 +1,21 @@
-# Booting G8OS on a VM using QEMU
+# Booting Zero-OS on a VM using QEMU
 
 > The below documentation is currently not supported, and meant for development purposes only.
 
 Steps:
 
-- [Get a G8OS boot image](#build-image)
+- [Get a Zero-OS boot image](#build-image)
 - [Add support for nesting KVM](#nesting-kvm)
-- [Create the G8OS disks](#create-disks)
+- [Create the Zero-OS disks](#create-disks)
 - [Create a new virtual machine on QEMU](#create-vm)
 - [Start the virtual machine](#start-vm)
 - [Ping the core0](#ping-core0)
 
 
 <a id="build-image"></a>
-## Get a G8OS boot image
+## Get a Zero-OS boot image
 
-Either build it yourself see [Building your G8OS Boot Image](../building/building.md) or download it from the [G8OS Bootstrap Server](https://bootstrap.gig.tech/).
+Either build it yourself see [Building your Zero-OS Boot Image](../building/README.md) or download it from the [Zero-OS Bootstrap Service](https://bootstrap.gig.tech/).
 
 We only require the kernel (`staging/vmlinuz.efi`) file when booting with QEMU.
 
@@ -36,7 +36,7 @@ sudo grub-mkconfig -o /boot/grub/grub.cfg
 ```
 
 <a id="create-disks"></a>
-## Create the G8OS disks
+## Create the Zero-OS disks
 
 To be able to provide storage for our ARDBs and our container's cache we need to create at least 5 disks:
 
@@ -62,7 +62,7 @@ virsh net enable default
 
 ### Making overlay
 
-For development mode we can create a small overlay device which overwrites the files inside G8OS.
+For development mode we can create a small overlay device which overwrites the files inside Zero-OS.
 
 See [Hot Debug](https://github.com/g8os/initramfs/tree/1.1.0-alpha#hot-debug-inject-files-without-rebuilding-the-vmlinuz) for detailed instructions.
 
@@ -84,7 +84,7 @@ cp $GOPATH/src/github.com/g8os/core0/bin/* overlay/bin/
 
 ### Adding shell at boot
 
-If you want a shell to launch at startup of your G8OS add the following file at `overlay/etc/g8os/conf/ashlogin.toml`:
+If you want a shell to launch at startup of your Zero-OS add the following file at `overlay/etc/g8os/conf/ashlogin.toml`:
 
 ```toml
 [startup.ashlogin]
