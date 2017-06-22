@@ -1,20 +1,12 @@
 # Booting Zero-OS on OVH
 
-Login to OVH: https://eu.soyoustart.com/
+Make sure you have an OVH account: https://eu.soyoustart.com/
 
-First create an **API Application**: https://eu.api.soyoustart.com/createApp/
+Then create your OVH API keys on https://eu.api.soyoustart.com/createToken/:
 
-Email and password are credentials to login to OVH. Application name and description are useful to recognize the app.
+![](images/create_ovh_api_keys.png)
 
-When the application is created, you will receive the **Application Key** and **Application Secret** which are needed on the below code.
-
-> Warning: it's not needed to create a new application, you can reuse one already existing, eg: AYS Automation
-
-In order to use the application, you also need a **Consumer Key**, which define your userkey to use the application.
-
-You can create one here: https://eu.api.soyoustart.com/createToken/
-
-To make it easy, add theses rights:
+Add theses rights:
 ```
 GET: /*
 POST: /*
@@ -31,9 +23,9 @@ Copy the created keys in into the below scripts, replacing:
 
 The last value, `{target}` is actually the DNS name of your server, e.g. 'ns3588821.ip-176-31-252.eu'
 
-In the first script you will also have to provide a value for `{ZeroTier Network ID}`.
+In the first script you will also have to provide a value for `ztnetwork` and the `ztapitoken`, the later can be created on the Account page of your https://my.zerotier.com/.
 
-Depending on whether you've JumpScale installed on your machine, you might prefer one of the two options to continue:
+Next, depending on whether you've JumpScale installed on your machine, you might prefer one of the two below options:
 - [Using JumpScale](#using-jumpscale)
 - [Using a plain Python script](#using-a-plain-python-script)
 
@@ -45,13 +37,14 @@ appsecret = "{Application Secret}"
 consumerkey = "{Consumer Key}"
 branch = "{Zero-OS Branch}"
 ztnetwork = "{ZeroTier Network ID}"
+ztapitoken="{ZeroTier API access token}"
 
 cl = j.clients.ovh.get(appkey, appsecret, consumerkey)
 
 serverlist = cl.serversGetList()
 serverid = j.tools.console.askChoice(serverlist, "Select server to boot Zero-OS, be careful!")
 
-pxescript = "https://bootstrap.gig.tech/ipxe/{0}/{1}".format(branch,ztnetwork)
+pxescript = "https://bootstrap.gig.tech/ipxe/{0}/{1}".format(branch, zt-network)
 
 task = cl.zeroOSBoot(serverid, pxescript)
 
@@ -61,14 +54,14 @@ cl.waitServerReboot(serverid, task['taskId'])
 ip_pub = cl.serverGetDetail(serverid)["ip"]
 ```
 
-Check the result in OVH Dashboard: https://eu.soyoustart.com/manager
+Check the result in the OVH Dashboard: https://eu.soyoustart.com/manager
 
 At this point you will now need to go to `https://my.zerotier.com/network/{ZeroTier Network ID}` in order to authorize the join request.
 
 Let's continue to get the ZeroTier network address via JumpScale, using the Zero-Tier client:
 
 ```python
-zt = j.clients.zerotier.get(ztnetwork)
+zt = j.clients.zerotier.get(token=ztapitoken)
 member = zt.getNetworkMemberFromIPPub(ip_pub, networkId=ztnetwork, online=True)
 ipaddr_priv = member["ipaddr_priv"][0]
 ```
@@ -96,18 +89,6 @@ class ZeroOS_Ovh():
         print(self.client.get("/auth/currentCredential"))
         print(self.client.get("/me/api/application"))
         print(self.client.get("/me/api/credential"))
-
-        """
-        rulz = [
-            {'method': 'GET', 'path': '/*'},
-            {'method': 'PUT', 'path': '/*'},
-            {'method': 'POST', 'path': '/*'},
-            {'method': 'DELETE', 'path': '/*'},
-        ]
-
-        print(self.client.post('/auth/credential', accessRules=rulz))
-        """
-
         return True
 
     def listNetworkBootloader(self):
@@ -205,7 +186,7 @@ if __name__ == '__main__':
     target = "{target}"
 
     print("[+] initializing client")
-    zos = ZeroOS_Ovh('{Application Key}', '{Application Sedcret}', '{Consumer Key}')
+    zos = ZeroOS_Ovh('{Application Key}', '{Application Secret}', '{Consumer Key}')
 
     print("[+] setting up machine: %s" % target)
     zos.configure(target, "https://bootstrap.gig.tech/ipxe/master/17d709436c7366d8/debug")
