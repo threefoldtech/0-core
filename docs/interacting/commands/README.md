@@ -1,8 +1,8 @@
 # Commands
 
-## Core0
+## 0-core
 
-Core0 is the first & master process for zero-os.
+0-core is the first & master process for Zero-OS.
 
 When started it first configures the networking, and then starts a local Redis instance to dispatch commands to the CoreX cores.
 
@@ -23,9 +23,7 @@ When started it first configures the networking, and then starts a local Redis i
 }
 ```
 
-The `Core0` core understands a very specific set of commands:
-
-
+0-core understands a very specific set of commands:
 - [Core commands](core.md)
 - [Info commands](info.md)
 - [CoreX commands](corex.md)
@@ -41,7 +39,7 @@ The `Core0` core understands a very specific set of commands:
 ## Check wether Redis is listening
 
 A basic test to check if your Zero-OS is ready to receive commands, is using the `redis-cli` Redis command line tool:
-```
+```shell
 ZEROTIER_NETWORK="..."
 REDIS_PORT="6379"
 redis-cli -h $ZEROTIER_NETWORK -p $REDIS_PORT ping
