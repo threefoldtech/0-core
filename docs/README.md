@@ -11,4 +11,4 @@ Interacting with Core0 is done by sending commands through Redis, allowing you t
 
 All documentation for Core0 is in the [`/docs`](./docs) directory, including a [table of contents](/docs/SUMMARY.md).
 
-In [Getting Started with Core0](/docs/gettingstarted/gettingstarted.md) you find the recommended path to quickly get up and running.
+In [Getting Started with Core0](/docs/gettingstarted/README.md) you find the recommended path to quickly get up and running.

@@ -26,7 +26,7 @@ cd 0-core/client/py-client
 
 Launch the Python interactive shell:
 ```bash
-python3
+ipython3
 ```
 
 Ping your Zero-OS instance on the IP address provided by ZeroTier:
@@ -49,29 +49,9 @@ Some more simple examples:
   cl.system('ip a').get()
   ```
 
-- Create a new partition table for UEFI systems:
-```python
-cl.disk.mktable("sda", "gpt")
-```
-See more partition tables types [here](https://www.gnu.org/software/parted/manual/html_node/mklabel.html#mklabel).
-
-- Create a new partition on a given device:
-```python
-cl.disk.mkpart("sda", 1, "20%", "extended")
-```
-or
-```python
-cl.disk.mkpart("sda", 1, 400, "extended")
-```
-
-- List all disks and partitions:
+- List all disks:
   ```python
   cl.disk.list()
   ```
-
-- Remove a partition:
-```python
-cl.disk.rmpart("sda", 1)
-```
 
 Also see the examples in [JumpScale Client](jumpscale.md).
