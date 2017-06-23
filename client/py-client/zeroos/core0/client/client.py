@@ -125,7 +125,7 @@ class Response:
         """
         Runtime copy of job stdout and stderr. This required the 'stream` flag to be set to True otherwise it will
         not be able to copy any output, while it will block until the process exits.
-        
+
         :note: This function will block until it reaches end of stream or the process is no longer running.
 
         :param out: Output stream
@@ -568,7 +568,7 @@ class BaseClient:
         :param arguments: A dict of required command arguments depends on the command name.
         :param queue: command queue (commands on the same queue are executed sequentially)
         :param max_time: kill job server side if it exceeded this amount of seconds
-        :param stream: If True, process stdout and stderr are pushed to a special queue (stream:<id>) so 
+        :param stream: If True, process stdout and stderr are pushed to a special queue (stream:<id>) so
             client can stream output
         :return: Response object
         """
@@ -709,7 +709,7 @@ class ContainerClient(BaseClient):
         :param arguments: A dict of required command arguments depends on the command name.
         :param queue: command queue (commands on the same queue are executed sequentially)
         :param max_time: kill job server side if it exceeded this amount of seconds
-        :param stream: If True, process stdout and stderr are pushed to a special queue (stream:<id>) so 
+        :param stream: If True, process stdout and stderr are pushed to a special queue (stream:<id>) so
             client can stream output
         :return: Response object
         """
@@ -2029,12 +2029,16 @@ class Client(BaseClient):
         super().__init__(timeout=timeout)
 
         socket_timeout = (timeout + 5) if timeout else 15
+        socket_keepalive_options = dict()
+        if hasattr(socket, 'TCP_KEEPIDLE'):
+            socket_keepalive_options[socket.TCP_KEEPIDLE] = 1
+        if hasattr(socket, 'TCP_KEEPINTVL'):
+            socket_keepalive_options[socket.TCP_KEEPINTVL] = 1
+        if hasattr(socket, 'TCP_KEEPIDLE'):
+            socket_keepalive_options[socket.TCP_KEEPIDLE] = 1
         self._redis = redis.Redis(host=host, port=port, password=password, db=db, ssl=ssl,
                                   socket_timeout=socket_timeout,
-                                  socket_keepalive=True, socket_keepalive_options={
-                                      socket.TCP_KEEPINTVL: 1,
-                                      socket.TCP_KEEPCNT: 10
-                                  })
+                                  socket_keepalive=True, socket_keepalive_options=socket_keepalive_options)
         self._container_manager = ContainerManager(self)
         self._bridge_manager = BridgeManager(self)
         self._disk_manager = DiskManager(self)
@@ -2106,7 +2110,7 @@ class Client(BaseClient):
         :param arguments: A dict of required command arguments depends on the command name.
         :param queue: command queue (commands on the same queue are executed sequentially)
         :param max_time: kill job server side if it exceeded this amount of seconds
-        :param stream: If True, process stdout and stderr are pushed to a special queue (stream:<id>) so 
+        :param stream: If True, process stdout and stderr are pushed to a special queue (stream:<id>) so
             client can stream output
         :return: Response object
         """
