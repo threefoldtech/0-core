@@ -22,7 +22,7 @@ Or you can clone the who repository:
 ```bash
 git clone git@github.com:zero-os/0-core.git
 cd 0-core/client/py-client
-``
+```
 
 Alternatively try:
 ```bash
