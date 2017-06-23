@@ -14,7 +14,7 @@ Once you got your boot image, continue following the next steps:
 - [Create a new virtual machine on VirtualBox](#create-vm)
 - [Create a port forward for the virtual machine in order to expose the Redis of the Zero-OS](#create-portforward)
 - [Start the virtual machine](#start-vm)
-- [Ping the Zero-OS](#ping-core0)
+- [Ping the Zero-OS](#ping)
 
 
 <a id="create-vm"></a>
@@ -68,7 +68,7 @@ Here you have two options:
 
 ![select iso](images/select_iso.png)
 
-<a id="ping-core0"></a>
+<a id="ping"></a>
 ## Ping the Zero-OS
 
 A basic test to check if your Zero-OS instance is functional, is using the `redis-cli` Redis command line tool:

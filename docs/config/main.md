@@ -1,10 +1,10 @@
 # Main Configuration
 
-The main configuration is auto-loaded from the `g8os.toml` file.
+The main configuration is auto-loaded from the `zero-os.toml` file.
 
-In the [zero-os/0-initramfs](https://github.com/zero-os/0-initramfs) repository that you'll use for creating the Zero-OS boot image, `g8os.toml` can be found in the `/config/g8os` directory.
+In the [zero-os/0-initramfs](https://github.com/zero-os/0-initramfs) repository, used for creating a Zero-OS kernel, `zero-os.toml` can be found in the `/config/etc/zero-os/zero-os.toml` directory.
 
-`g8os.toml` has the following sections:
+`zero-os.toml` has the following sections:
 
 - [\[main\]](#main)
 - [\[containers\]](#containers)
@@ -24,8 +24,8 @@ include = "/config/root"
 network = "/config/g8os/network.toml"
 ```
 
-- **max_jobs**: Max parallel jobs the core can execute concurrently (as its own direct children), once this limit is reached core0 will not pull for any new jobs from its dedicated Redis queue until it has at least one free job slot to fill
-- **include**: Path to the directory with TOML files to include, this directory can have configurations for startup services and extensions, when core0 boots it will try to load all `.toml` files from the given locations, each of these TOML file can define one or more extensions to the core0 commands, and/or start up services
+- **max_jobs**: Max parallel jobs the core can execute concurrently (as its own direct children), once this limit is reached 0-core will not pull for any new jobs from its dedicated Redis queue until it has at least one free job slot to fill
+- **include**: Path to the directory with TOML files to include, this directory can have configurations for startup services and extensions, when Zero-OS boots it will try to load all `.toml` files from the given locations, each of these TOML file can define one or more extensions to the 0-core commands, and/or start up services
 - **network**: Path to the network configuration file, discussed in [Network Configuration](network.md)
 
 
@@ -46,7 +46,7 @@ In this section you define how Core0 processes logs from running processes.
 
 There are 2 built in loggers that are used by zero-os to log jobs outputs that can be refined by the following two seconds
 
-- **logging.file**: writes logs to `/var/log/core.log` 
+- **logging.file**: writes logs to `/var/log/core.log`
 - **ledis**: forwards logs to Ledis
 
 For each logger you define log levels, specifying which log levels are logged to this logger.
@@ -80,7 +80,7 @@ Here's an example:
 enabled = true
 ```
 
-See the section [Stats](../monitoring/stats.md) for more details about stats.
+See [Monitoring](../monitoring/README.md) for more details about statistics.
 
 
 <a id="globals"></a>
@@ -101,7 +101,7 @@ With `storage` you set the default key-value store that will be mounted by the [
 <a id="extension"></a>
 ## [extension]
 
-An extension is simply a new command or functionality to extend what core0 can do. This allows you to add new functionality and commands to core0 without actually changing its code. An extension works as a wrapper around the `core.system` command by wrapping the actual command call.
+An extension is simply a new command or functionality to extend what Zero-OS can do. This allows you to add new functionality and commands to Zero-OS without actually changing its code. An extension works as a wrapper around the `core.system` command by wrapping the actual command call.
 
 The below example is a user management extension for adding and removing users, and changing their passwords:
 
@@ -119,7 +119,7 @@ binary = "sh"
 args = ["-c", "echo '{username}:{password}' | chpasswd"]
 ```
 
-Adding the above into a TOML file and saving it in one of the paths specified in the `include` section of the main configuration file will add the following commands to core0:
+Adding the above into a TOML file and saving it in one of the paths specified in the `include` section of the main configuration file will add the following commands to Zero-OS:
 
  - **user.add**
    - Args: `{"username": "user name to add"}`

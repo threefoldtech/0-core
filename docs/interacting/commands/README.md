@@ -2,9 +2,11 @@
 
 ## 0-core
 
-0-core is the first & master process for Zero-OS.
+0-core is the master process for Zero-OS, replacing the systemd, the init system for bootstrapping the user space and managing all processes.
 
-When started it first configures the networking, and then starts a local Redis instance to dispatch commands to the CoreX cores.
+Interacting with Zero-OS is done by sending commands to 0-core, allowing you to manage disks, set-up networks, and run both containers and virtual machines.
+
+When Zero-OS starts, 0-core is the first process that starts. First it configures the networking, and then starts a local Redis instance through which the actual commands are received, and dispatches the commands to the other processes, e.g. the CoreX cores. CoreX is the master process of a container running on Zero-OS, the equivalent of 0-core in the containers.
 
 ## Command structure
 

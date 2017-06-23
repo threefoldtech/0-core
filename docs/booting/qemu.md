@@ -9,7 +9,7 @@ Steps:
 - [Create the Zero-OS disks](#create-disks)
 - [Create a new virtual machine on QEMU](#create-vm)
 - [Start the virtual machine](#start-vm)
-- [Ping the core0](#ping-core0)
+- [Ping the Zero-OS](#ping)
 
 
 <a id="build-image"></a>
@@ -73,18 +73,18 @@ mkdir -p overlay
 touch overlay/.g8os-debug
 ```
 
-### Overwriting core0 and coreX
+### Overwriting
 
-In your core0 repo run `make` and copy the binaries to the overlay:
+In your 0-core repository run `make` and copy the binaries to the overlay:
 
 ```shell
 mkdir -p overlay/bin
-cp $GOPATH/src/github.com/g8os/core0/bin/* overlay/bin/
+cp $GOPATH/src/github.com/zero-os/0-core/bin/* overlay/bin/
 ```
 
 ### Adding shell at boot
 
-If you want a shell to launch at startup of your Zero-OS add the following file at `overlay/etc/g8os/conf/ashlogin.toml`:
+If you want a shell to launch at startup of your Zero-OS add the following file at `overlay/etc/zero-os/conf/ashlogin.toml`:
 
 ```toml
 [startup.ashlogin]
@@ -101,7 +101,7 @@ done
 
 ### Starting the virtual machine
 
-If you are not using the ashlogin it is best to connect your serial to the console which prints kernel output and core0 logs.
+If you are not using the ashlogin it is best to connect your serial to the console which prints kernel output and 0-core logs.
 To accomplish this use the following command
 
 ```shell
@@ -135,8 +135,8 @@ qemu-system-x86_64 -kernel staging/vmlinuz.efi `# specify kernel to boot` \
 ```
 
 
-<a id="ping-core0"></a>
-## Ping the core0
+<a id="ping"></a>
+## Ping the Zero-OS
 
 Using the Python client:
 
