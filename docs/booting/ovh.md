@@ -41,17 +41,13 @@ ztapitoken="{ZeroTier API access token}"
 
 cl = j.clients.ovh.get(appkey, appsecret, consumerkey)
 
-serverlist = cl.serversGetList()
-serverid = j.tools.console.askChoice(serverlist, "Select server to boot Zero-OS, be careful!")
+serverid = j.tools.console.askChoice(cl.serversGetList(), "Select server to boot Zero-OS, be careful!")
 
-pxescript = "https://bootstrap.gig.tech/ipxe/{0}/{1}".format(branch, zt-network)
+pxescript = "https://bootstrap.gig.tech/ipxe/{0}/{1}".format(branch, ztnetwork)
 
 task = cl.zeroOSBoot(serverid, pxescript)
 
-print("[+] waiting for reboot")
 cl.waitServerReboot(serverid, task['taskId'])
-
-ip_pub = cl.serverGetDetail(serverid)["ip"]
 ```
 
 Check the result in the OVH Dashboard: https://eu.soyoustart.com/manager
@@ -61,6 +57,7 @@ At this point you will now need to go to `https://my.zerotier.com/network/{ZeroT
 Let's continue to get the ZeroTier network address via JumpScale, using the Zero-Tier client:
 
 ```python
+ip_pub = cl.serverGetDetail(serverid)["ip"]
 zt = j.clients.zerotier.get(token=ztapitoken)
 member = zt.getNetworkMemberFromIPPub(ip_pub, networkId=ztnetwork, online=True)
 ipaddr_priv = member["ipaddr_priv"][0]
