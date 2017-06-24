@@ -1,147 +1,98 @@
 # Booting Zero-OS on a VM using QEMU
 
-> The below documentation is currently not supported, and meant for development purposes only.
+Follow below steps in order to boot a virtual machine with Zero-OS on a physical machine running Ubuntu using QEMU:
 
-Steps:
-
-- [Get a Zero-OS boot image](#build-image)
-- [Add support for nesting KVM](#nesting-kvm)
-- [Create the Zero-OS disks](#create-disks)
-- [Create a new virtual machine on QEMU](#create-vm)
-- [Start the virtual machine](#start-vm)
-- [Ping the Zero-OS](#ping)
+- [Install QEMU on Ubuntu](#install-qemu-on-ubuntu)
+- [Configure the bridge](#configure-the-bridge)
+- [Get a Zero-OS kernel](#get-a-zero-os-kernel)
+- [Create the boot disk](#create-the-boot-disk)
+- [Start the virtual machine](#start-the-virtual-machine)
+- [Ping Zero-OS](#ping-zero-os)
 
 
-<a id="build-image"></a>
-## Get a Zero-OS boot image
+## Install QEMU On Ubuntu
 
-Either build it yourself see [Building your Zero-OS Boot Image](../building/README.md) or download it from the [Zero-OS Bootstrap Service](https://bootstrap.gig.tech/).
-
-We only require the kernel (`staging/vmlinuz.efi`) file when booting with QEMU.
-
-<a id="nesting-kvm"></a>
-## Add support for nesting KVM
-
-Nested virtualization enables existing virtual machines to be run on third-party hypervisors and on other clouds without any modifications to the original virtual machines or their networking.
-
-On the host, enable nested feature for `kvm_intel` as follows:
+Install all required packages:
 ```shell
-sudo modprobe -r kvm_intel
-sudo modprobe kvm_intel nesting=1
+sudo apt-get update
+sudo apt-get install qemu-kvm qemu virt-viewer libvirt-bin
 ```
 
-To make it permanent, in `/etc/default/grub.conf` add `kvm-intel.nesting=1` at the end of the line `GRUB_CMDLINE_LINUX_DEFAULT` and run:
+After installing the above packages, reboot your system.
+
+Check if your computer supports hardware virtualization (VT) and whether it is enabled:
+```shell
+kvm-ok
 ```
-sudo grub-mkconfig -o /boot/grub/grub.cfg
+
+If hardware virtualization is enabled, you should see something like:
+```shell
+INFO: /dev/kvm exists
+KVM acceleration can be used
 ```
 
-<a id="create-disks"></a>
-## Create the Zero-OS disks
+If hardware virtualization is not enabled you have to go first to the BIOS/UEFI settings to enable it.
 
-To be able to provide storage for our ARDBs and our container's cache we need to create at least 5 disks:
 
+## Configure the bridge
+
+We need to have a bridge to connect your virtual machine to your Ethernet network, typically you can use the default `virbr0`.
+
+Check the state of existing networks:
+```shell
+sudo virsh net-list --all
+```
+
+If the state of the default network is **inactive**, activate it:
+```shell
+sudo virsh net-start default
+```
+
+> **NOTE**: If your WiFi card doesn't support bridging network connections, you have to connect the Ethernet cable.
+
+By default the `qemu` directory and `bridge.conf` file are not created. In order to create them execute:
+```shell
+sudo mkdir /etc/qemu
+sudo vi /etc/qemu/bridge.conf
+```
+
+Type the following on this file:
+```shell
+allow virbr0
+```
+
+
+## Get a Zero-OS kernel
+
+Either build the kernel yourself as documented in [Building your Zero-OS Kernel](../building/README.md) or download it from the [Zero-OS Bootstrap Service](https://bootstrap.gig.tech/) as documented in [Zero-OS Bootstrap Service](../bootstrap/README.md).
+
+We only require the kernel (`zero-os-master.efi`) file when booting with QEMU.
+
+
+## Create the boot disk
+
+Create an empty boot disk for the virtual machine:
 ```shell
 qemu-img create -f qcow2 vda.qcow2 10G
-qemu-img create -f qcow2 vdb.qcow2 10G
-qemu-img create -f qcow2 vdc.qcow2 10G
-qemu-img create -f qcow2 vdd.qcow2 10G
-qemu-img create -f qcow2 vde.qcow2 10G
 ```
 
-> Note: Run this at any time if you want to wipe your disks (erase the content).
+> Note: Run this at any time when you want to wipe your boot disk.
 
-<a id="create-vm"></a>
-## Create a new virtual machine on QEMU
 
-First we need to have a bridge where you can put your management interface in, typically you can use `virbr0`.
-
-If you do not have `virbr0` you can get it by installing `libvirt-bin` and enabling the default network:
-```
-virsh net enable default
-```
-
-### Making overlay
-
-For development mode we can create a small overlay device which overwrites the files inside Zero-OS.
-
-See [Hot Debug](https://github.com/g8os/initramfs/tree/1.1.0-alpha#hot-debug-inject-files-without-rebuilding-the-vmlinuz) for detailed instructions.
-
-In this overlay file system we can overwrite files coming from the `initramfs` for example `bin/core0` and `bin/coreX`:
+## Start the virtual machine
 
 ```shell
-mkdir -p overlay
-touch overlay/.g8os-debug
-```
-
-### Overwriting
-
-In your 0-core repository run `make` and copy the binaries to the overlay:
-
-```shell
-mkdir -p overlay/bin
-cp $GOPATH/src/github.com/zero-os/0-core/bin/* overlay/bin/
-```
-
-### Adding shell at boot
-
-If you want a shell to launch at startup of your Zero-OS add the following file at `overlay/etc/zero-os/conf/ashlogin.toml`:
-
-```toml
-[startup.ashlogin]
-name = "bash"
-
-[startup.ashlogin.args]
-script = """
-# Start shell at serial 0
-while true; do
-getty -l /bin/ash -n 19200 ttyS0
-done
-"""
-```
-
-### Starting the virtual machine
-
-If you are not using the ashlogin it is best to connect your serial to the console which prints kernel output and 0-core logs.
-To accomplish this use the following command
-
-```shell
-qemu-system-x86_64 -kernel staging/vmlinuz.efi `# specify kernel to boot` \
-    -m 2048 -enable-kvm -cpu host `# create vm with 2GB ram and emulate cpu as the host` \
-    -netdev bridge,id=net0,br=virbr0 -device virtio-net-pci,netdev=net0 `# create network connected to virbr0` \
-    -nodefaults -nographic `# do not add floppy drivers and dont create graphic window` \
-    -serial null -serial mon:stdio `# first serial is for stdout and monitoring switch with ctrl+a c` \
-    -append "console=ttyS1,115200n8 zerotier=myzerotierid" `# specify kernel params send console to ttyS1 and specify zerotier network id` \
-    -drive file=fat:rw:overlay,format=raw `# add overlay device` \
-    -drive file=vda.qcow2,if=virtio -drive file=vdb.qcow2,if=virtio `# add two disks` \
-    -drive file=vdc.qcow2,if=virtio -drive file=vdd.qcow2,if=virtio `# add another two disks` \
-    -drive file=vde.qcow2,if=virtio # and another one
-```
-
-If you are using the ashlogin you should connect your serial to ttyS0
-To accomplish this use the following command
-This will launch a shell into the g8os, execute `ip a` to know the IP address.
-
-```shell
-qemu-system-x86_64 -kernel staging/vmlinuz.efi `# specify kernel to boot` \
-    -m 2048 -enable-kvm -cpu host `# create vm with 2GB ram and emulate cpu as the host` \
-    -netdev bridge,id=net0,br=virbr0 -device virtio-net-pci,netdev=net0 `# create network connected to virbr0` \
-    -nodefaults -nographic `# do not add floppy drivers and dont create graphic window` \
-    -serial mon:stdio `# first serial is for stdout and monitoring switch with ctrl+a c` \
-    -append "zerotier=myzerotierid" `# specify kernel params specify zerotier network id` \
-    -drive file=fat:overlay,format=raw `# add overlay device` \
-    -drive file=vda.qcow2,if=virtio -drive file=vdb.qcow2,if=virtio `# add two disks` \
-    -drive file=vdc.qcow2,if=virtio -drive file=vdd.qcow2,if=virtio `# add another two disks` \
-    -drive file=vde.qcow2,if=virtio # and another one
+ZEROTIER="<your_ZeroTier_network>"
+sudo qemu-system-x86_64 -kernel staging/vmlinuz.efi -m 2048 -enable-kvm -cpu host -nographic -append "console=ttyS0,115200n8 zerotier=$ZEROTIER" -netdev bridge,id=virbr0,br=virbr0 -device virtio-net-pci,netdev=virbr0
 ```
 
 
-<a id="ping"></a>
-## Ping the Zero-OS
+## Ping Zero-OS
 
 Using the Python client:
 
 ```python
-import g8core
-cl = g8core.Client('{host-ip-address}', port=6379, password='')
+from zeroos.core0.client import Client
+cl = Client("<your_ZeroTier_network>")
 cl.ping()
 ```
