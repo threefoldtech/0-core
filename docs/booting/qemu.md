@@ -4,7 +4,7 @@ Follow below steps in order to boot a virtual machine with Zero-OS on a physical
 
 - [Install QEMU on Ubuntu](#install-qemu-on-ubuntu)
 - [Configure the bridge](#configure-the-bridge)
-- [Get a Zero-OS kernel](#get-a-zero-os-kernel)
+- [Get the Zero-OS kernel](#get-the-zero-os-kernel)
 - [Create the boot disk](#create-the-boot-disk)
 - [Start the virtual machine](#start-the-virtual-machine)
 - [Ping Zero-OS](#ping-zero-os)
@@ -15,12 +15,12 @@ Follow below steps in order to boot a virtual machine with Zero-OS on a physical
 Install all required packages:
 ```shell
 sudo apt-get update
-sudo apt-get install qemu-kvm qemu virt-viewer libvirt-bin
+sudo apt-get install qemu-kvm qemu libvirt-bin
 ```
 
 After installing the above packages, reboot your system.
 
-Check if your computer supports hardware virtualization (VT) and whether it is enabled:
+Check if your computer supports hardware virtualization (Intel VT) and whether it is enabled:
 ```shell
 kvm-ok
 ```
@@ -31,7 +31,7 @@ INFO: /dev/kvm exists
 KVM acceleration can be used
 ```
 
-If hardware virtualization is not enabled you have to go first to the BIOS/UEFI settings to enable it.
+If hardware virtualization is not enabled you first have to enable it in the BIOS/UEFI settings.
 
 
 ## Configure the bridge
@@ -62,7 +62,7 @@ allow virbr0
 ```
 
 
-## Get a Zero-OS kernel
+## Get the Zero-OS kernel
 
 Either build the kernel yourself as documented in [Building your Zero-OS Kernel](../building/README.md) or download it from the [Zero-OS Bootstrap Service](https://bootstrap.gig.tech/) as documented in [Zero-OS Bootstrap Service](../bootstrap/README.md).
 
