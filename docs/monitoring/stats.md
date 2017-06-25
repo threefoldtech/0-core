@@ -3,13 +3,11 @@
 Statistics are reported as level 10 log messages. See [Logging](logging.md#log-levels) for an overview of all log levels.
 
 The statistics message format is as follows:
-
 ```
 10::<key>:<value float>|<OP>[|<tags>]
 ```
 
 Hereby:
-
 - `10::` (const) is the message prefix that tells 0-core that it is a statistics message
 - `key` (string) is the metric key reported by the process
 - `value` (float) is the metric value at the time of the reporting
