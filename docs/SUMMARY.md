@@ -33,6 +33,7 @@
   * [Python Client](interacting/python.md)
   * [JumpScale Client](interacting/jumpscale.md)
   * [Go Client](interacting/go.md)
+  * [Streaming](interacting/streaming.md)
 * [Monitoring](monitoring/README.md)
   * [Logging](monitoring/logging.md)
   * [Statistics Log Message Format](monitoring/stats-msg-format.md)
