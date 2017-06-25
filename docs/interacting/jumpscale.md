@@ -1,6 +1,6 @@
 # JumpScale Client
 
-The below code examples requires JumpScale 9. A quick and easy way to meet this requirement is running a Docker container with JumpScale 9.0 preinstalled, achieved by following the steps in https://github.com/Jumpscale/developer.
+The below code examples requires JumpScale 9. A quick and easy way to meet this requirement is running a Docker container with JumpScale preinstalled, achieved by following the steps in https://github.com/Jumpscale/developer.
 
 - [Setup ZeroTier network](setup-the-zerotier-network)
 - [Using the Interactive JumpScale Shell](#using-the-interactive-jumpscale-shell)
