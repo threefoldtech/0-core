@@ -25,6 +25,10 @@ When Zero-OS starts, 0-core is the first process that starts. First it configure
 }
 ```
 
+Hereby:
+- See [Streaming Process Output from Zero-OS](../streaming.md) for more details about the `stream` attribute.
+- With the `log_levels` attribute you can filter which log levels will get passed to the loggers, if nothing specified all log levels will be passed. See [Logging](../monitoring/logging.md) for more details.
+
 0-core understands a very specific set of commands:
 - [Core commands](core.md)
 - [Info commands](info.md)
