@@ -1,8 +1,10 @@
 package client
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
@@ -35,7 +37,12 @@ func GetPool(address, password string) *redis.Pool {
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
 			// the redis protocol should probably be made sett-able
-			c, err := redis.Dial("tcp", address)
+			c, err := redis.Dial("tcp", address, redis.DialNetDial(func(network, address string) (net.Conn, error) {
+				return tls.Dial(network, address, &tls.Config{
+					InsecureSkipVerify: true,
+				})
+			}))
+
 			if err != nil {
 				return nil, err
 			}
