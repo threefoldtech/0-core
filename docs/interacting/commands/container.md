@@ -81,11 +81,11 @@ Values:
 - **{hostname}**: Specific hostname you want to give to the container
   - If none it will automatically be set to `core-x`, x being the ID of the container
 
-- **{privileged}**: True/False. When True the container has privileged access to the host, the default is False, isolating the container from the host.
+- **{privileged}**: True/False. When True the container has privileged access to the host devices, the default is False, isolating the container from the host.
 
 - **{storage}**: URL to the ARDB storage cluster to mount, e.g. `ardb://hub.gig.tech:16379`
   - If not provided the default one from the Zero-OS main configuration will be used, see the documentation about `storage` in [Main Configuration](../../config/main.md) for more details
-- **{tags}**: List of key-values that you can attach to a container, can be used to to search all containers matching a specified set of tags; see the `find()` command
+- **{tags}**: List of labels (strings) that you can attach to a container, can be used to to search all containers matching a specified set of tags; see the `find()` command
 
 
 ## list
