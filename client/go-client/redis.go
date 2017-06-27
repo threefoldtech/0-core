@@ -31,7 +31,7 @@ func NewClientWithPool(pool *redis.Pool) Client {
 	return cl
 }
 
-func GetPool(address, password string) *redis.Pool {
+func NewPool(address, password string) *redis.Pool {
 	return &redis.Pool{
 		MaxIdle:     5,
 		IdleTimeout: 240 * time.Second,
@@ -72,7 +72,7 @@ func GetPool(address, password string) *redis.Pool {
 }
 
 func NewClient(address, password string) Client {
-	pool := GetPool(address, password)
+	pool := NewPool(address, password)
 	return NewClientWithPool(pool)
 }
 
