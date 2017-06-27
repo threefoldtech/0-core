@@ -95,7 +95,7 @@ Example:
 storage = "ardb://hub.gig.tech:16379"
 ```
 
-With `storage` you set the default key-value store that will be mounted by the [Zero-OS File System](https://github.com/zero-os/0-fs) when creating containers using the [container.create()](../interacting/commands/corex.md#create) command. The default, as shown above, is the ARDB storage cluster implemented in [0-Hub](https://github.com/zero-os/-hub?). When creating a new container you can override this default by specifying any other ARDB storage cluster, as documented in [Creating Containers](../containers/creating.md).
+With `storage` you set the default key-value store that will be mounted by the [Zero-OS File System](https://github.com/zero-os/0-fs) when creating containers using the [container.create()](../interacting/commands/container.md#create) command. The default, as shown above, is the ARDB storage cluster implemented in [0-Hub](https://github.com/zero-os/-hub?). When creating a new container you can override this default by specifying any other ARDB storage cluster, as documented in [Creating Containers](../containers/creating.md).
 
 
 <a id="extension"></a>

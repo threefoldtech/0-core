@@ -14,7 +14,7 @@ https://github.com/zero-os/0-core/archive/master.zip#subdirectory=client/py-clie
 On Linux:
 ```bash
 BRANCH="master"
-sudo -H pip3 install git+https://github.com/zero-os/0-core.git@${BRANCH}#subdirectory=client/py-client
+sudo -H pip3 install --upgrade git+https://github.com/zero-os/0-core.git@${BRANCH}#subdirectory=client/py-client
 ```
 
 Or you can clone the who repository:
@@ -43,7 +43,7 @@ cl = Client("<ZeroTier-IP-address>")
 cl.ping()
 ```
 
-The above example will of course only work from a machine that joined the same ZeroTier network.
+The above example will of course only work from a machine that joined the same ZeroTier management network. See [Join the ZeroTier Management Network](zerotier.md) for instructions.
 
 Some more simple examples:
 - List all processes:
@@ -61,4 +61,4 @@ Some more simple examples:
   cl.disk.list()
   ```
 
-Also see the examples in [JumpScale Client](jumpscale.md).
+For for more examples see [Examples](examples/readme.md).
