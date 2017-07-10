@@ -24,6 +24,7 @@ func init() {
 	pm.CmdMap["nft.open_port"] = process.NewInternalProcessFactory(b.openPort)
 	pm.CmdMap["nft.drop_port"] = process.NewInternalProcessFactory(b.dropPort)
 	pm.CmdMap["nft.list"] = process.NewInternalProcessFactory(b.listPorts)
+	pm.CmdMap["nft.rule_exists"] = process.NewInternalProcessFactory(b.ruleExists)
 
 }
 
@@ -144,4 +145,20 @@ func (b *nftMgr) listPorts(cmd *core.Command) (interface{}, error) {
 		ports = append(ports, port)
 	}
 	return ports, nil
+}
+
+func (b *nftMgr) ruleExists(cmd *core.Command) (interface{}, error) {
+	rule, err := b.parsePort(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	if !b.exists(rule) {
+		return false, nil
+	}
+
+	return true, nil
 }
