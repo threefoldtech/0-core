@@ -153,12 +153,8 @@ func (b *nftMgr) ruleExists(cmd *core.Command) (interface{}, error) {
 		return nil, err
 	}
 
-	b.m.Lock()
-	defer b.m.Unlock()
+	b.m.RLock()
+	defer b.m.RUnlock()
 
-	if !b.exists(rule) {
-		return false, nil
-	}
-
-	return true, nil
+	return b.exists(rule), nil
 }
