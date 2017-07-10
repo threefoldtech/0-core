@@ -14,7 +14,7 @@ import (
 
 type nftMgr struct {
 	rules map[string]struct{}
-	m     sync.Mutex
+	m     sync.RWMutex
 }
 
 func init() {
@@ -23,6 +23,8 @@ func init() {
 	}
 	pm.CmdMap["nft.open_port"] = process.NewInternalProcessFactory(b.openPort)
 	pm.CmdMap["nft.drop_port"] = process.NewInternalProcessFactory(b.dropPort)
+	pm.CmdMap["nft.list"] = process.NewInternalProcessFactory(b.listPorts)
+
 }
 
 type Port struct {
@@ -131,4 +133,15 @@ func (b *nftMgr) dropPort(cmd *core.Command) (interface{}, error) {
 
 	delete(b.rules, rule)
 	return nil, nil
+}
+
+func (b *nftMgr) listPorts(cmd *core.Command) (interface{}, error) {
+	b.m.RLock()
+	defer b.m.RUnlock()
+
+	ports := make([]string, 0, len(b.rules))
+	for port, _ := range b.rules {
+		ports = append(ports, port)
+	}
+	return ports, nil
 }

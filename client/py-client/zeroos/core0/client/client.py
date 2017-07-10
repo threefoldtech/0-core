@@ -2015,6 +2015,12 @@ class Nft:
 
         return self._client.json('nft.drop_port', args)
 
+    def list(self):
+        """
+        List open ports
+        """
+        return self._client.json('nft.list', {})
+
 
 class Config:
 
