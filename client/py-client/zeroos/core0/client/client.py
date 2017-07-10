@@ -2223,6 +2223,28 @@ class Nft:
 
         return self._client.json('nft.drop_port', args)
 
+    def list(self):
+        """
+        List open ports
+        """
+        return self._client.json('nft.list', {})
+
+    def rule_exists(self, port, interface=None, subnet=None):
+        """
+        Check if a rule exists (takes the same parameters passed in open)
+        :param port: then port number
+        :param interface: an optional interface
+        :param subnet: an optional subnet
+        """
+        args = {
+            'port': port,
+            'interface': interface,
+            'subnet': subnet,
+        }
+        self._port_chk.check(args)
+
+        return self._client.json('nft.rule_exists', args)
+
 
 class Config:
 
