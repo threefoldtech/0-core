@@ -28,6 +28,8 @@ const (
 	cmdContainerFind         = "corex.find"
 	cmdContainerZerotierInfo = "corex.zerotier.info"
 	cmdContainerZerotierList = "corex.zerotier.list"
+	cmdContainerNicAdd       = "corex.nic-add"
+	cmdContainerNicRemove    = "corex.nic-remove"
 
 	coreXResponseQueue = "corex:results"
 	coreXBinaryName    = "coreX"
@@ -35,6 +37,13 @@ const (
 	redisSocketSrc      = "/var/run/redis.socket"
 	DefaultBridgeName   = "core0"
 	ContainersHardLimit = 1000
+)
+
+const (
+	NicStateConfigured = NicState("configured")
+	NicStateDestroyed  = NicState("destroyed")
+	NicStateUnknown    = NicState("unknown")
+	NicStateError      = NicState("error")
 )
 
 var (
@@ -54,25 +63,30 @@ type NetworkConfig struct {
 	DNS     []string `json:"dns"`
 }
 
+type NicState string
+
 type Nic struct {
 	Type      string        `json:"type"`
 	ID        string        `json:"id"`
 	HWAddress string        `json:"hwaddr"`
 	Name      string        `json:"name,omitempty"`
 	Config    NetworkConfig `json:"config"`
+
+	State NicState `json:"state"`
 }
 
 type ContainerCreateArguments struct {
 	Root        string            `json:"root"`         //Root plist
 	Mount       map[string]string `json:"mount"`        //data disk mounts.
 	HostNetwork bool              `json:"host_network"` //share host networking stack
-	Nics        []Nic             `json:"nics"`         //network setup (only respected if HostNetwork is false)
+	Nics        []*Nic            `json:"nics"`         //network setup (only respected if HostNetwork is false)
 	Port        map[int]int       `json:"port"`         //port forwards (only if default networking is enabled)
 	Privileged  bool              `json:"privileged"`   //Apply cgroups and capabilities limitations on the container
 	Hostname    string            `json:"hostname"`     //hostname
 	Storage     string            `json:"storage"`      //ardb storage needed for g8ufs mounts.
-	Tags        core.Tags         `json:"tags"`         //for searching containers
 	Name        string            `json:"name"`         //for searching containers
+
+	Tags core.Tags `json:"-"` //for searching containers
 }
 
 type ContainerDispatchArguments struct {
@@ -118,6 +132,9 @@ func (c *ContainerCreateArguments) Validate() error {
 	//validating networking
 	brcounter := make(map[string]int)
 	for _, nic := range c.Nics {
+		if nic.State == NicStateDestroyed {
+			continue
+		}
 		switch nic.Type {
 		case "default":
 			brcounter[DefaultBridgeName]++
@@ -224,6 +241,8 @@ func ContainerSubsystem(sink *transport.Sink, cell *screen.RowCell) (ContainerMa
 	pm.CmdMap[cmdContainerDispatch] = process.NewInternalProcessFactory(containerMgr.dispatch)
 	pm.CmdMap[cmdContainerTerminate] = process.NewInternalProcessFactory(containerMgr.terminate)
 	pm.CmdMap[cmdContainerFind] = process.NewInternalProcessFactory(containerMgr.find)
+	pm.CmdMap[cmdContainerNicAdd] = process.NewInternalProcessFactory(containerMgr.nicAdd)
+	pm.CmdMap[cmdContainerNicRemove] = process.NewInternalProcessFactory(containerMgr.nicRemove)
 
 	//container specific info
 	pm.CmdMap[cmdContainerZerotierInfo] = process.NewInternalProcessFactory(containerMgr.ztInfo)
@@ -300,7 +319,7 @@ func (m *containerManager) getNextSequence() uint16 {
 	return m.sequence
 }
 
-func (m *containerManager) set_container(id uint16, c *container) {
+func (m *containerManager) setContainer(id uint16, c *container) {
 	m.conM.Lock()
 	defer m.conM.Unlock()
 	m.containers[id] = c
@@ -309,12 +328,85 @@ func (m *containerManager) set_container(id uint16, c *container) {
 }
 
 //cleanup is called when a container terminates.
-func (m *containerManager) unset_container(id uint16) {
+func (m *containerManager) unsetContainer(id uint16) {
 	m.conM.Lock()
 	defer m.conM.Unlock()
 	delete(m.containers, id)
 	m.cell.Text = fmt.Sprintf("Containers: %d", len(m.containers))
 	screen.Refresh()
+}
+
+func (m *containerManager) nicAdd(cmd *core.Command) (interface{}, error) {
+	var args struct {
+		Container uint16 `json:"container"`
+		Nic       Nic    `json:"nic"`
+	}
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+
+	m.conM.RLock()
+	defer m.conM.RUnlock()
+	container, ok := m.containers[args.Container]
+	if !ok {
+		return nil, fmt.Errorf("container does not exist")
+	}
+
+	if container.Args.HostNetwork {
+		return nil, fmt.Errorf("cannot add a nic in host network mode")
+	}
+
+	args.Nic.State = NicStateUnknown
+
+	idx := len(container.Args.Nics)
+	container.Args.Nics = append(container.Args.Nics, &args.Nic)
+
+	if err := container.Args.Validate(); err != nil {
+		return nil, err
+	}
+
+	if err := container.preStartNetwork(idx, &args.Nic); err != nil {
+		return nil, err
+	}
+
+	if err := container.postStartNetwork(idx, &args.Nic); err != nil {
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+func (m *containerManager) nicRemove(cmd *core.Command) (interface{}, error) {
+	var args struct {
+		Container uint16 `json:"container"`
+		Index     int    `json:"index"`
+	}
+
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+
+	m.conM.RLock()
+	defer m.conM.RUnlock()
+	container, ok := m.containers[args.Container]
+	if !ok {
+		return nil, fmt.Errorf("container does not exist")
+	}
+
+	if args.Index < 0 || args.Index >= len(container.Args.Nics) {
+		return nil, fmt.Errorf("nic index out of range")
+	}
+	nic := container.Args.Nics[args.Index]
+	if nic.State != NicStateConfigured {
+		return nil, fmt.Errorf("nic is in '%s' state", nic.State)
+	}
+
+	var ovs Container
+	if nic.Type == "vlan" || nic.Type == "vxlan" {
+		ovs = m.GetOneWithTags("ovs")
+	}
+
+	return nil, container.unBridge(args.Index, nic, ovs)
 }
 
 func (m *containerManager) create(cmd *core.Command) (interface{}, error) {
@@ -341,8 +433,9 @@ func (m *containerManager) create(cmd *core.Command) (interface{}, error) {
 	}
 
 	id := m.getNextSequence()
+	log.Warningf("TAGS: %v (Args: %v)", cmd.Tags, args.Tags)
 	c := newContainer(m, id, cmd.Route, args)
-	m.set_container(id, c)
+	m.setContainer(id, c)
 
 	if err := c.Start(); err != nil {
 		return nil, err

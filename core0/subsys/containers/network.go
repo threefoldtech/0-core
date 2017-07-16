@@ -470,33 +470,41 @@ func (c *container) postVlanNetwork(name string, idx int, net *Nic) error {
 	return c.postBridge(name, idx, net)
 }
 
+func (c *container) postStartNetwork(idx int, network *Nic) (err error) {
+	var name string
+	name = fmt.Sprintf("eth%d", idx)
+	if network.Name != "" {
+		name = network.Name
+	}
+
+	switch network.Type {
+	case "vxlan":
+		err = c.postVxlanNetwork(name, idx, network)
+	case "vlan":
+		err = c.postVlanNetwork(name, idx, network)
+	case "zerotier":
+		err = c.postZerotierNetwork(idx, network.ID)
+	case "default":
+		err = c.postDefaultNetwork(name, idx, network)
+	case "bridge":
+		err = c.postBridge(name, idx, network)
+	}
+
+	if err != nil {
+		network.State = NicStateError
+	} else {
+		network.State = NicStateConfigured
+	}
+	return
+}
+
 func (c *container) postStartIsolatedNetworking() error {
 	if err := c.namespace(); err != nil {
 		return err
 	}
 
 	for idx, network := range c.Args.Nics {
-		var err error
-		var name string
-		name = fmt.Sprintf("eth%d", idx)
-		if network.Name != "" {
-			name = network.Name
-		}
-
-		switch network.Type {
-		case "vxlan":
-			err = c.postVxlanNetwork(name, idx, &network)
-		case "vlan":
-			err = c.postVlanNetwork(name, idx, &network)
-		case "zerotier":
-			err = c.postZerotierNetwork(idx, network.ID)
-		case "default":
-			err = c.postDefaultNetwork(name, idx, &network)
-		case "bridge":
-			err = c.postBridge(name, idx, &network)
-		}
-
-		if err != nil {
+		if err := c.postStartNetwork(idx, network); err != nil {
 			log.Errorf("failed to initialize network '%v': %s", network, err)
 		}
 	}
@@ -504,36 +512,42 @@ func (c *container) postStartIsolatedNetworking() error {
 	return nil
 }
 
+func (c *container) preStartNetwork(idx int, network *Nic) (err error) {
+	network.State = NicStateUnknown
+	switch network.Type {
+	case "vxlan":
+		err = c.preVxlanNetwork(idx, network)
+	case "vlan":
+		err = c.preVlanNetwork(idx, network)
+	case "default":
+		err = c.preDefaultNetwork(idx, network)
+	case "bridge":
+		err = c.preBridge(idx, network.ID, network, nil)
+	case "zerotier":
+	default:
+		err = fmt.Errorf("unkown network type '%s'", network.Type)
+	}
+
+	if err != nil {
+		network.State = NicStateError
+	}
+
+	return nil
+}
+
 func (c *container) preStartIsolatedNetworking() error {
 	for idx, network := range c.Args.Nics {
-		switch network.Type {
-		case "vxlan":
-			if err := c.preVxlanNetwork(idx, &network); err != nil {
-				return err
-			}
-		case "vlan":
-			if err := c.preVlanNetwork(idx, &network); err != nil {
-				return err
-			}
-		case "default":
-			if err := c.preDefaultNetwork(idx, &network); err != nil {
-				return err
-			}
-		case "bridge":
-			if err := c.preBridge(idx, network.ID, &network, nil); err != nil {
-				return err
-			}
-		case "zerotier":
-		default:
-			return fmt.Errorf("unkown network type '%s'", network.Type)
+		if err := c.preStartNetwork(idx, network); err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-func (c *container) unBridge(idx int, n *Nic, ovs Container) {
+func (c *container) unBridge(idx int, n *Nic, ovs Container) error {
 	name := fmt.Sprintf(containerLinkNameFmt, c.id, idx)
+	n.State = NicStateDestroyed
 	if ovs != nil {
 		_, err := c.mgr.Dispatch(ovs.ID(), &core.Command{
 			Command: "ovs.port-del",
@@ -543,17 +557,16 @@ func (c *container) unBridge(idx int, n *Nic, ovs Container) {
 		})
 
 		if err != nil {
-			log.Errorf("failed to delete port %s: %s", name, err)
+			return err
 		}
-		return
 	}
 
 	link, err := netlink.LinkByName(name)
 	if err != nil {
-		return
+		return err
 	}
 
-	netlink.LinkDel(link)
+	return netlink.LinkDel(link)
 }
 
 func (c *container) destroyNetwork() {
@@ -569,9 +582,9 @@ func (c *container) destroyNetwork() {
 			fallthrough
 		case "vlan":
 			ovs := c.mgr.GetOneWithTags(OVSTag)
-			c.unBridge(idx, &network, ovs)
+			c.unBridge(idx, network, ovs)
 		case "default":
-			c.unBridge(idx, &network, nil)
+			c.unBridge(idx, network, nil)
 			c.unPortForward()
 		}
 	}
