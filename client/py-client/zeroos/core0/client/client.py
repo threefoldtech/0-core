@@ -168,7 +168,7 @@ class Response:
         not be able to copy any output, while it will block until the process exits.
 
         :note: This function will block until it reaches end of stream or the process is no longer running.
-        
+
         :param callback: callback method that will get called for each received message
                          callback accepts 3 arguments
                          - level int: the log message levels, refer to the docs for available levels
@@ -177,10 +177,10 @@ class Response:
                          - flags int: flags associated with this message
                                       - 0x2 means EOF with success exit status
                                       - 0x4 means EOF with error
-                                      
+
                                       for example (eof = flag & 0x6) eof will be true for last message u will ever
                                       receive on this callback.
-                        
+
                          Note: if callback is none, a default callback will be used that prints output on stdout/stderr
                          based on level.
         :return: None
@@ -239,7 +239,7 @@ class Response:
         while maxwait > 0:
             if not self.exists:
                 raise JobNotFound(self.id)
-            v = r.brpoplpush(self._queue, self._queue, 10)
+            v = r.brpoplpush(self._queue, self._queue, min(maxwait, 10))
             if v is not None:
                 payload = json.loads(v.decode())
                 r = Return(payload)
@@ -789,37 +789,37 @@ class BaseClient:
         """
         Subscribes to job logs. It return the subscribe Response object which you will need to call .stream() on
         to read the output stream of this job.
-        
+
         Calling subscribe multiple times will cause different subscriptions on the same job, each subscription will
         have a copy of this job streams.
-        
+
         Note: killing the subscription job will not affect this job, it will also not cause unsubscripe from this stream
         the subscriptions will die automatically once this job exits.
-        
+
         example:
             job = client.system('long running job')
             subscription = client.subscribe(job.id)
-            
+
             subscription.stream() # this will print directly on stdout/stderr check stream docs for more details.
-        
+
         hint: u can give an optional id to the subscriber (otherwise a guid will be generate for you). You probably want
         to use this in case your job watcher died, so u can hook on the stream of the current subscriber instead of creating a new one
-        
+
         example:
             job = client.system('long running job')
             subscription = client.subscribe(job.id, 'my-job-subscriber')
-            
+
             subscription.stream()
-            
+
             # process dies for any reason
             # on next start u can simply do
-            
+
             subscription = client.response_for('my-job-subscriber')
             subscription.stream()
-            
-            
+
+
         :param job: the job ID to subscribe to
-        :param id: the subscriber ID (optional) 
+        :param id: the subscriber ID (optional)
         :return: the subscribe Job object
         """
         return self.raw('core.subscribe', {'id': job}, stream=True, id=id)
@@ -1081,7 +1081,7 @@ class ContainerManager:
     def nic_add(self, container, nic):
         """
         Hot plug a nic into a container
-        
+
         :param container: container ID
         :param nic: {
                         'type': nic_type # default, bridge, zerotier, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
@@ -1095,7 +1095,7 @@ class ContainerManager:
                             'dns': [dns]
                         }
                      }
-        :return: 
+        :return:
         """
         args = {
             'container': container,
@@ -1108,13 +1108,13 @@ class ContainerManager:
     def nic_remove(self, container, index):
         """
         Hot unplug of nic from a container
-        
+
         Note: removing a nic, doesn't remove the nic from the container info object, instead it sets it's state
         to `destroyed`.
-        
+
         :param container: container ID
         :param index: index of the nic as returned in the container object info (as shown by container.list())
-        :return: 
+        :return:
         """
         args = {
             'container': container,
@@ -2401,16 +2401,16 @@ class AggregatorManager:
     def query(self, key=None, **tags):
         """
         Query zero-os aggregator for current state object of monitored metrics.
-        
+
         Note: ID is returned as part of the key (if set) to avoid conflict with similar metrics that
-        has same key. For example, a cpu core nr can be the id associated with 'machine.CPU.percent' 
+        has same key. For example, a cpu core nr can be the id associated with 'machine.CPU.percent'
         so we can return all values for all the core numbers in the same dict.
-        
+
         U can filter on the ID as a tag
         :example:
             self.query(key=key, id=value)
-            
-        :param key: metric key (ex: machine.memory.ram.available) 
+
+        :param key: metric key (ex: machine.memory.ram.available)
         :param tags: optional tags filter
         :return: dict of {
             'key[/id]': state object
@@ -2547,7 +2547,7 @@ class Client(BaseClient):
     def aggregator(self):
         """
         Aggregator manager
-        :return: 
+        :return:
         """
         return self._aggregator
 
