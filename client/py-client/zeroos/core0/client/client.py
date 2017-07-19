@@ -2023,6 +2023,42 @@ class KvmManager:
 
         return self._client.sync('kvm.create', args, tags=tags)
 
+    def prepare_migration_target(self, name, media, cpu=2, memory=512, nics=None, port=None, tags=None):
+        """
+        :param name: Name of the kvm domain that will be migrated 
+        :param media: array of media objects to attach to the machine, where the first object is the boot device
+                      each media object is a dict of {url, type} where type can be one of 'disk', or 'cdrom', or empty (default to disk)
+                      example: [{'url': 'nbd+unix:///test?socket=/tmp/ndb.socket'}, {'type': 'cdrom': '/somefile.iso'}
+        :param cpu: number of vcpu cores
+        :param memory: memory in MiB
+        :param port: A dict of host_port: container_port pairs
+                       Example:
+                        `port={8080: 80, 7000:7000}`
+                     Only supported if default network is used
+        :param nics: Configure the attached nics to the container
+                     each nic object is a dict of the format
+                     {
+                        'type': nic_type # default, bridge, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
+                        'id': id # depends on the type, bridge name (bridge type) zerotier network id (zertier type), the vlan tag or the vxlan id
+                     }
+        :return:
+        """
+
+        if nics is None:
+            nics = []
+
+        args = {
+            'name': name,
+            'media': media,
+            'cpu': cpu,
+            'memory': memory,
+            'nics': nics,
+            'port': port,
+        }
+        self._create_chk.check(args)
+
+        self._client.sync('kvm.prepare_migration_target', args, tags=tags)
+
     def destroy(self, uuid):
         """
         Destroy a kvm domain by uuid

@@ -59,24 +59,25 @@ var (
 )
 
 const (
-	kvmCreateCommand      = "kvm.create"
-	kvmDestroyCommand     = "kvm.destroy"
-	kvmShutdownCommand    = "kvm.shutdown"
-	kvmRebootCommand      = "kvm.reboot"
-	kvmResetCommand       = "kvm.reset"
-	kvmPauseCommand       = "kvm.pause"
-	kvmResumeCommand      = "kvm.resume"
-	kvmInfoCommand        = "kvm.info"
-	kvmInfoPSCommand      = "kvm.infops"
-	kvmAttachDiskCommand  = "kvm.attach_disk"
-	kvmDetachDiskCommand  = "kvm.detach_disk"
-	kvmAddNicCommand      = "kvm.add_nic"
-	kvmRemoveNicCommand   = "kvm.remove_nic"
-	kvmLimitDiskIOCommand = "kvm.limit_disk_io"
-	kvmMigrateCommand     = "kvm.migrate"
-	kvmListCommand        = "kvm.list"
-	kvmMonitorCommand     = "kvm.monitor"
-	kvmEventsCommand      = "kvm.events"
+	kvmCreateCommand          = "kvm.create"
+	kvmPrepareMigrationTarget = "kvm.prepare_migration_target"
+	kvmDestroyCommand         = "kvm.destroy"
+	kvmShutdownCommand        = "kvm.shutdown"
+	kvmRebootCommand          = "kvm.reboot"
+	kvmResetCommand           = "kvm.reset"
+	kvmPauseCommand           = "kvm.pause"
+	kvmResumeCommand          = "kvm.resume"
+	kvmInfoCommand            = "kvm.info"
+	kvmInfoPSCommand          = "kvm.infops"
+	kvmAttachDiskCommand      = "kvm.attach_disk"
+	kvmDetachDiskCommand      = "kvm.detach_disk"
+	kvmAddNicCommand          = "kvm.add_nic"
+	kvmRemoveNicCommand       = "kvm.remove_nic"
+	kvmLimitDiskIOCommand     = "kvm.limit_disk_io"
+	kvmMigrateCommand         = "kvm.migrate"
+	kvmListCommand            = "kvm.list"
+	kvmMonitorCommand         = "kvm.monitor"
+	kvmEventsCommand          = "kvm.events"
 
 	DefaultBridgeName = "kvm0"
 )
@@ -121,6 +122,7 @@ func KVMSubsystem(conmgr containers.ContainerManager, cell *screen.RowCell) erro
 	pm.CmdMap[kvmLimitDiskIOCommand] = process.NewInternalProcessFactory(mgr.limitDiskIO)
 	pm.CmdMap[kvmMigrateCommand] = process.NewInternalProcessFactory(mgr.migrate)
 	pm.CmdMap[kvmListCommand] = process.NewInternalProcessFactory(mgr.list)
+	pm.CmdMap[kvmPrepareMigrationTarget] = process.NewInternalProcessFactory(mgr.prepareMigrationTarget)
 
 	//those next 2 commands should never be called by the client, unfortunately we don't have
 	//support for internal commands yet.
@@ -785,6 +787,31 @@ func (m *kvmManager) create(cmd *core.Command) (interface{}, error) {
 	}
 
 	return domain.UUID, nil
+}
+
+func (m *kvmManager) prepareMigrationTarget(cmd *core.Command) (interface{}, error) {
+	defer m.updateView()
+	var params CreateParams
+	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
+		return nil, err
+	}
+
+	params.Tags = cmd.Tags
+	if err := params.Valid(); err != nil {
+		return nil, err
+	}
+
+	seq := m.getNextSequence()
+
+	domain, err := m.mkDomain(seq, &params)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := m.setNetworking(&params, seq, domain); err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
 func (m *kvmManager) getDomain(cmd *core.Command) (*libvirt.Domain, string, error) {
