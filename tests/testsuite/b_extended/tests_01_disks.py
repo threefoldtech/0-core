@@ -162,7 +162,7 @@ class DisksTests(BaseTest):
 
         self.lg('List btrfs subvolumes, should return nothing')
         sub_list = self.client.btrfs.subvol_list(self.mount_point)
-        self.assertIsNone(sub_list)
+        self.assertEqual(sub_list, [])
 
         self.lg('Delete SV1, should Fail')
         with self.assertRaises(RuntimeError):
@@ -217,7 +217,7 @@ class DisksTests(BaseTest):
 
         self.lg('List btrfs subvolumes, should return nothing')
         sub_list = self.client.btrfs.subvol_list(self.mount_point)
-        self.assertIsNone(sub_list)
+        self.assertEqual(sub_list, [])
 
         self.destroy_btrfs()
 
