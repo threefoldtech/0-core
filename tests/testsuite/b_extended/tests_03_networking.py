@@ -313,7 +313,8 @@ class ExtendedNetworking(BaseTest):
 
             self.lg('Create new container and attach bridge (B1) to it, should succeed')
             nic = [{'type': 'bridge', 'id': bridge_name}]
-            cid = self.create_container(self.root_url, storage=self.storage, nics=nic)
+            cid = self.create_container(self.root_url, storage=self.storage, nics=nic, p
+rivileged=True)
             container_client = self.client.container.client(cid)
             time.sleep(2)
 

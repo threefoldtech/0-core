@@ -118,7 +118,7 @@ class AdvancedNetworking(BaseTest):
         dhcp_ip = '192.168.1.1'
         nic = [{'type': 'default'}, {'type': 'vlan', 'id': v1_id, 'config': {'cidr': '{}/24'.format(dhcp_ip)}}]
 
-        dhcp_c = self.create_container(root_url=self.root_url, storage=self.storage, nics=nic)
+        dhcp_c = self.create_container(root_url=self.root_url, storage=self.storage, nics=nic,  privileged=True)
         dhcp_c_client = self.client.container.client(dhcp_c)
         rs = dhcp_c_client.system('apt-get update').get()
         self.assertEqual(rs.state, 'SUCCESS')
@@ -129,7 +129,7 @@ class AdvancedNetworking(BaseTest):
 
         self.lg('Create container (c1) on a new vlan bridge (v1), should succeed')
         nic1 = [{'type': 'vlan', 'id': v1_id, 'config': {'dhcp': True}}]
-        c1 = self.create_container(root_url=self.root_url, storage=self.storage, nics=nic1)
+        c1 = self.create_container(root_url=self.root_url, storage=self.storage, nics=nic1,  privileged=True)
         c1_client = self.client.container.client(c1)
         time.sleep(5)
         r = c1_client.system('ip a').get()
@@ -137,7 +137,7 @@ class AdvancedNetworking(BaseTest):
 
         self.lg('Create container (c2) connected on (v1) and connect it to default network.')
         nic2 = [{'type': 'default'}, {'type': 'vlan', 'id': v1_id, 'config': {'dhcp': True}}]
-        c2 = self.create_container(root_url=self.root_url, storage=self.storage, nics=nic2)
+        c2 = self.create_container(root_url=self.root_url, storage=self.storage, nics=nic2,  privileged=True)
         c2_client = self.client.container.client(c2)
         time.sleep(5)
         r = c2_client.system('ip a').get()
@@ -147,7 +147,7 @@ class AdvancedNetworking(BaseTest):
         v2_id = str(randint(1, 4094))
         c3_ip = '192.168.1.30'
         nic3 = [{'type': 'vlan', 'id': v2_id, 'config': {'cidr': '{}/24'.format(c3_ip)}}]
-        c3 = self.create_container(root_url=self.root_url, storage=self.storage, nics=nic3)
+        c3 = self.create_container(root_url=self.root_url, storage=self.storage, nics=nic3,  privileged=True)
         c3_client = self.client.container.client(c3)
 
         self.lg('Check that (c2) can reach the internet while (c1) can\'t')
