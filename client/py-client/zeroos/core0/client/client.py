@@ -957,7 +957,8 @@ class ContainerManager:
         ),
         'storage': typchk.Or(str, typchk.IsNone()),
         'name': typchk.Or(str, typchk.IsNone()),
-        'identity': typchk.Or(str, typchk.IsNone())
+        'identity': typchk.Or(str, typchk.IsNone()),
+        'env': typchk.Or(None, typchk.Map(str, str))
     })
 
     _client_chk = typchk.Checker(
@@ -992,7 +993,7 @@ class ContainerManager:
     def __init__(self, client):
         self._client = client
 
-    def create(self, root_url, mount=None, host_network=False, nics=DefaultNetworking, port=None, hostname=None, privileged=False, storage=None, name=None, tags=None, identity=None):
+    def create(self, root_url, mount=None, host_network=False, nics=DefaultNetworking, port=None, hostname=None, privileged=False, storage=None, name=None, tags=None, identity=None, env=None):
         """
         Creater a new container with the given root flist, mount points and
         zerotier id, and connected to the given bridges
@@ -1028,6 +1029,7 @@ class ContainerManager:
                         if not provided, the default one from core0 configuration will be used.
         :param name: Optional name for the container
         :param identity: Container Zerotier identity, Only used if at least one of the nics is of type zerotier
+        :param env: a dict with the environment variables needed to be set for the container
         """
 
         if nics == self.DefaultNetworking:
@@ -1046,6 +1048,7 @@ class ContainerManager:
             'storage': storage,
             'name': name,
             'identity': identity,
+            'env': env
         }
 
         # validate input
