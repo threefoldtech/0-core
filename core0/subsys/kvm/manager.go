@@ -1267,12 +1267,13 @@ func (m *kvmManager) migrate(cmd *core.Command) (interface{}, error) {
 }
 
 type Machine struct {
-	ID    int       `json:"id"`
-	UUID  string    `json:"uuid"`
-	Name  string    `json:"name"`
-	State string    `json:"state"`
-	Vnc   int       `json:"vnc"`
-	Tags  core.Tags `json:"tags"`
+	ID         int       `json:"id"`
+	UUID       string    `json:"uuid"`
+	Name       string    `json:"name"`
+	State      string    `json:"state"`
+	Vnc        int       `json:"vnc"`
+	Tags       core.Tags `json:"tags"`
+	IfcTargets []string  `json:"ifctargets"`
 }
 
 func (m *kvmManager) list(cmd *core.Command) (interface{}, error) {
@@ -1315,6 +1316,13 @@ func (m *kvmManager) list(cmd *core.Command) (interface{}, error) {
 				break
 			}
 		}
+
+		targets := []string{}
+		for _, ifc := range domainstruct.Devices.Interfaces {
+			targets = append(targets, ifc.Target.Dev)
+
+		}
+
 		domainMetaData, err := domain.GetMetadata(libvirt.DOMAIN_METADATA_ELEMENT, metadataUri, libvirt.DOMAIN_AFFECT_LIVE)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get metadata for domain with the uuid %s", uuid)
@@ -1332,12 +1340,13 @@ func (m *kvmManager) list(cmd *core.Command) (interface{}, error) {
 		}
 
 		found = append(found, Machine{
-			ID:    int(id),
-			UUID:  uuid,
-			Name:  name,
-			State: StateToString(state),
-			Vnc:   port,
-			Tags:  tags,
+			ID:         int(id),
+			UUID:       uuid,
+			Name:       name,
+			State:      StateToString(state),
+			Vnc:        port,
+			Tags:       tags,
+			IfcTargets: targets,
 		})
 	}
 
