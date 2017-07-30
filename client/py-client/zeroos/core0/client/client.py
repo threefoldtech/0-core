@@ -1968,7 +1968,6 @@ class KvmManager:
     })
 
     _migrate_network_chk = typchk.Checker({
-        'name': str,
         'nics': [{
             'type': typchk.Enum('default', 'bridge', 'vxlan', 'vlan'),
             'id': typchk.Or(str, typchk.Missing()),
