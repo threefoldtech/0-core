@@ -4,14 +4,15 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/pm/core"
-	"github.com/libvirt/libvirt-go"
-	"github.com/pborman/uuid"
-	"github.com/vishvananda/netlink"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/libvirt/libvirt-go"
+	"github.com/pborman/uuid"
+	"github.com/vishvananda/netlink"
+	"github.com/zero-os/0-core/base/pm"
+	"github.com/zero-os/0-core/base/pm/core"
 )
 
 const (
@@ -44,7 +45,7 @@ func (m *kvmManager) setVirtNetwork(network Network) error {
 	return nil
 }
 
-func (m *kvmManager) setNetworking(args *CreateParams, seq uint16, domain *Domain) error {
+func (m *kvmManager) setNetworking(args *NicParams, seq uint16, domain *Domain) error {
 	var (
 		inf *InterfaceDevice
 		err error

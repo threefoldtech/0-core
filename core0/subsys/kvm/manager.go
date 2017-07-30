@@ -157,18 +157,36 @@ type Nic struct {
 	ID        string `json:"id"`
 	HWAddress string `json:"hwaddr"`
 }
-
+type NicParams struct {
+	Nics []Nic       `json:"nics"`
+	Port map[int]int `json:"port"`
+}
 type CreateParams struct {
-	Name   string      `json:"name"`
-	CPU    int         `json:"cpu"`
-	Memory int         `json:"memory"`
-	Media  []Media     `json:"media"`
-	Nics   []Nic       `json:"nics"`
-	Port   map[int]int `json:"port"`
-	Tags   core.Tags   `json:"tags"`
+	NicParams
+	Name   string    `json:"name"`
+	CPU    int       `json:"cpu"`
+	Memory int       `json:"memory"`
+	Media  []Media   `json:"media"`
+	Tags   core.Tags `json:"tags"`
 }
 
 func (c *CreateParams) Valid() error {
+	if err := c.NicParams.Valid(); err != nil {
+		return err
+	}
+	if len(c.Media) < 1 {
+		return fmt.Errorf("At least a boot disk has to be provided")
+	}
+	if c.CPU == 0 {
+		return fmt.Errorf("CPU is a required parameter")
+	}
+	if c.Memory == 0 {
+		return fmt.Errorf("Memory is a required parameter")
+	}
+	return nil
+}
+
+func (c *NicParams) Valid() error {
 	brcounter := make(map[string]int)
 	for _, nic := range c.Nics {
 		switch nic.Type {
@@ -190,9 +208,6 @@ func (c *CreateParams) Valid() error {
 		default:
 			return fmt.Errorf("invalid nic type '%s'", nic.Type)
 		}
-	}
-	if len(c.Media) < 1 {
-		return fmt.Errorf("At least a boot disk has to be provided")
 	}
 	return nil
 }
@@ -746,7 +761,7 @@ func (m *kvmManager) create(cmd *core.Command) (interface{}, error) {
 		return nil, err
 	}
 
-	if err := m.setNetworking(&params, seq, domain); err != nil {
+	if err := m.setNetworking(&params.NicParams, seq, domain); err != nil {
 		return nil, err
 	}
 
@@ -791,24 +806,23 @@ func (m *kvmManager) create(cmd *core.Command) (interface{}, error) {
 
 func (m *kvmManager) prepareMigrationTarget(cmd *core.Command) (interface{}, error) {
 	defer m.updateView()
-	var params CreateParams
+	var params struct {
+		NicParams
+		UUID string `json:"uuid"`
+	}
+
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
 
-	params.Tags = cmd.Tags
-	if err := params.Valid(); err != nil {
+	var domain Domain
+	domain.UUID = params.UUID
+	if err := params.NicParams.Valid(); err != nil {
 		return nil, err
 	}
 
 	seq := m.getNextSequence()
-
-	domain, err := m.mkDomain(seq, &params)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := m.setNetworking(&params, seq, domain); err != nil {
+	if err := m.setNetworking(&params.NicParams, seq, &domain); err != nil {
 		return nil, err
 	}
 	return nil, nil
