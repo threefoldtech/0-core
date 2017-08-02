@@ -1429,25 +1429,25 @@ func (m *kvmManager) monitor(cmd *core.Command) (interface{}, error) {
 		for _, block := range info.Block {
 			p.Aggregate(
 				pm.AggreagteDifference,
-				"kvm.disk.rdbytes", float64(block.RdBytes), block.Name,
+				"kvm.disk.rdbytes", float64(block.RdBytes), uuid,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", block.Name},
 			)
 
 			p.Aggregate(
 				pm.AggreagteDifference,
-				"kvm.disk.rdtimes", float64(block.RdTimes), block.Name,
+				"kvm.disk.rdtimes", float64(block.RdTimes), uuid,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", block.Name},
 			)
 
 			p.Aggregate(
 				pm.AggreagteDifference,
-				"kvm.disk.wrbytes", float64(block.WrBytes), block.Name,
+				"kvm.disk.wrbytes", float64(block.WrBytes), uuid,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", block.Name},
 			)
 
 			p.Aggregate(
 				pm.AggreagteDifference,
-				"kvm.disk.wrtimes", float64(block.WrTimes), block.Name,
+				"kvm.disk.wrtimes", float64(block.WrTimes), uuid,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", block.Name},
 			)
 		}
