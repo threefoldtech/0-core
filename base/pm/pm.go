@@ -13,9 +13,6 @@ import (
 
 	"github.com/op/go-logging"
 	"github.com/pborman/uuid"
-	psutil "github.com/shirou/gopsutil/process"
-	"github.com/zero-os/0-core/base/pm/core"
-	"github.com/zero-os/0-core/base/pm/process"
 	"github.com/zero-os/0-core/base/pm/stream"
 	"github.com/zero-os/0-core/base/settings"
 	"github.com/zero-os/0-core/base/utils"
@@ -27,199 +24,105 @@ const (
 )
 
 var (
-	log               = logging.MustGetLogger("pm")
+	MaxJobs           int
 	UnknownCommandErr = errors.New("unkonw command")
 	DuplicateIDErr    = errors.New("duplicate job id")
 )
-
-type PreProcessor func(cmd *core.Command)
-
-//MeterHandler represents a callback type
-type MeterHandler func(cmd *core.Command, p *psutil.Process)
-
-type MessageHandler func(*core.Command, *stream.Message)
-
-//ResultHandler represents a callback type
-type ResultHandler func(cmd *core.Command, result *core.JobResult)
 
 type Tag struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
 }
 
-//StatsFlushHandler represents a callback type
-type StatsHandler func(operation string, key string, value float64, id string, tags ...Tag)
+//PM is the main r manager.
+var (
+	log = logging.MustGetLogger("pm")
 
-//PM is the main process manager.
-type PM struct {
-	cmds    chan *core.Command
-	runners map[string]Runner
+	n        sync.Once
+	jobs     map[string]Job
+	jobsM    sync.RWMutex
+	jobsCond *sync.Cond
 
-	runnersMux sync.RWMutex
-	maxJobs    int
-	jobsCond   *sync.Cond
-
-	preProcessors      []PreProcessor
-	msgHandlers        []MessageHandler
-	resultHandlers     []ResultHandler
-	statsFlushHandlers []StatsHandler
-	queueMgr           *cmdQueueManager
+	//needs clean up
+	handlers []Handler
+	queue    Queue
 
 	pids    map[int]chan syscall.WaitStatus
 	pidsMux sync.Mutex
 
 	unprivileged bool
-}
-
-var pm *PM
+)
 
 //NewPM creates a new PM
-func InitProcessManager(maxJobs int) *PM {
-	pm = &PM{
-		cmds:     make(chan *core.Command),
-		runners:  make(map[string]Runner),
-		maxJobs:  maxJobs,
-		jobsCond: sync.NewCond(&sync.Mutex{}),
-		queueMgr: newCmdQueueManager(),
+func New() {
+	n.Do(func() {
+		log.Debugf("initializing r manager")
+		jobs = make(map[string]Job)
+		jobsCond = sync.NewCond(&sync.Mutex{})
+		pids = make(map[int]chan syscall.WaitStatus)
+	})
+}
 
-		pids: make(map[int]chan syscall.WaitStatus),
+func AddHandle(handler Handler) {
+	handlers = append(handlers, handler)
+}
+
+func SetUnprivileged() {
+	unprivileged = true
+}
+
+func RunFactory(cmd *Command, factory ProcessFactory, hooks ...RunnerHook) (Job, error) {
+	if len(cmd.ID) == 0 {
+		cmd.ID = uuid.New()
 	}
 
-	log.Infof("Process manager intialization completed")
-	return pm
-}
-
-//TODO: That's not clean, find another way to make this available for other
-//code
-func GetManager() *PM {
-	if pm == nil {
-		panic("Process manager is not intialized")
-	}
-	return pm
-}
-
-//PushCmd schedules a command to run, might block if no free slots available
-//it also runs all the preprocessors
-func (pm *PM) PushCmd(cmd *core.Command) {
-	for _, processor := range pm.preProcessors {
-		processor(cmd)
+	for _, handler := range handlers {
+		if handler, ok := handler.(PreHandler); ok {
+			handler.Pre(cmd)
+		}
 	}
 
-	if cmd.Queue == "" {
-		pm.cmds <- cmd
-	} else {
-		pm.pushCmdToQueue(cmd)
-	}
-}
+	jobsM.Lock()
+	defer jobsM.Unlock()
 
-func (pm *PM) pushCmdToQueue(cmd *core.Command) {
-	pm.queueMgr.Push(cmd)
-}
-
-func (pm *PM) AddPreProcessor(processor PreProcessor) {
-	pm.preProcessors = append(pm.preProcessors, processor)
-}
-
-//AddMessageHandler adds handlers for messages that are captured from sub processes. Logger can use this to
-//process messages
-func (pm *PM) AddMessageHandler(handler MessageHandler) {
-	pm.msgHandlers = append(pm.msgHandlers, handler)
-}
-
-//AddResultHandler adds a handler that receives job results.
-func (pm *PM) AddResultHandler(handler ResultHandler) {
-	pm.resultHandlers = append(pm.resultHandlers, handler)
-}
-
-//AddStatsFlushHandler adds handler to stats flush.
-func (pm *PM) AddStatsHandler(handler StatsHandler) {
-	pm.statsFlushHandlers = append(pm.statsFlushHandlers, handler)
-}
-
-func (pm *PM) SetUnprivileged() {
-	pm.unprivileged = true
-}
-
-func (pm *PM) NewRunner(cmd *core.Command, factory process.ProcessFactory, hooks ...RunnerHook) (Runner, error) {
-	pm.runnersMux.Lock()
-	defer pm.runnersMux.Unlock()
-
-	_, exists := pm.runners[cmd.ID]
+	_, exists := jobs[cmd.ID]
 	if exists {
 		return nil, DuplicateIDErr
 	}
 
-	runner := NewRunner(pm, cmd, factory, hooks...)
-	pm.runners[cmd.ID] = runner
+	job := newJob(cmd, factory, hooks...)
+	jobs[cmd.ID] = job
 
-	go runner.start(pm.unprivileged)
-
-	return runner, nil
+	queue.Push(job)
+	return job, nil
 }
 
-//RunCmd runs a command immediately (no pre-processors)
-func (pm *PM) RunCmd(cmd *core.Command, hooks ...RunnerHook) (runner Runner, err error) {
+//Run runs a command immediately (no pre-processors)
+func Run(cmd *Command, hooks ...RunnerHook) (Job, error) {
 	factory := GetProcessFactory(cmd)
-	defer func() {
-		if err != nil {
-			pm.queueMgr.Notify(cmd)
-			pm.jobsCond.Broadcast()
-		}
-	}()
-
 	if factory == nil {
-		log.Errorf("Unknow command '%s'", cmd.Command)
-		errResult := core.NewBasicJobResult(cmd)
-		errResult.State = core.StateUnknownCmd
-		pm.resultCallback(cmd, errResult)
-		err = UnknownCommandErr
-		return
+		return nil, UnknownCommandErr
 	}
 
-	runner, err = pm.NewRunner(cmd, factory, hooks...)
-
-	if err == DuplicateIDErr {
-		log.Errorf("Duplicate job id '%s'", cmd.ID)
-		errResult := core.NewBasicJobResult(cmd)
-		errResult.State = core.StateDuplicateID
-		errResult.Data = err.Error()
-		pm.resultCallback(cmd, errResult)
-		return
-	} else if err != nil {
-		errResult := core.NewBasicJobResult(cmd)
-		errResult.State = core.StateError
-		errResult.Data = err.Error()
-		pm.resultCallback(cmd, errResult)
-		return
-	}
-
-	return
+	return RunFactory(cmd, factory, hooks...)
 }
 
-func (pm *PM) processCmds() {
+func loop() {
+	ch := queue.Start()
 	for {
-		pm.jobsCond.L.Lock()
+		jobsCond.L.Lock()
 
-		for len(pm.runners) >= pm.maxJobs {
-			pm.jobsCond.Wait()
+		for len(jobs) >= MaxJobs {
+			jobsCond.Wait()
 		}
-		pm.jobsCond.L.Unlock()
-
-		var cmd *core.Command
-
-		//we have 2 possible sources of cmds.
-		//1- cmds that doesn't require waiting on a queue, those can run immediately
-		//2- cmds that were waiting on a queue (so they must execute serially)
-		select {
-		case cmd = <-pm.cmds:
-		case cmd = <-pm.queueMgr.Producer():
-		}
-
-		pm.RunCmd(cmd)
+		jobsCond.L.Unlock()
+		job := <-ch
+		log.Debugf("starting job: %s", job.Command())
+		go job.start(unprivileged)
 	}
 }
 
-func (pm *PM) processWait() {
+func processWait() {
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, syscall.SIGCHLD)
 	for range c {
@@ -238,18 +141,18 @@ func (pm *PM) processWait() {
 				break
 			}
 
-			//Avoid reading the process state before the Register call is complete.
-			pm.pidsMux.Lock()
-			ch, ok := pm.pids[pid]
-			pm.pidsMux.Unlock()
+			//Avoid reading the r state before the PIDTable call is complete.
+			pidsMux.Lock()
+			ch, ok := pids[pid]
+			pidsMux.Unlock()
 
 			if ok {
 				go func(ch chan syscall.WaitStatus, status syscall.WaitStatus) {
 					ch <- status
 					close(ch)
-					pm.pidsMux.Lock()
-					defer pm.pidsMux.Unlock()
-					delete(pm.pids, pid)
+					pidsMux.Lock()
+					defer pidsMux.Unlock()
+					delete(pids, pid)
 				}(ch, status)
 			}
 		}
@@ -257,35 +160,35 @@ func (pm *PM) processWait() {
 	}
 }
 
-func (pm *PM) Register(g process.GetPID) error {
-	pm.pidsMux.Lock()
-	defer pm.pidsMux.Unlock()
+func registerPID(g GetPID) error {
+	pidsMux.Lock()
+	defer pidsMux.Unlock()
 	pid, err := g()
 	if err != nil {
 		return err
 	}
 
 	ch := make(chan syscall.WaitStatus)
-	pm.pids[pid] = ch
+	pids[pid] = ch
 
 	return nil
 }
 
-func (pm *PM) WaitPID(pid int) syscall.WaitStatus {
-	pm.pidsMux.Lock()
-	c, ok := pm.pids[pid]
-	pm.pidsMux.Unlock()
+func waitPID(pid int) syscall.WaitStatus {
+	pidsMux.Lock()
+	c, ok := pids[pid]
+	pidsMux.Unlock()
 	if !ok {
 		return syscall.WaitStatus(0)
 	}
 	return <-c
 }
 
-//Run starts the process manager.
-func (pm *PM) Run() {
-	//process and start all commands according to args.
-	go pm.processWait()
-	go pm.processCmds()
+//Start starts the r manager.
+func Start() {
+	//r and start all commands according to args.
+	go processWait()
+	go loop()
 }
 
 func processArgs(args map[string]interface{}, values map[string]interface{}) {
@@ -309,13 +212,13 @@ RunSlice runs a slice of processes honoring dependencies. It won't just
 start in order, but will also make sure a service won't start until it's dependencies are
 running.
 */
-func (pm *PM) RunSlice(slice settings.StartupSlice) {
+func RunSlice(slice settings.StartupSlice) {
 	var all []string
 	for _, startup := range slice {
 		all = append(all, startup.Key())
 	}
 
-	state := NewStateMachine(all...)
+	state := newStateMachine(all...)
 	cmdline := utils.GetKernelOptions().GetLast()
 
 	for _, startup := range slice {
@@ -325,17 +228,17 @@ func (pm *PM) RunSlice(slice settings.StartupSlice) {
 
 		processArgs(startup.Args, cmdline)
 
-		cmd := &core.Command{
+		cmd := &Command{
 			ID:              startup.Key(),
 			Command:         startup.Name,
 			RecurringPeriod: startup.RecurringPeriod,
 			MaxRestart:      startup.MaxRestart,
 			Protected:       startup.Protected,
 			Tags:            startup.Tags,
-			Arguments:       core.MustArguments(startup.Args),
+			Arguments:       MustArguments(startup.Args),
 		}
 
-		go func(up settings.Startup, c *core.Command) {
+		go func(up settings.Startup, c *Command) {
 			log.Debugf("Waiting for %s to run %s", up.After, cmd)
 			canRun := state.Wait(up.After...)
 
@@ -349,7 +252,7 @@ func (pm *PM) RunSlice(slice settings.StartupSlice) {
 			var hooks []RunnerHook
 
 			if up.RunningMatch != "" {
-				//NOTE: If runner match is provided it take presence over the delay
+				//NOTE: If r match is provided it take presence over the delay
 				hooks = append(hooks, &MatchHook{
 					Match: up.RunningMatch,
 					Action: func(msg *stream.Message) {
@@ -378,9 +281,10 @@ func (pm *PM) RunSlice(slice settings.StartupSlice) {
 				},
 			})
 
-			_, err := pm.RunCmd(c, hooks...)
+			_, err := Run(c, hooks...)
 			if err != nil {
-				//failed to dispatch command to process manager.
+				//failed to dispatch command to r manager.
+				log.Errorf("failed to start command %v: %s", c, err)
 				state.Release(c.ID, false)
 			}
 		}(startup, cmd)
@@ -391,67 +295,69 @@ func (pm *PM) RunSlice(slice settings.StartupSlice) {
 	state.WaitAll()
 }
 
-func (pm *PM) cleanUp(runner Runner) {
-	pm.runnersMux.Lock()
-	delete(pm.runners, runner.Command().ID)
-	pm.runnersMux.Unlock()
+func cleanUp(runner Job) {
+	jobsM.Lock()
+	delete(jobs, runner.Command().ID)
+	jobsM.Unlock()
 
-	pm.queueMgr.Notify(runner.Command())
-	pm.jobsCond.Broadcast()
+	queue.Notify(runner)
+	jobsCond.Broadcast()
 }
 
 //Processes returs a list of running processes
-func (pm *PM) Runners() map[string]Runner {
-	res := make(map[string]Runner)
-	pm.runnersMux.RLock()
-	defer pm.runnersMux.RUnlock()
+func Jobs() map[string]Job {
+	res := make(map[string]Job)
+	jobsM.RLock()
+	defer jobsM.RUnlock()
 
-	for k, v := range pm.runners {
+	for k, v := range jobs {
 		res[k] = v
 	}
 
 	return res
 }
 
-func (pm *PM) Runner(id string) (Runner, bool) {
-	pm.runnersMux.RLock()
-	defer pm.runnersMux.RUnlock()
-	r, ok := pm.runners[id]
+func JobOf(id string) (Job, bool) {
+	jobsM.RLock()
+	defer jobsM.RUnlock()
+	r, ok := jobs[id]
 	return r, ok
 }
 
 //Killall kills all running processes.
-func (pm *PM) Killall() {
-	pm.runnersMux.RLock()
-	defer pm.runnersMux.RUnlock()
+func Killall() {
+	jobsM.RLock()
+	defer jobsM.RUnlock()
 
-	for _, v := range pm.runners {
+	for _, v := range jobs {
 		if v.Command().Protected {
 			continue
 		}
-		v.Terminate()
+		v.Signal(syscall.SIGTERM)
 	}
 }
 
-//Kill kills a process by the cmd ID
-func (pm *PM) Kill(cmdID string) error {
-	pm.runnersMux.RLock()
-	defer pm.runnersMux.RUnlock()
-	v, ok := pm.runners[cmdID]
+//Kill kills a r by the cmd ID
+func Kill(cmdID string) error {
+	jobsM.RLock()
+	defer jobsM.RUnlock()
+	v, ok := jobs[cmdID]
 	if !ok {
 		return fmt.Errorf("not found")
 	}
-	v.Terminate()
+	v.Signal(syscall.SIGTERM)
 	return nil
 }
 
-func (pm *PM) Aggregate(op, key string, value float64, id string, tags ...Tag) {
-	for _, handler := range pm.statsFlushHandlers {
-		handler(op, key, value, id, tags...)
+func Aggregate(op, key string, value float64, id string, tags ...Tag) {
+	for _, handler := range handlers {
+		if handler, ok := handler.(StatsHandler); ok {
+			handler.Stats(op, key, value, id, tags...)
+		}
 	}
 }
 
-func (pm *PM) handleStatsMessage(cmd *core.Command, msg *stream.Message) {
+func handleStatsMessage(cmd *Command, msg *stream.Message) {
 	parts := strings.Split(msg.Message, "|")
 	if len(parts) < 2 {
 		log.Errorf("Invalid statsd string, expecting data|type[|options], got '%s'", msg.Message)
@@ -501,13 +407,13 @@ func (pm *PM) handleStatsMessage(cmd *core.Command, msg *stream.Message) {
 	}
 
 	id, tags := parse(tagsStr)
-	pm.Aggregate(optype, key, v, id, tags...)
+	Aggregate(optype, key, v, id, tags...)
 }
 
-func (pm *PM) msgCallback(cmd *core.Command, msg *stream.Message) {
+func msgCallback(cmd *Command, msg *stream.Message) {
 	//handle stats messages
 	if msg.Meta.Assert(stream.LevelStatsd) {
-		pm.handleStatsMessage(cmd, msg)
+		handleStatsMessage(cmd, msg)
 	}
 
 	//update message
@@ -515,27 +421,30 @@ func (pm *PM) msgCallback(cmd *core.Command, msg *stream.Message) {
 	if cmd.Stream {
 		msg.Meta = msg.Meta.Set(stream.StreamFlag)
 	}
-	for _, handler := range pm.msgHandlers {
-		handler(cmd, msg)
+
+	for _, handler := range handlers {
+		if handler, ok := handler.(MessageHandler); ok {
+			handler.Message(cmd, msg)
+		}
 	}
 }
 
-func (pm *PM) resultCallback(cmd *core.Command, result *core.JobResult) {
+func callback(cmd *Command, result *JobResult) {
 	result.Tags = cmd.Tags
-	//NOTE: we always force the real gid and nid on the result.
-
-	for _, handler := range pm.resultHandlers {
-		handler(cmd, result)
+	for _, handler := range handlers {
+		if handler, ok := handler.(ResultHandler); ok {
+			handler.Result(cmd, result)
+		}
 	}
 }
 
 //System is a wrapper around core.system
-func (pm *PM) System(bin string, args ...string) (*core.JobResult, error) {
-	runner, err := pm.RunCmd(&core.Command{
+func System(bin string, args ...string) (*JobResult, error) {
+	runner, err := Run(&Command{
 		ID:      uuid.New(),
-		Command: process.CommandSystem,
-		Arguments: core.MustArguments(
-			process.SystemCommandArguments{
+		Command: CommandSystem,
+		Arguments: MustArguments(
+			SystemCommandArguments{
 				Name: bin,
 				Args: args,
 			},
@@ -547,7 +456,7 @@ func (pm *PM) System(bin string, args ...string) (*core.JobResult, error) {
 	}
 
 	job := runner.Wait()
-	if job.State != core.StateSuccess {
+	if job.State != StateSuccess {
 		return job, fmt.Errorf("exited with error (%s): %v", job.State, job.Streams)
 	}
 

@@ -8,8 +8,6 @@ import (
 	"github.com/patrickmn/go-cache"
 	"github.com/siddontang/ledisdb/ledis"
 	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/pm/core"
-	"github.com/zero-os/0-core/base/pm/process"
 	"sort"
 	"strings"
 	"time"
@@ -33,9 +31,6 @@ that are collected via the process manager. Flush happens when buffer is full or
 
 The StatsBuffer.Handler should be registers as StatsFlushHandler on the process manager object.
 */
-type Aggregator interface {
-	Aggregate(operation string, key string, value float64, id string, tags ...pm.Tag)
-}
 
 type Tags []pm.Tag
 
@@ -66,7 +61,7 @@ type redisStatsBuffer struct {
 	cache *cache.Cache
 }
 
-func NewLedisStatsAggregator(db *ledis.DB) Aggregator {
+func NewLedisStatsAggregator(db *ledis.DB) pm.StatsHandler {
 	redisBuffer := &redisStatsBuffer{
 		db:    db,
 		cache: cache.New(1*time.Hour, 5*time.Minute),
@@ -78,7 +73,7 @@ func NewLedisStatsAggregator(db *ledis.DB) Aggregator {
 		}
 	})
 
-	pm.CmdMap["aggregator.query"] = process.NewInternalProcessFactory(redisBuffer.query)
+	pm.RegisterBuiltIn("aggregator.query", redisBuffer.query)
 
 	return redisBuffer
 }
@@ -89,7 +84,7 @@ type Point struct {
 	Tags map[string]string `json:"tags,omitempty"`
 }
 
-func (r *redisStatsBuffer) query(cmd *core.Command) (interface{}, error) {
+func (r *redisStatsBuffer) query(cmd *pm.Command) (interface{}, error) {
 	var filter struct {
 		Key  string            `json:"key"`
 		Tags map[string]string `json:"tags"`
@@ -159,13 +154,12 @@ func (r *redisStatsBuffer) hash(tags []pm.Tag) string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%v", tags))))
 }
 
-func (r *redisStatsBuffer) Aggregate(op string, key string, value float64, id string, tags ...pm.Tag) {
+func (r *redisStatsBuffer) Stats(op string, key string, value float64, id string, tags ...pm.Tag) {
 	if len(id) != 0 {
 		tags = append(tags, pm.Tag{IDTag, id})
 	}
 
 	hash := r.hash(tags)
-	log.Debugf("STATS: %s(%s, %f, '%s') #%s", op, key, value, tags, hash)
 	internal := fmt.Sprintf(StateKey, key, hash)
 
 	//touch key in cache so we know we are tracking this key

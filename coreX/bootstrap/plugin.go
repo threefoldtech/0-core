@@ -3,8 +3,6 @@ package bootstrap
 import (
 	"fmt"
 	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/pm/core"
-	"github.com/zero-os/0-core/base/pm/process"
 	"github.com/zero-os/0-core/base/utils"
 	"strings"
 )
@@ -26,11 +24,21 @@ type PluginsSettings struct {
 	Plugin map[string]Plugin
 }
 
-func (b *Bootstrap) pluginFactory(plugin *Plugin, fn string) process.ProcessFactory {
-	return func(table process.PIDTable, srcCmd *core.Command) process.Process {
-		cmd := &core.Command{
+type pluginPreProcessor struct {
+	domain string
+}
+
+func (p *pluginPreProcessor) Pre(cmd *pm.Command) {
+	if strings.HasPrefix(cmd.Command, p.domain+".") {
+		cmd.Queue = p.domain
+	}
+}
+
+func (b *Bootstrap) pluginFactory(plugin *Plugin, fn string) pm.ProcessFactory {
+	return func(table pm.PIDTable, srcCmd *pm.Command) pm.Process {
+		cmd := &pm.Command{
 			ID: srcCmd.ID,
-			Arguments: core.MustArguments(process.SystemCommandArguments{
+			Arguments: pm.MustArguments(pm.SystemCommandArguments{
 				Name: plugin.Path,
 				Args: []string{fn, string(*srcCmd.Arguments)},
 			}),
@@ -43,25 +51,20 @@ func (b *Bootstrap) pluginFactory(plugin *Plugin, fn string) process.ProcessFact
 			Tags:            srcCmd.Tags,
 		}
 
-		return process.NewSystemProcess(table, cmd)
+		return pm.NewSystemProcess(table, cmd)
 	}
 }
 
 func (b *Bootstrap) plugin(domain string, plugin Plugin) {
 	if plugin.Queue {
 		//if plugin requires queuing we make sure when a command is pushed (from a cient)
-		//that we force a queue on it.
-		pm.GetManager().AddPreProcessor(func(cmd *core.Command) {
-			if strings.HasPrefix(cmd.Command, domain+".") {
-				log.Debugf("setting command queue to: %s", domain)
-				cmd.Queue = domain
-			}
-		})
+		//that we force a domain on it.
+		pm.AddHandle(&pluginPreProcessor{domain})
 	}
 
 	for _, export := range plugin.Exports {
 		cmd := fmt.Sprintf("%s.%s", domain, export)
-		pm.CmdMap[cmd] = b.pluginFactory(&plugin, export)
+		pm.Register(cmd, b.pluginFactory(&plugin, export))
 	}
 }
 

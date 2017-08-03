@@ -3,8 +3,6 @@ package containers
 import (
 	"fmt"
 	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/pm/core"
-	"github.com/zero-os/0-core/base/pm/process"
 	"os"
 	"path"
 	"sync"
@@ -24,18 +22,18 @@ var (
 
 type container struct {
 	id     uint16
-	runner pm.Runner
+	runner pm.Job
 	mgr    *containerManager
 	Args   ContainerCreateArguments `json:"arguments"`
 	Root   string                   `json:"root"`
 	PID    int                      `json:"pid"`
 
-	zt    pm.Runner
+	zt    pm.Job
 	zterr error
 	zto   sync.Once
 
-	channel     process.Channel
-	forwardChan chan *core.Command
+	channel     pm.Channel
+	forwardChan chan *pm.Command
 }
 
 func newContainer(mgr *containerManager, id uint16, args ContainerCreateArguments) *container {
@@ -43,7 +41,7 @@ func newContainer(mgr *containerManager, id uint16, args ContainerCreateArgument
 		mgr:         mgr,
 		id:          id,
 		Args:        args,
-		forwardChan: make(chan *core.Command),
+		forwardChan: make(chan *pm.Command),
 	}
 	c.Root = c.root()
 	return c
@@ -53,7 +51,7 @@ func (c *container) ID() uint16 {
 	return c.id
 }
 
-func (c *container) dispatch(cmd *core.Command) error {
+func (c *container) dispatch(cmd *pm.Command) error {
 	select {
 	case c.forwardChan <- cmd:
 	case <-time.After(5 * time.Second):
@@ -66,7 +64,7 @@ func (c *container) Arguments() ContainerCreateArguments {
 	return c.Args
 }
 
-func (c *container) Start() (runner pm.Runner, err error) {
+func (c *container) Start() (runner pm.Job, err error) {
 	coreID := fmt.Sprintf("core-%d", c.id)
 
 	defer func() {
@@ -93,8 +91,6 @@ func (c *container) Start() (runner pm.Runner, err error) {
 		args = append(args, "-unprivileged")
 	}
 
-	mgr := pm.GetManager()
-
 	//Set a Default Env and merge it with environment map from args
 	env := map[string]string{
 		"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
@@ -104,16 +100,16 @@ func (c *container) Start() (runner pm.Runner, err error) {
 		env[key] = value
 	}
 
-	extCmd := &core.Command{
+	extCmd := &pm.Command{
 		ID: coreID,
-		Arguments: core.MustArguments(
-			process.ContainerCommandArguments{
+		Arguments: pm.MustArguments(
+			pm.ContainerCommandArguments{
 				Name:        "/coreX",
 				Chroot:      c.root(),
 				Dir:         "/",
 				HostNetwork: c.Args.HostNetwork,
 				Args:        args,
-				Env: 	     env,
+				Env:         env,
 			},
 		),
 	}
@@ -126,7 +122,7 @@ func (c *container) Start() (runner pm.Runner, err error) {
 		Action: c.onExit,
 	}
 
-	runner, err = mgr.NewRunner(extCmd, process.NewContainerProcess, onpid, onexit)
+	runner, err = pm.RunFactory(extCmd, pm.NewContainerProcess, onpid, onexit)
 	if err != nil {
 		log.Errorf("error in container runner: %s", err)
 		return
@@ -140,7 +136,7 @@ func (c *container) Terminate() error {
 	if c.runner == nil {
 		return fmt.Errorf("container was not started")
 	}
-	c.runner.Terminate()
+	c.runner.Signal(syscall.SIGTERM)
 	c.runner.Wait()
 	return nil
 }
@@ -160,9 +156,9 @@ func (c *container) preStart() error {
 func (c *container) onStart(pid int) {
 	//get channel
 	ps := c.runner.Process()
-	if ps, ok := ps.(process.ContainerProcess); !ok {
+	if ps, ok := ps.(pm.ContainerProcess); !ok {
 		log.Errorf("not a valid container process")
-		c.runner.Terminate()
+		c.runner.Signal(syscall.SIGTERM)
 		return
 	} else {
 		c.channel = ps.Channel()
@@ -205,7 +201,7 @@ func (c *container) cleanup() {
 
 func (c *container) cleanSandbox() {
 	if c.getFSType(BackendBaseDir) == "btrfs" {
-		pm.GetManager().System("btrfs", "subvolume", "delete", path.Join(BackendBaseDir, c.name()))
+		pm.System("btrfs", "subvolume", "delete", path.Join(BackendBaseDir, c.name()))
 	} else {
 		os.RemoveAll(path.Join(BackendBaseDir, c.name()))
 	}

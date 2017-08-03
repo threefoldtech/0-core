@@ -58,14 +58,16 @@ func NewBootstrap() *Bootstrap {
 
 func (b *Bootstrap) registerExtensions(extensions map[string]settings.Extension) {
 	for extKey, extCfg := range extensions {
-		pm.RegisterCmd(extKey, extCfg.Binary, extCfg.Cwd, extCfg.Args, extCfg.Env)
+		if err := pm.RegisterExtension(extKey, extCfg.Binary, extCfg.Cwd, extCfg.Args, extCfg.Env); err != nil {
+			log.Error(err)
+		}
 	}
 }
 
 func (b *Bootstrap) startupServices(s, e settings.After) {
 	log.Debugf("Starting up '%s' services", s)
 	slice := b.t.Slice(s.Weight(), e.Weight())
-	pm.GetManager().RunSlice(slice)
+	pm.RunSlice(slice)
 	log.Debugf("'%s' services are booted", s)
 }
 
@@ -174,7 +176,7 @@ func (b *Bootstrap) watchers() {
 
 	go func() {
 		for {
-			result, err := pm.GetManager().System("zerotier-cli", "-D/tmp/zt", "info")
+			result, err := pm.System("zerotier-cli", "-D/tmp/zt", "info")
 			var current string
 			if err != nil {
 				current = fmt.Sprintf("Cannot show zerotier info due too error: %s",

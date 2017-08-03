@@ -1,10 +1,9 @@
-package process
+package pm
 
 import (
 	"encoding/json"
 	"fmt"
 	psutils "github.com/shirou/gopsutil/process"
-	"github.com/zero-os/0-core/base/pm/core"
 	"github.com/zero-os/0-core/base/pm/stream"
 	"io"
 	"os"
@@ -23,8 +22,6 @@ type ContainerCommandArguments struct {
 }
 
 type Channel interface {
-	Writer() uintptr
-	Reader() uintptr
 	io.ReadWriteCloser
 }
 
@@ -51,21 +48,13 @@ func (c *channel) Write(p []byte) (n int, err error) {
 	return c.w.Write(p)
 }
 
-func (c *channel) Writer() uintptr {
-	return c.w.Fd()
-}
-
-func (c *channel) Reader() uintptr {
-	return c.r.Fd()
-}
-
 type ContainerProcess interface {
 	Process
 	Channel() Channel
 }
 
 type containerProcessImpl struct {
-	cmd     *core.Command
+	cmd     *Command
 	args    ContainerCommandArguments
 	pid     int
 	process *psutils.Process
@@ -74,7 +63,7 @@ type containerProcessImpl struct {
 	table PIDTable
 }
 
-func NewContainerProcess(table PIDTable, cmd *core.Command) Process {
+func NewContainerProcess(table PIDTable, cmd *Command) Process {
 	process := &containerProcessImpl{
 		cmd:   cmd,
 		table: table,
@@ -84,7 +73,7 @@ func NewContainerProcess(table PIDTable, cmd *core.Command) Process {
 	return process
 }
 
-func (process *containerProcessImpl) Command() *core.Command {
+func (process *containerProcessImpl) Command() *Command {
 	return process.cmd
 }
 
@@ -179,7 +168,7 @@ func (process *containerProcessImpl) Run() (<-chan *stream.Message, error) {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%v=%v", k, v))
 	}
 
-	err = process.table.Register(func() (int, error) {
+	err = process.table.RegisterPID(func() (int, error) {
 		err := cmd.Start()
 		if err != nil {
 			return 0, err

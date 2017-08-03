@@ -2,15 +2,15 @@ package main
 
 import (
 	"github.com/codegangsta/cli"
-	"github.com/zero-os/0-core/base/pm/core"
+	"github.com/zero-os/0-core/base/pm"
 )
 
 func jobs(t Transport, c *cli.Context) {
 	response, err := t.Run(Command{
 		Sync: true,
-		Content: core.Command{
+		Content: pm.Command{
 			Command:   "job.list",
-			Arguments: core.MustArguments(M{}),
+			Arguments: pm.MustArguments(M{}),
 		},
 	})
 
@@ -30,9 +30,9 @@ func jobKill(t Transport, c *cli.Context) {
 
 	response, err := t.Run(Command{
 		Sync: true,
-		Content: core.Command{
+		Content: pm.Command{
 			Command: "job.kill",
-			Arguments: core.MustArguments(M{
+			Arguments: pm.MustArguments(M{
 				"id": id,
 			}),
 		},

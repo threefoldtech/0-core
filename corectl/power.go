@@ -2,13 +2,13 @@ package main
 
 import (
 	"github.com/codegangsta/cli"
-	"github.com/zero-os/0-core/base/pm/core"
+	"github.com/zero-os/0-core/base/pm"
 )
 
 func reboot(t Transport, c *cli.Context) {
 	response, err := t.Run(Command{
 		Sync: true,
-		Content: core.Command{
+		Content: pm.Command{
 			Command: "core.reboot",
 		},
 	})
@@ -24,7 +24,7 @@ func reboot(t Transport, c *cli.Context) {
 func poweroff(t Transport, c *cli.Context) {
 	response, err := t.Run(Command{
 		Sync: true,
-		Content: core.Command{
+		Content: pm.Command{
 			Command: "core.poweroff",
 		},
 	})

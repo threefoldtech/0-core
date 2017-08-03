@@ -1,9 +1,8 @@
-package process
+package pm
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/zero-os/0-core/base/pm/core"
 	"github.com/zero-os/0-core/base/pm/stream"
 	"runtime/debug"
 	"syscall"
@@ -12,11 +11,11 @@ import (
 /*
 Runnable represents a runnable built in function that can be managed by the process manager.
 */
-type Runnable func(*core.Command) (interface{}, error)
+type Runnable func(*Command) (interface{}, error)
 type RunnableWithCtx func(*Context) (interface{}, error)
 
 type Context struct {
-	Command *core.Command
+	Command *Command
 
 	ch chan *stream.Message
 }
@@ -52,8 +51,8 @@ type internalProcess struct {
 /*
 internalProcessFactory factory to build Runnable processes
 */
-func NewInternalProcessFactory(runnable Runnable) ProcessFactory {
-	factory := func(_ PIDTable, cmd *core.Command) Process {
+func internalProcessFactory(runnable Runnable) ProcessFactory {
+	factory := func(_ PIDTable, cmd *Command) Process {
 		return &internalProcess{
 			runnable: runnable,
 			ctx: Context{
@@ -65,8 +64,8 @@ func NewInternalProcessFactory(runnable Runnable) ProcessFactory {
 	return factory
 }
 
-func NewInternalProcessFactoryWithCtx(runnable RunnableWithCtx) ProcessFactory {
-	factory := func(_ PIDTable, cmd *core.Command) Process {
+func internalProcessFactoryWithCtx(runnable RunnableWithCtx) ProcessFactory {
+	factory := func(_ PIDTable, cmd *Command) Process {
 		return &internalProcess{
 			runnable: runnable,
 			ctx: Context{
@@ -81,7 +80,7 @@ func NewInternalProcessFactoryWithCtx(runnable RunnableWithCtx) ProcessFactory {
 /*
 Cmd returns the internal process command
 */
-func (process *internalProcess) Command() *core.Command {
+func (process *internalProcess) Command() *Command {
 	return process.ctx.Command
 }
 
@@ -118,36 +117,26 @@ func (process *internalProcess) Run() (<-chan *stream.Message, error) {
 			value, err = runnable(&process.ctx)
 		}
 
-		msg := stream.Message{
-			Meta: stream.NewMeta(stream.LevelResultJSON),
-		}
+		var msg *stream.Message
 
 		if err != nil {
 			m, _ := json.Marshal(err.Error())
-			msg.Message = string(m)
+			msg = &stream.Message{
+				Meta:    stream.NewMeta(stream.LevelResultJSON, stream.ExitErrorFlag),
+				Message: string(m),
+			}
 		} else {
 			m, _ := json.Marshal(value)
-			msg.Message = string(m)
+			msg = &stream.Message{
+				Meta:    stream.NewMeta(stream.LevelResultJSON, stream.ExitSuccessFlag),
+				Message: string(m),
+			}
 		}
 
-		channel <- &msg
-		if err != nil {
-			channel <- stream.MessageExitError
-		} else {
-			channel <- stream.MessageExitSuccess
-		}
-
+		channel <- msg
 	}(channel)
 
 	return channel, nil
-}
-
-/*
-Kill kills internal process (not implemented)
-*/
-func (process *internalProcess) Kill() error {
-	//you can't kill an internal process.
-	return nil
 }
 
 func (process *internalProcess) Signal(sig syscall.Signal) error {

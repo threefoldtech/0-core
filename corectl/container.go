@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/codegangsta/cli"
-	"github.com/zero-os/0-core/base/pm/core"
 	"github.com/olekukonko/tablewriter"
+	"github.com/zero-os/0-core/base/pm"
 	"gopkg.in/yaml.v2"
 	"os"
 	"sort"
@@ -34,9 +34,9 @@ func containers(t Transport, c *cli.Context) {
 
 	response, err := t.Run(Command{
 		Sync: true,
-		Content: core.Command{
+		Content: pm.Command{
 			Command: "corex.find",
-			Arguments: core.MustArguments(M{
+			Arguments: pm.MustArguments(M{
 				"tags": tags,
 			}),
 		},
@@ -85,9 +85,9 @@ func containerInspect(t Transport, c *cli.Context) {
 
 	response, err := t.Run(Command{
 		Sync: true,
-		Content: core.Command{
+		Content: pm.Command{
 			Command:   "corex.list",
-			Arguments: core.MustArguments(M{}),
+			Arguments: pm.MustArguments(M{}),
 		},
 	})
 

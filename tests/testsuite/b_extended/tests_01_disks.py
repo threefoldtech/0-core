@@ -32,7 +32,6 @@ class DisksTests(BaseTest):
 
     def bash_disk_info(self, keys, diskname):
         diskinf = {}
-        upper_values = ['disc-gran', 'disc-max', 'wsame', 'serial']
         info = self.client.bash('lsblk -d dev/{} -O -P '.format(diskname))
         info = self.stdout(info)
         lines = info.split()
@@ -40,15 +39,12 @@ class DisksTests(BaseTest):
             for line in lines:
                 if key == line[:line.find('=')]:
                     value = line[line.find('=')+2:-1]
-                    if value == '':
-                        value = None
-                    if key in upper_values:
-                        value = value.upper()
+                    value = value.lower()
                     diskinf[key] = value
                     break
 
-        diskinf['model'] = self.stdout(self.client.bash('cat /sys/block/{}/device/model'.format(diskname))).upper()
-        diskinf['vendor'] = self.stdout(self.client.bash('cat /sys/block/{}/device/vendor'.format(diskname))).upper()
+        diskinf['model'] = self.stdout(self.client.bash('cat /sys/block/{}/device/model'.format(diskname))).lower()
+        diskinf['vendor'] = self.stdout(self.client.bash('cat /sys/block/{}/device/vendor'.format(diskname))).lower()
 
         logical_block_size = int(self.stdout(self.client.bash('cat /sys/block/{}/queue/logical_block_size '.format(diskname))))
         size = int(self.stdout(self.client.bash('cat /sys/block/{}/size '.format(diskname))))
@@ -256,7 +252,12 @@ class DisksTests(BaseTest):
             self.lg('compare g8os results to disk{} of the bash results, should be the same '.format(disk))
             for key in g8os_disk_info.keys():
                 if key in bash_disk_info.keys():
-                    self.assertEqual(g8os_disk_info[key], bash_disk_info[key],'different in key {} for disk{} '.format(key,disk))
+                    v = g8os_disk_info[key]
+                    if v is None:
+                        v = ''
+                    if isinstance(v, str):
+                        v = v.lower()
+                    self.assertEqual(v, bash_disk_info[key],'different in key {} for disk{} '.format(key,disk))
 
         self.lg('{} ENDED'.format(self._testID))
 
@@ -297,15 +298,16 @@ class DisksTests(BaseTest):
         with self.assertRaises(RuntimeError):
             self.client.disk.mount(loop_dev_list[0], mount_point, [""])
 
-        self.lg('unmount the disk, shouldn\'t be found in the disks list')
-
-        self.client.disk.umount(loop_dev_list[0])
-        disks = self.client.bash(' lsblk -n -io NAME ').get().stdout
-        disks = disks.splitlines()
-        result = [disk in loop_dev_list[0] for disk in disks]
-        self.assertFalse(True in result)
-
-        self.lg('{} ENDED'.format(self._testID))
+        self.lg('no, unmounting a disk does not remove the loop device')
+        # self.lg('unmount the disk, shouldn\'t be found in the disks list')
+        #
+        # self.client.disk.umount(loop_dev_list[0])
+        # disks = self.client.bash(' lsblk -n -io NAME ').get().stdout
+        # disks = disks.splitlines()
+        # result = [disk in loop_dev_list[0] for disk in disks]
+        # self.assertFalse(True in result)
+        #
+        # self.lg('{} ENDED'.format(self._testID))
 
     def test006_disk_partitions(self):
 
@@ -479,7 +481,7 @@ class DisksTests(BaseTest):
         self.lg('Try to write file inside that directory exceeding L1, should fail')
         rs = self.client.bash('cd {}; fallocate -l 200M {}'.format(sv1_path, self.rand_str()))
         self.assertEqual(rs.get().state, 'ERROR')
-        self.assertEqual(rs.get().stderr, 'fallocate: fallocate failed: Disk quota exceeded\n')
+        self.assertEqual(rs.get().stderr.strip(), 'fallocate: fallocate failed: Disk quota exceeded')
 
         self.lg('Destroy this btrfs filesystem')
         self.destroy_btrfs()
@@ -519,7 +521,7 @@ class DisksTests(BaseTest):
         self.lg('Add device (D1) to the (Bfs1) mount point, should succeed')
         self.client.btrfs.device_add(self.mount_point, d1)
         rs = self.client.bash('btrfs filesystem show | grep -o "loop0"')
-        self.assertEqual(rs.get().stdout, 'loop0\n')
+        self.assertEqual(rs.get().stdout.strip(), 'loop0')
         self.assertEqual(rs.get().state, 'SUCCESS')
 
         self.lg('Add (D1) again to the (Bfs1) mount point, should fail')

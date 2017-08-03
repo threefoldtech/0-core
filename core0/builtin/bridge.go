@@ -14,8 +14,6 @@ import (
 	"github.com/vishvananda/netlink"
 	"github.com/zero-os/0-core/base/nft"
 	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/pm/core"
-	"github.com/zero-os/0-core/base/pm/process"
 	"github.com/zero-os/0-core/base/utils"
 )
 
@@ -25,10 +23,10 @@ type bridgeMgr struct {
 
 func init() {
 	b := &bridgeMgr{}
-	pm.CmdMap["bridge.create"] = process.NewInternalProcessFactory(b.create)
-	pm.CmdMap["bridge.list"] = process.NewInternalProcessFactory(b.list)
-	pm.CmdMap["bridge.delete"] = process.NewInternalProcessFactory(b.delete)
-	pm.CmdMap["bridge.add_host"] = process.NewInternalProcessFactory(b.addHost)
+	pm.RegisterBuiltIn("bridge.create", b.create)
+	pm.RegisterBuiltIn("bridge.list", b.list)
+	pm.RegisterBuiltIn("bridge.delete", b.delete)
+	pm.RegisterBuiltIn("bridge.add_host", b.addHost)
 }
 
 var (
@@ -188,11 +186,11 @@ func (b *bridgeMgr) bridgeStaticNetworking(bridge *netlink.Bridge, network *Brid
 		"--except-interface=lo",
 	}
 
-	cmd := &core.Command{
+	cmd := &pm.Command{
 		ID:      b.dnsmasqPName(bridge.Name),
-		Command: process.CommandSystem,
-		Arguments: core.MustArguments(
-			process.SystemCommandArguments{
+		Command: pm.CommandSystem,
+		Arguments: pm.MustArguments(
+			pm.SystemCommandArguments{
 				Name: "dnsmasq",
 				Args: args,
 			},
@@ -208,7 +206,7 @@ func (b *bridgeMgr) bridgeStaticNetworking(bridge *netlink.Bridge, network *Brid
 	}
 
 	log.Debugf("dnsmasq(%s): %s", bridge.Name, args)
-	_, err = pm.GetManager().RunCmd(cmd, onExit)
+	_, err = pm.Run(cmd, onExit)
 
 	if err != nil {
 		return nil, err
@@ -271,11 +269,11 @@ func (b *bridgeMgr) bridgeDnsMasqNetworking(bridge *netlink.Bridge, network *Bri
 		"--except-interface=lo",
 	}
 
-	cmd := &core.Command{
+	cmd := &pm.Command{
 		ID:      b.dnsmasqPName(bridge.Name),
-		Command: process.CommandSystem,
-		Arguments: core.MustArguments(
-			process.SystemCommandArguments{
+		Command: pm.CommandSystem,
+		Arguments: pm.MustArguments(
+			pm.SystemCommandArguments{
 				Name:     "dnsmasq",
 				Args:     args,
 				NoOutput: true,
@@ -292,7 +290,7 @@ func (b *bridgeMgr) bridgeDnsMasqNetworking(bridge *netlink.Bridge, network *Bri
 	}
 
 	log.Debugf("dnsmasq(%s): %s", bridge.Name, args)
-	_, err = pm.GetManager().RunCmd(cmd, onExit)
+	_, err = pm.Run(cmd, onExit)
 
 	if err != nil {
 		return nil, err
@@ -301,14 +299,14 @@ func (b *bridgeMgr) bridgeDnsMasqNetworking(bridge *netlink.Bridge, network *Bri
 	return addr, nil
 }
 
-func (b *bridgeMgr) addHost(cmd *core.Command) (interface{}, error) {
+func (b *bridgeMgr) addHost(cmd *pm.Command) (interface{}, error) {
 	var args BridgeAddHost
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
 
 	name := b.dnsmasqPName(args.Bridge)
-	runner, ok := pm.GetManager().Runner(name)
+	job, ok := pm.JobOf(name)
 	if !ok {
 		//either no bridge with that name, or this bridge does't have dnsmasq settings.
 		return nil, fmt.Errorf("not supported no dnsmasq process found")
@@ -323,13 +321,7 @@ func (b *bridgeMgr) addHost(cmd *core.Command) (interface{}, error) {
 		return nil, err
 	}
 
-	if ps, ok := runner.Process().(process.Signaler); ok {
-		if err := ps.Signal(syscall.SIGHUP); err != nil {
-			return nil, err
-		}
-	}
-
-	return nil, nil
+	return nil, job.Signal(syscall.SIGHUP)
 }
 
 func (b *bridgeMgr) bridgeNetworking(bridge *netlink.Bridge, network *BridgeNetwork) error {
@@ -377,7 +369,7 @@ func (b *bridgeMgr) setNAT(addr *netlink.Addr) error {
 
 func (b *bridgeMgr) unsetNAT(addr []netlink.Addr) error {
 	//enable nat-ting
-	job, err := pm.GetManager().System("nft", "list", "ruleset", "-a")
+	job, err := pm.System("nft", "list", "ruleset", "-a")
 	if err != nil {
 		return err
 	}
@@ -393,14 +385,14 @@ func (b *bridgeMgr) unsetNAT(addr []netlink.Addr) error {
 		ip := line[1]
 		handle := line[2]
 		if utils.InString(ips, ip) {
-			pm.GetManager().System("nft", "delete", "rule", "nat", "post", "handle", handle)
+			pm.System("nft", "delete", "rule", "nat", "post", "handle", handle)
 		}
 	}
 
 	return nil
 }
 
-func (b *bridgeMgr) create(cmd *core.Command) (interface{}, error) {
+func (b *bridgeMgr) create(cmd *pm.Command) (interface{}, error) {
 	b.m.Lock()
 	defer b.m.Unlock()
 
@@ -531,7 +523,7 @@ func (b *bridgeMgr) unNFT(idx int) error {
 	return nil
 }
 
-func (b *bridgeMgr) list(cmd *core.Command) (interface{}, error) {
+func (b *bridgeMgr) list(cmd *pm.Command) (interface{}, error) {
 	links, err := netlink.LinkList()
 	if err != nil {
 		return nil, err
@@ -547,7 +539,7 @@ func (b *bridgeMgr) list(cmd *core.Command) (interface{}, error) {
 	return bridges, nil
 }
 
-func (b *bridgeMgr) delete(cmd *core.Command) (interface{}, error) {
+func (b *bridgeMgr) delete(cmd *pm.Command) (interface{}, error) {
 	b.m.Lock()
 	b.m.Unlock()
 
@@ -566,7 +558,7 @@ func (b *bridgeMgr) delete(cmd *core.Command) (interface{}, error) {
 	}
 
 	//make sure to stop dnsmasq, just in case it's running
-	pm.GetManager().Kill(fmt.Sprintf("dnsmasq-%s", link.Attrs().Name))
+	pm.Kill(fmt.Sprintf("dnsmasq-%s", link.Attrs().Name))
 
 	addresses, err := netlink.AddrList(link, netlink.FAMILY_V4)
 	if err != nil {

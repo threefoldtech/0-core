@@ -8,8 +8,6 @@ import (
 	"strconv"
 
 	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/pm/core"
-	"github.com/zero-os/0-core/base/pm/process"
 )
 
 /*
@@ -26,8 +24,8 @@ type diskMgr struct{}
 
 func init() {
 	d := (*diskMgr)(nil)
-	pm.CmdMap["disk.getinfo"] = process.NewInternalProcessFactory(d.info)
-	pm.CmdMap["disk.list"] = process.NewInternalProcessFactory(d.list)
+	pm.RegisterBuiltIn("disk.getinfo", d.info)
+	pm.RegisterBuiltIn("disk.list", d.list)
 }
 
 type diskInfo struct {
@@ -117,7 +115,7 @@ func (d *diskMgr) readUInt64(p string) (uint64, error) {
 }
 
 func (d *diskMgr) lsblk(dev string) (*lsblkResult, error) {
-	result, err := pm.GetManager().System("lsblk", "-O", "-J", fmt.Sprintf("/dev/%s", dev))
+	result, err := pm.System("lsblk", "-O", "-J", fmt.Sprintf("/dev/%s", dev))
 
 	if err != nil {
 		return nil, err
@@ -144,7 +142,7 @@ func (d *diskMgr) blockSize(dev string) (uint64, error) {
 
 func (d *diskMgr) getTableInfo(disk string) (string, []DiskFreeBlock, error) {
 	blocks := make([]DiskFreeBlock, 0)
-	result, err := pm.GetManager().System("parted", fmt.Sprintf("/dev/%s", disk), "unit", "B", "print", "free")
+	result, err := pm.System("parted", fmt.Sprintf("/dev/%s", disk), "unit", "B", "print", "free")
 
 	if err != nil {
 		return "", blocks, err
@@ -239,7 +237,7 @@ func (d *diskMgr) partInfo(disk, part string) (*DiskInfoResult, error) {
 	return &info, nil
 }
 
-func (d *diskMgr) info(cmd *core.Command) (interface{}, error) {
+func (d *diskMgr) info(cmd *pm.Command) (interface{}, error) {
 	var args diskInfo
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
@@ -253,8 +251,8 @@ func (d *diskMgr) info(cmd *core.Command) (interface{}, error) {
 	return d.partInfo(args.Disk, args.Part)
 }
 
-func (d *diskMgr) list(cmd *core.Command) (interface{}, error) {
-	result, err := pm.GetManager().System("lsblk", "--json", "--output-all", "--bytes", "--exclude", "1,2")
+func (d *diskMgr) list(cmd *pm.Command) (interface{}, error) {
+	result, err := pm.System("lsblk", "--json", "--output-all", "--bytes", "--exclude", "1,2")
 	if err != nil {
 		return nil, err
 	}

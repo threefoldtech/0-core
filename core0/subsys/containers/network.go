@@ -7,8 +7,6 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/vishvananda/netlink"
 	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/pm/core"
-	"github.com/zero-os/0-core/base/pm/process"
 	"io/ioutil"
 	"net"
 	"os"
@@ -62,7 +60,7 @@ func (c *container) zerotierDaemon() error {
 				log.Info("checking for zt availability")
 				var err error
 				for i := 0; i < 10; i++ {
-					_, err = pm.GetManager().System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "listnetworks")
+					_, err = pm.System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "listnetworks")
 					if err == nil {
 						break
 					}
@@ -84,11 +82,11 @@ func (c *container) zerotierDaemon() error {
 			},
 		}
 
-		c.zt, c.zterr = pm.GetManager().RunCmd(&core.Command{
+		c.zt, c.zterr = pm.Run(&pm.Command{
 			ID:      uuid.New(),
-			Command: process.CommandSystem,
-			Arguments: core.MustArguments(
-				process.SystemCommandArguments{
+			Command: pm.CommandSystem,
+			Arguments: pm.MustArguments(
+				pm.SystemCommandArguments{
 					Name: "ip",
 					Args: []string{
 						"netns", "exec", fmt.Sprint(c.ID()), "zerotier-one", "-p0", home,
@@ -124,7 +122,7 @@ func (c *container) joinZerotierNetwork(idx int, netID string) error {
 	}
 
 	home := c.zerotierHome()
-	_, err := pm.GetManager().System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "join", netID)
+	_, err := pm.System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "join", netID)
 	return err
 }
 
@@ -134,7 +132,7 @@ func (c *container) leaveZerotierNetwork(idx int, netID string) error {
 	}
 
 	home := c.zerotierHome()
-	_, err := pm.GetManager().System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "leave", netID)
+	_, err := pm.System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "leave", netID)
 	return err
 }
 
@@ -158,18 +156,18 @@ func (c *container) postBridge(dev string, index int, n *Nic) error {
 	//	return fmt.Errorf("set link name: %s", err)
 	//}
 
-	_, err = pm.GetManager().System("ip", "netns", "exec", fmt.Sprintf("%v", c.id), "ip", "link", "set", peerName, "name", dev)
+	_, err = pm.System("ip", "netns", "exec", fmt.Sprintf("%v", c.id), "ip", "link", "set", peerName, "name", dev)
 	if err != nil {
 		return fmt.Errorf("failed to rename device: %s", err)
 	}
 
 	if n.Config.Dhcp {
 		//start a dhcpc inside the container.
-		dhcpc := &core.Command{
+		dhcpc := &pm.Command{
 			ID:      uuid.New(),
-			Command: process.CommandSystem,
-			Arguments: core.MustArguments(
-				process.SystemCommandArguments{
+			Command: pm.CommandSystem,
+			Arguments: pm.MustArguments(
+				pm.SystemCommandArguments{
 					Name: "ip",
 					Args: []string{
 						"netns",
@@ -183,14 +181,14 @@ func (c *container) postBridge(dev string, index int, n *Nic) error {
 				},
 			),
 		}
-		pm.GetManager().RunCmd(dhcpc)
+		pm.Run(dhcpc)
 	} else if n.Config.CIDR != "" {
 		if _, _, err := net.ParseCIDR(n.Config.CIDR); err != nil {
 			return err
 		}
 
 		//putting the interface up
-		_, err := pm.GetManager().System("ip", "netns",
+		_, err := pm.System("ip", "netns",
 			"exec",
 			fmt.Sprintf("%v", c.id),
 			"ip", "link", "set", "dev", dev, "up")
@@ -200,7 +198,7 @@ func (c *container) postBridge(dev string, index int, n *Nic) error {
 		}
 
 		//setting the ip address
-		_, err = pm.GetManager().System("ip", "netns", "exec", fmt.Sprintf("%v", c.id), "ip", "address", "add", n.Config.CIDR, "dev", dev)
+		_, err = pm.System("ip", "netns", "exec", fmt.Sprintf("%v", c.id), "ip", "address", "add", n.Config.CIDR, "dev", dev)
 		if err != nil {
 			return fmt.Errorf("error settings interface ip: %v", err)
 		}
@@ -256,9 +254,9 @@ func (c *container) preBridge(index int, bridge string, n *Nic, ovs Container) e
 		}
 	} else {
 		//with ovs
-		result, err := c.mgr.Dispatch(ovs.ID(), &core.Command{
+		result, err := c.mgr.Dispatch(ovs.ID(), &pm.Command{
 			Command: "ovs.port-add",
-			Arguments: core.MustArguments(
+			Arguments: pm.MustArguments(
 				map[string]interface{}{
 					"bridge": bridge,
 					"port":   name,
@@ -270,7 +268,7 @@ func (c *container) preBridge(index int, bridge string, n *Nic, ovs Container) e
 			return fmt.Errorf("ovs dispatch error: %s", err)
 		}
 
-		if result.State != core.StateSuccess {
+		if result.State != pm.StateSuccess {
 			return fmt.Errorf("failed to attach veth to bridge: %s", result.Data)
 		}
 	}
@@ -318,7 +316,7 @@ func (c *container) forwardId(host int, container int) string {
 
 func (c *container) unPortForward() {
 	for host, container := range c.Args.Port {
-		pm.GetManager().Kill(c.forwardId(host, container))
+		pm.Kill(c.forwardId(host, container))
 	}
 }
 
@@ -327,11 +325,11 @@ func (c *container) setPortForwards() error {
 
 	for host, container := range c.Args.Port {
 		//nft add rule nat prerouting iif eth0 tcp dport { 80, 443 } dnat 192.168.1.120
-		cmd := &core.Command{
+		cmd := &pm.Command{
 			ID:      c.forwardId(host, container),
-			Command: process.CommandSystem,
-			Arguments: core.MustArguments(
-				process.SystemCommandArguments{
+			Command: pm.CommandSystem,
+			Arguments: pm.MustArguments(
+				pm.SystemCommandArguments{
 					Name: "socat",
 					Args: []string{
 						fmt.Sprintf("tcp-listen:%d,reuseaddr,fork", host),
@@ -348,7 +346,7 @@ func (c *container) setPortForwards() error {
 			},
 		}
 
-		pm.GetManager().RunCmd(cmd, onExit)
+		pm.Run(cmd, onExit)
 	}
 
 	return nil
@@ -356,7 +354,7 @@ func (c *container) setPortForwards() error {
 
 func (c *container) setGateway(dev string, gw string) error {
 	////setting the ip address
-	_, err := pm.GetManager().System("ip", "netns", "exec", fmt.Sprintf("%v", c.id),
+	_, err := pm.System("ip", "netns", "exec", fmt.Sprintf("%v", c.id),
 		"ip", "route", "add", "metric", "1000", "default", "via", gw, "dev", dev)
 
 	if err != nil {
@@ -418,9 +416,9 @@ func (c *container) preVxlanNetwork(idx int, net *Nic) error {
 
 	//ensure that a bridge is available with that vlan tag.
 	//we dispatch the ovs.vlan-ensure command to container.
-	result, err := c.mgr.Dispatch(ovs.ID(), &core.Command{
+	result, err := c.mgr.Dispatch(ovs.ID(), &pm.Command{
 		Command: "ovs.vxlan-ensure",
-		Arguments: core.MustArguments(map[string]interface{}{
+		Arguments: pm.MustArguments(map[string]interface{}{
 			"master": OVSVXBackend,
 			"vxlan":  vxlan,
 		}),
@@ -430,7 +428,7 @@ func (c *container) preVxlanNetwork(idx int, net *Nic) error {
 		return err
 	}
 
-	if result.State != core.StateSuccess {
+	if result.State != pm.StateSuccess {
 		return fmt.Errorf("failed to ensure vxlan bridge: %v", result.Data)
 	}
 
@@ -465,9 +463,9 @@ func (c *container) preVlanNetwork(idx int, net *Nic) error {
 
 	//ensure that a bridge is available with that vlan tag.
 	//we dispatch the ovs.vlan-ensure command to container.
-	result, err := c.mgr.Dispatch(ovs.ID(), &core.Command{
+	result, err := c.mgr.Dispatch(ovs.ID(), &pm.Command{
 		Command: "ovs.vlan-ensure",
-		Arguments: core.MustArguments(map[string]interface{}{
+		Arguments: pm.MustArguments(map[string]interface{}{
 			"master": OVSBackPlane,
 			"vlan":   vlanID,
 		}),
@@ -477,7 +475,7 @@ func (c *container) preVlanNetwork(idx int, net *Nic) error {
 		return err
 	}
 
-	if result.State != core.StateSuccess {
+	if result.State != pm.StateSuccess {
 		return fmt.Errorf("failed to ensure vlan bridge: %v", result.Data)
 	}
 	//brname:
@@ -573,9 +571,9 @@ func (c *container) unBridge(idx int, n *Nic, ovs Container) error {
 	name := fmt.Sprintf(containerLinkNameFmt, c.id, idx)
 	n.State = NicStateDestroyed
 	if ovs != nil {
-		_, err := c.mgr.Dispatch(ovs.ID(), &core.Command{
+		_, err := c.mgr.Dispatch(ovs.ID(), &pm.Command{
 			Command: "ovs.port-del",
-			Arguments: core.MustArguments(map[string]interface{}{
+			Arguments: pm.MustArguments(map[string]interface{}{
 				"port": name,
 			}),
 		})
@@ -614,7 +612,7 @@ func (c *container) destroyNetwork() {
 	}
 
 	if c.zt != nil {
-		c.zt.Terminate()
+		c.zt.Signal(syscall.SIGTERM)
 	}
 
 	//clean up namespace

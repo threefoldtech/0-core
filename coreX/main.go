@@ -7,7 +7,6 @@ import (
 	"github.com/op/go-logging"
 	"github.com/zero-os/0-core/base"
 	"github.com/zero-os/0-core/base/pm"
-	pmcore "github.com/zero-os/0-core/base/pm/core"
 	"github.com/zero-os/0-core/coreX/bootstrap"
 	"github.com/zero-os/0-core/coreX/options"
 
@@ -55,7 +54,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	pm.InitProcessManager(opt.MaxJobs())
+	pm.MaxJobs = opt.MaxJobs()
+	pm.New()
 
 	input := os.NewFile(3, "|input")
 	output := os.NewFile(4, "|output")
@@ -64,13 +64,9 @@ func main() {
 
 	//start process mgr.
 	log.Infof("Starting process manager")
-	mgr := pm.GetManager()
 
-	mgr.AddResultHandler(dispatcher.Result)
-	mgr.AddMessageHandler(dispatcher.Message)
-	mgr.AddStatsHandler(dispatcher.Stats)
-
-	mgr.Run()
+	pm.AddHandle(dispatcher)
+	pm.Start()
 
 	bs := bootstrap.NewBootstrap()
 
@@ -82,11 +78,20 @@ func main() {
 
 	dec := json.NewDecoder(input)
 	for {
-		var cmd pmcore.Command
+		var cmd pm.Command
 		if err := dec.Decode(&cmd); err != nil {
 			log.Errorf("failed to decode command message: %s", err)
 
 		}
-		mgr.PushCmd(&cmd)
+
+		_, err := pm.Run(&cmd)
+
+		if err == pm.UnknownCommandErr {
+			result := pm.NewJobResult(&cmd)
+			result.State = pm.StateUnknownCmd
+			dispatcher.Result(&cmd, result)
+		} else if err != nil {
+			log.Errorf("unknown error while queueing command: %s", err)
+		}
 	}
 }

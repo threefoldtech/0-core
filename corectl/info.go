@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/codegangsta/cli"
-	"github.com/zero-os/0-core/base/pm/core"
+	"github.com/zero-os/0-core/base/pm"
 )
 
 func info(t Transport, cmd string, body ...interface{}) {
@@ -17,9 +17,9 @@ func info(t Transport, cmd string, body ...interface{}) {
 
 	response, err := t.Run(Command{
 		Sync: true,
-		Content: core.Command{
+		Content: pm.Command{
 			Command:   cmd,
-			Arguments: core.MustArguments(data),
+			Arguments: pm.MustArguments(data),
 		},
 	})
 
