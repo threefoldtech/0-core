@@ -19,6 +19,7 @@ import (
 
 const (
 	containerLinkNameFmt = "cont%d-%d"
+	containerMonitoredLinkNameFmt = "contm%d-%d"
 	containerPeerNameFmt = "%sp"
 )
 
@@ -137,7 +138,12 @@ func (c *container) leaveZerotierNetwork(idx int, netID string) error {
 }
 
 func (c *container) postBridge(dev string, index int, n *Nic) error {
-	name := fmt.Sprintf(containerLinkNameFmt, c.id, index)
+	var name string
+	if n.Monitor {
+		name = fmt.Sprintf(containerMonitoredLinkNameFmt, c.id, index)
+	} else {
+		name = fmt.Sprintf(containerLinkNameFmt, c.id, index)
+	}
 	peerName := fmt.Sprintf(containerPeerNameFmt, name)
 
 	peer, err := netlink.LinkByName(peerName)
@@ -225,7 +231,12 @@ func (c *container) preBridge(index int, bridge string, n *Nic, ovs Container) e
 		return fmt.Errorf("bridge '%s' not found: %s", bridge, err)
 	}
 
-	name := fmt.Sprintf(containerLinkNameFmt, c.id, index)
+	var name string
+	if n.Monitor {
+		name = fmt.Sprintf(containerMonitoredLinkNameFmt, c.id, index)
+	} else {
+		name = fmt.Sprintf(containerLinkNameFmt, c.id, index)
+	}
 	peerName := fmt.Sprintf(containerPeerNameFmt, name)
 
 	veth := &netlink.Veth{
@@ -568,7 +579,12 @@ func (c *container) preStartIsolatedNetworking() error {
 }
 
 func (c *container) unBridge(idx int, n *Nic, ovs Container) error {
-	name := fmt.Sprintf(containerLinkNameFmt, c.id, idx)
+	var name string
+	if n.Monitor {
+		name = fmt.Sprintf(containerMonitoredLinkNameFmt, c.id, idx)
+	} else {
+		name = fmt.Sprintf(containerLinkNameFmt, c.id, idx)
+	}
 	n.State = NicStateDestroyed
 	if ovs != nil {
 		_, err := c.mgr.Dispatch(ovs.ID(), &pm.Command{

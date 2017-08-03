@@ -30,6 +30,7 @@ var (
 		"device",
 		"bridge",
 		"openvswitch",
+		"veth",
 	}
 
 	networkMonitorIgnoreNames = []string{
@@ -271,7 +272,8 @@ func (m *monitor) network() error {
 		}
 
 		//only required devices
-		if !utils.InString(networkMonitorTypes, link.Type()) {
+		if !utils.InString(networkMonitorTypes, link.Type()) ||
+			(link.Type() == "veth" && !strings.HasPrefix(counter.Name, "contm")) {
 			continue
 		}
 
