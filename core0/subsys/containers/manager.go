@@ -71,6 +71,7 @@ type Nic struct {
 	HWAddress string        `json:"hwaddr"`
 	Name      string        `json:"name,omitempty"`
 	Config    NetworkConfig `json:"config"`
+	Monitor   bool          `json:"monitor"`
 
 	State NicState `json:"state"`
 }

@@ -935,7 +935,8 @@ class ContainerManager:
                 'gateway': typchk.Or(str, typchk.Missing()),
                 'dns': typchk.Or([str], typchk.Missing()),
             }
-        )
+        ),
+        'monitor': typchk.Or(bool, typchk.Missing()),
     }
 
     _create_chk = typchk.Checker({

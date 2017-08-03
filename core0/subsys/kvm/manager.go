@@ -1382,6 +1382,20 @@ func (m *kvmManager) monitor(cmd *pm.Command) (interface{}, error) {
 			return nil, err
 		}
 
+		domainxml, err := info.Domain.GetXMLDesc(libvirt.DOMAIN_XML_SECURE)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get domain xml: %v", err)
+		}
+		domainstruct := Domain{}
+		err = xml.Unmarshal([]byte(domainxml), &domainstruct)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse the domain xml: %v", err)
+		}
+		interfacesMap := make(map[string]string)
+		for _, ifc := range domainstruct.Devices.Interfaces {
+			interfacesMap[ifc.Target.Dev] = ifc.Mac.Address
+		}
+
 		for i, vcpu := range info.Vcpu {
 			nr := fmt.Sprintf("%d", i)
 			pm.Aggregate(
@@ -1398,53 +1412,57 @@ func (m *kvmManager) monitor(cmd *pm.Command) (interface{}, error) {
 		}
 
 		for _, net := range info.Net {
+			mac, _ := interfacesMap[net.Name]
+			netStats := fmt.Sprintf("%v.%v", name, mac)
+
 			pm.Aggregate(
 				pm.AggreagteDifference,
-				"kvm.net.rxbytes", float64(net.RxBytes), name,
+				"kvm.net.rxbytes", float64(net.RxBytes), netStats,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", net.Name},
 			)
 
 			pm.Aggregate(
 				pm.AggreagteDifference,
-				"kvm.net.rxpackets", float64(net.RxPkts), name,
+				"kvm.net.rxpackets", float64(net.RxPkts), netStats,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", net.Name},
 			)
 
 			pm.Aggregate(
 				pm.AggreagteDifference,
-				"kvm.net.txbytes", float64(net.TxBytes), name,
+				"kvm.net.txbytes", float64(net.TxBytes), netStats,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", net.Name},
 			)
 
 			pm.Aggregate(
 				pm.AggreagteDifference,
-				"kvm.net.txpackets", float64(net.TxPkts), name,
+				"kvm.net.txpackets", float64(net.TxPkts), netStats,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", net.Name},
 			)
 		}
 
 		for _, block := range info.Block {
+			statsName := fmt.Sprintf("%v.%v", name, block.Name)
 			pm.Aggregate(
 				pm.AggreagteDifference,
-				"kvm.disk.rdbytes", float64(block.RdBytes), name,
+				"kvm.disk.rdbytes", float64(block.RdBytes), statsName,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", block.Name},
 			)
 
 			pm.Aggregate(
 				pm.AggreagteDifference,
-				"kvm.disk.rdtimes", float64(block.RdTimes), name,
+				"kvm.disk.iops.read", float64(block.RdReqs), statsName,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", block.Name},
 			)
 
 			pm.Aggregate(
 				pm.AggreagteDifference,
-				"kvm.disk.wrbytes", float64(block.WrBytes), name,
+				"kvm.disk.wrbytes", float64(block.WrBytes), statsName,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", block.Name},
 			)
 
 			pm.Aggregate(
 				pm.AggreagteDifference,
-				"kvm.disk.wrtimes", float64(block.WrTimes), name,
+				"kvm.disk.iops.write", float64(block.WrReqs), statsName,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", block.Name},
 			)
 		}
