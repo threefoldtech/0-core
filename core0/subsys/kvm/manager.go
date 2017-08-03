@@ -1432,7 +1432,7 @@ func (m *kvmManager) monitor(cmd *pm.Command) (interface{}, error) {
 
 			pm.Aggregate(
 				pm.AggreagteDifference,
-				"kvm.disk.rdtimes", float64(block.RdTimes), name,
+				"kvm.disk.iops.read", float64(block.RdReqs), name,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", block.Name},
 			)
 
@@ -1444,7 +1444,7 @@ func (m *kvmManager) monitor(cmd *pm.Command) (interface{}, error) {
 
 			pm.Aggregate(
 				pm.AggreagteDifference,
-				"kvm.disk.wrtimes", float64(block.WrTimes), name,
+				"kvm.disk.iops.write", float64(block.WrReqs), name,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", block.Name},
 			)
 		}
