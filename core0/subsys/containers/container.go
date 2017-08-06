@@ -110,6 +110,7 @@ func (c *container) Start() (runner pm.Job, err error) {
 				HostNetwork: c.Args.HostNetwork,
 				Args:        args,
 				Env:         env,
+				Log:         path.Join(BackendBaseDir, c.name(), "container.log"),
 			},
 		),
 	}
@@ -170,7 +171,7 @@ func (c *container) onStart(pid int) {
 	}
 
 	if err := c.postStart(); err != nil {
-		log.Errorf("Container post start error: %s", err)
+		log.Errorf("container post start error: %s", err)
 		//TODO. Should we shut the container down?
 	}
 

@@ -3,13 +3,13 @@ package pm
 import (
 	"encoding/json"
 	"fmt"
-	psutils "github.com/shirou/gopsutil/process"
-	"github.com/zero-os/0-core/base/pm/stream"
 	"io"
 	"os"
-	"os/exec"
 	"sync"
 	"syscall"
+
+	psutils "github.com/shirou/gopsutil/process"
+	"github.com/zero-os/0-core/base/pm/stream"
 )
 
 type ContainerCommandArguments struct {
@@ -19,6 +19,11 @@ type ContainerCommandArguments struct {
 	Env         map[string]string `json:"env"`
 	HostNetwork bool              `json:"host_network"`
 	Chroot      string            `json:"chroot"`
+	Log         string            `json:"log"`
+}
+
+func (c *ContainerCommandArguments) String() string {
+	return fmt.Sprintf("%s %v %s", c.Name, c.Args, c.Chroot)
 }
 
 type Channel interface {
@@ -73,24 +78,24 @@ func NewContainerProcess(table PIDTable, cmd *Command) Process {
 	return process
 }
 
-func (process *containerProcessImpl) Command() *Command {
-	return process.cmd
+func (p *containerProcessImpl) Command() *Command {
+	return p.cmd
 }
 
-func (process *containerProcessImpl) Channel() Channel {
-	return process.ch
+func (p *containerProcessImpl) Channel() Channel {
+	return p.ch
 }
 
-func (process *containerProcessImpl) Signal(sig syscall.Signal) error {
-	if process.process != nil {
-		return syscall.Kill(int(process.process.Pid), sig)
+func (p *containerProcessImpl) Signal(sig syscall.Signal) error {
+	if p.process != nil {
+		return syscall.Kill(int(p.process.Pid), sig)
 	}
 
-	return fmt.Errorf("process not found")
+	return fmt.Errorf("p not found")
 }
 
 //GetStats gets stats of an external process
-func (process *containerProcessImpl) Stats() *ProcessStats {
+func (p *containerProcessImpl) Stats() *ProcessStats {
 	stats := ProcessStats{}
 
 	defer func() {
@@ -99,7 +104,7 @@ func (process *containerProcessImpl) Stats() *ProcessStats {
 		}
 	}()
 
-	ps := process.process
+	ps := p.process
 	if ps == nil {
 		return &stats
 	}
@@ -116,12 +121,12 @@ func (process *containerProcessImpl) Stats() *ProcessStats {
 		stats.Swap = mem.Swap
 	}
 
-	stats.Debug = fmt.Sprintf("%d", process.process.Pid)
+	stats.Debug = fmt.Sprintf("%d", p.process.Pid)
 
 	return &stats
 }
 
-func (process *containerProcessImpl) setupChannel() (*os.File, *os.File, error) {
+func (p *containerProcessImpl) setupChannel() (*os.File, *os.File, error) {
 	lr, lw, err := os.Pipe()
 	if err != nil {
 		return nil, nil, err
@@ -132,7 +137,7 @@ func (process *containerProcessImpl) setupChannel() (*os.File, *os.File, error) 
 		return nil, nil, err
 	}
 
-	process.ch = &channel{
+	p.ch = &channel{
 		r: lr,
 		w: rw,
 	}
@@ -140,65 +145,93 @@ func (process *containerProcessImpl) setupChannel() (*os.File, *os.File, error) 
 	return rr, lw, nil
 }
 
-func (process *containerProcessImpl) Run() (<-chan *stream.Message, error) {
-	cmd := exec.Command(process.args.Name,
-		process.args.Args...)
-	cmd.Dir = process.args.Dir
+func (p *containerProcessImpl) Run() (ch <-chan *stream.Message, err error) {
+	//we don't do lookup on the name because the name
+	//is only available under the chroot
+	name := p.args.Name
+
+	var env []string
+
+	if len(p.args.Env) > 0 {
+		env = append(env, os.Environ()...)
+		for k, v := range p.args.Env {
+			env = append(env, fmt.Sprintf("%v=%v", k, v))
+		}
+	}
+
+	channel := make(chan *stream.Message)
+	ch = channel
+	defer func() {
+		if err != nil {
+			close(channel)
+		}
+	}()
+
+	var wg sync.WaitGroup
 
 	var flags uintptr = syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWUTS
 
-	if !process.args.HostNetwork {
+	if !p.args.HostNetwork {
 		flags |= syscall.CLONE_NEWNET
 	}
 
-	r, w, err := process.setupChannel()
+	r, w, err := p.setupChannel()
 	if err != nil {
 		return nil, err
 	}
-
-	cmd.ExtraFiles = []*os.File{r, w}
-
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Chroot:     process.args.Chroot,
-		Cloneflags: flags,
-		Setsid:     true,
+	var logf *os.File
+	if len(p.args.Log) != 0 {
+		logf, err = os.OpenFile(p.args.Log, os.O_WRONLY|os.O_CREATE, 0644)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	for k, v := range process.args.Env {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%v=%v", k, v))
+	attrs := os.ProcAttr{
+		Dir: p.args.Dir,
+		Env: env,
+		Files: []*os.File{
+			nil, logf, logf, r, w,
+		},
+		Sys: &syscall.SysProcAttr{
+			Chroot:     p.args.Chroot,
+			Cloneflags: flags,
+			Setsid:     true,
+		},
 	}
 
-	err = process.table.RegisterPID(func() (int, error) {
-		err := cmd.Start()
+	log.Debugf("system: %s", p.args)
+	var ps *os.Process
+	args := []string{name}
+	args = append(args, p.args.Args...)
+	err = p.table.RegisterPID(func() (int, error) {
+		ps, err = os.StartProcess(name, args, &attrs)
 		if err != nil {
 			return 0, err
 		}
 
-		return cmd.Process.Pid, nil
+		return ps.Pid, nil
 	})
 
 	if err != nil {
-		log.Errorf("Failed to start process(%s): %s", process.cmd.ID, err)
-		return nil, err
+		return
 	}
 
-	channel := make(chan *stream.Message)
-
-	process.pid = cmd.Process.Pid
-	psProcess, _ := psutils.NewProcess(int32(process.pid))
-	process.process = psProcess
+	p.pid = ps.Pid
+	psProcess, _ := psutils.NewProcess(int32(p.pid))
+	p.process = psProcess
 
 	go func(channel chan *stream.Message) {
 		//make sure all outputs are closed before waiting for the process
-		//to exit.
 		defer close(channel)
-
-		state := process.table.WaitPID(process.pid)
-		if err := process.ch.Close(); err != nil {
+		state := p.table.WaitPID(p.pid)
+		//wait for all streams to finish copying
+		wg.Wait()
+		ps.Release()
+		log.Debugf("Process %s exited with state: %d", p.cmd, state.ExitStatus())
+		if err := p.ch.Close(); err != nil {
 			log.Errorf("failed to close container channel: %s", err)
 		}
-		log.Debugf("Process %s exited with state: %d", process.cmd, state.ExitStatus())
-
 		if state.ExitStatus() == 0 {
 			channel <- stream.MessageExitSuccess
 		} else {

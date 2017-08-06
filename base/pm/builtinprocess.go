@@ -3,9 +3,10 @@ package pm
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/zero-os/0-core/base/pm/stream"
 	"runtime/debug"
 	"syscall"
+
+	"github.com/zero-os/0-core/base/pm/stream"
 )
 
 /*

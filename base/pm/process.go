@@ -1,8 +1,9 @@
 package pm
 
 import (
-	"github.com/zero-os/0-core/base/pm/stream"
 	"syscall"
+
+	"github.com/zero-os/0-core/base/pm/stream"
 )
 
 const (

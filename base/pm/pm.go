@@ -60,6 +60,8 @@ func New() {
 		jobs = make(map[string]Job)
 		jobsCond = sync.NewCond(&sync.Mutex{})
 		pids = make(map[int]chan syscall.WaitStatus)
+
+		queue.Init()
 	})
 }
 
@@ -108,7 +110,7 @@ func Run(cmd *Command, hooks ...RunnerHook) (Job, error) {
 }
 
 func loop() {
-	ch := queue.Start()
+	ch := queue.Channel()
 	for {
 		jobsCond.L.Lock()
 
