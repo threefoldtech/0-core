@@ -30,6 +30,8 @@ const (
 	cmdContainerZerotierList = "corex.zerotier.list"
 	cmdContainerNicAdd       = "corex.nic-add"
 	cmdContainerNicRemove    = "corex.nic-remove"
+	cmdContainerBackup       = "corex.backup"
+	cmdContainerRestore      = "corex.restore"
 
 	coreXResponseQueue = "corex:results"
 	coreXBinaryName    = "coreX"
@@ -249,6 +251,8 @@ func ContainerSubsystem(sink *transport.Sink, cell *screen.RowCell) (ContainerMa
 	pm.RegisterBuiltIn(cmdContainerFind, containerMgr.find)
 	pm.RegisterBuiltIn(cmdContainerNicAdd, containerMgr.nicAdd)
 	pm.RegisterBuiltIn(cmdContainerNicRemove, containerMgr.nicRemove)
+	pm.RegisterBuiltIn(cmdContainerBackup, containerMgr.backup)
+	pm.RegisterBuiltIn(cmdContainerRestore, containerMgr.restore)
 
 	//container specific info
 	pm.RegisterBuiltIn(cmdContainerZerotierInfo, containerMgr.ztInfo)
@@ -439,13 +443,7 @@ func (m *containerManager) nicRemove(cmd *pm.Command) (interface{}, error) {
 	return nil, container.unBridge(args.Index, nic, ovs)
 }
 
-func (m *containerManager) createContainer(cmd *pm.Command) (*container, error) {
-	var args ContainerCreateArguments
-	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
-		return nil, err
-	}
-
-	args.Tags = cmd.Tags
+func (m *containerManager) createContainer(args ContainerCreateArguments) (*container, error) {
 	if err := args.Validate(); err != nil {
 		return nil, err
 	}
@@ -474,7 +472,13 @@ func (m *containerManager) createContainer(cmd *pm.Command) (*container, error) 
 }
 
 func (m *containerManager) createSync(cmd *pm.Command) (interface{}, error) {
-	container, err := m.createContainer(cmd)
+	var args ContainerCreateArguments
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+
+	args.Tags = cmd.Tags
+	container, err := m.createContainer(args)
 	if err != nil {
 		return nil, err
 	}
@@ -484,7 +488,13 @@ func (m *containerManager) createSync(cmd *pm.Command) (interface{}, error) {
 }
 
 func (m *containerManager) create(cmd *pm.Command) (interface{}, error) {
-	container, err := m.createContainer(cmd)
+	var args ContainerCreateArguments
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+
+	args.Tags = cmd.Tags
+	container, err := m.createContainer(args)
 	if err != nil {
 		return nil, err
 	}

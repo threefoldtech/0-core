@@ -339,6 +339,9 @@ func (c *container) setPortForwards() error {
 		cmd := &pm.Command{
 			ID:      c.forwardId(host, container),
 			Command: pm.CommandSystem,
+			Flags: pm.JobFlags{
+				NoOutput: true,
+			},
 			Arguments: pm.MustArguments(
 				pm.SystemCommandArguments{
 					Name: "socat",
@@ -346,7 +349,6 @@ func (c *container) setPortForwards() error {
 						fmt.Sprintf("tcp-listen:%d,reuseaddr,fork", host),
 						fmt.Sprintf("tcp-connect:%s:%d", ip, container),
 					},
-					NoOutput: true,
 				},
 			),
 		}

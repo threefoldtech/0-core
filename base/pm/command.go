@@ -7,6 +7,14 @@ import (
 
 type Tags []string
 
+//JobFlags to control job behavior but only from the internal API\
+//Clients cant set the JobFlags, unlike the other public flags on the Command struct body.
+type JobFlags struct {
+	Protected bool
+	NoOutput  bool
+	NoSetPGID bool //set new process group id for job
+}
+
 //Cmd is an executable command
 type Command struct {
 	ID              string           `json:"id"`
@@ -21,7 +29,7 @@ type Command struct {
 	LogLevels       []int            `json:"log_levels,omitempty"`
 	Tags            Tags             `json:"tags"`
 
-	Protected bool `json:"-"`
+	Flags JobFlags `json:"-"`
 }
 
 type M map[string]interface{}

@@ -708,6 +708,9 @@ func (m *kvmManager) setPortForwards(uuid string, seq uint16, port map[int]int) 
 		cmd := &pm.Command{
 			ID:      m.forwardId(uuid, host),
 			Command: pm.CommandSystem,
+			Flags: pm.JobFlags{
+				NoOutput: true,
+			},
 			Arguments: pm.MustArguments(
 				pm.SystemCommandArguments{
 					Name: "socat",
@@ -715,7 +718,6 @@ func (m *kvmManager) setPortForwards(uuid string, seq uint16, port map[int]int) 
 						fmt.Sprintf("tcp-listen:%d,reuseaddr,fork", host),
 						fmt.Sprintf("tcp-connect:%s:%d", ip, container),
 					},
-					NoOutput: true,
 				},
 			),
 		}

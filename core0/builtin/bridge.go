@@ -274,11 +274,13 @@ func (b *bridgeMgr) bridgeDnsMasqNetworking(bridge *netlink.Bridge, network *Bri
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(
 			pm.SystemCommandArguments{
-				Name:     "dnsmasq",
-				Args:     args,
-				NoOutput: true,
+				Name: "dnsmasq",
+				Args: args,
 			},
 		),
+		Flags: pm.JobFlags{
+			NoOutput: true,
+		},
 	}
 
 	onExit := &pm.ExitHook{
