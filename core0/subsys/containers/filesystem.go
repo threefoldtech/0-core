@@ -181,38 +181,54 @@ func (c *container) mountPList(src string, target string, hooks ...pm.RunnerHook
 	os.RemoveAll(backend)
 	os.MkdirAll(backend, 0755)
 
-	db, err := c.getMetaDB(src)
-	if err != nil {
-		return err
-	}
-
-	storageUrl := c.Args.Storage
-	if storageUrl == "" {
-		storageUrl = settings.Settings.Globals.Get("storage", "ardb://hub.gig.tech:16379")
-		c.Args.Storage = storageUrl
-	}
-
 	cache := settings.Settings.Globals.Get("cache", path.Join(BackendBaseDir, "cache"))
+	g8ufs := []string{
+		"-reset",
+		"-backend", backend,
+		"-cache", cache,
+	}
+
+	if strings.HasPrefix(src, "restic:") {
+		if err := c.mgr.restoreRepo(
+			strings.TrimPrefix(src, "restic:"),
+			path.Join(backend, "ro"),
+		); err != nil {
+			return err
+		}
+		//clean up the restored repo (delete meta file)
+		os.Remove(path.Join(backend, "ro", backupMetaName))
+	} else {
+		//assume an flist, an flist requires the meat and storage url
+		db, err := c.getMetaDB(src)
+		if err != nil {
+			return err
+		}
+		storageUrl := c.Args.Storage
+		if storageUrl == "" {
+			storageUrl = settings.Settings.Globals.Get("storage", "ardb://hub.gig.tech:16379")
+			c.Args.Storage = storageUrl
+		}
+
+		g8ufs = append(g8ufs,
+			"-meta", db,
+			"-storage-url", storageUrl,
+		)
+	}
+
+	g8ufs = append(g8ufs, target)
 	cmd := &pm.Command{
 		ID:      uuid.New(),
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(pm.SystemCommandArguments{
 			Name: "g8ufs",
-			Args: []string{
-				"-reset",
-				"-backend", backend,
-				"-cache", cache,
-				"-meta", db,
-				"-storage-url", storageUrl,
-				target},
-			NoOutput: false, //this can't be set to true other wise the MatchHook below won't work
+			Args: g8ufs,
 		}),
 	}
 
 	var o sync.Once
 	var wg sync.WaitGroup
 	wg.Add(1)
-
+	var err error
 	hooks = append(hooks, &pm.MatchHook{
 		Match: "mount starts",
 		Action: func(_ *stream.Message) {
