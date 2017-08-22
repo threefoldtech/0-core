@@ -4,6 +4,7 @@ import unittest
 from nose_parameterized import parameterized
 import os
 import io
+from random import randint
 
 
 class SystemTests(BaseTest):
@@ -661,7 +662,7 @@ class SystemTests(BaseTest):
 
     def test012_add_delete_list_addr(self):
 
-        """ g8os-000
+        """ g8os-038
         *Test case for testing adding, deleteing and listing ip addresses*
 
         **Test Scenario:**
@@ -711,7 +712,7 @@ class SystemTests(BaseTest):
 
     def test013_link_up_down_list_rename(self):
 
-        """ g8os-000
+        """ g8os-039
         *Test case for testing adding, deleteing and listing ip addresses*
 
         **Test Scenario:**
@@ -750,7 +751,7 @@ class SystemTests(BaseTest):
 
     def test014_add_delete_interface_bridge(self):
 
-        """ g8os-000
+        """ g8os-040
         *Test case for testing adding, deleteing bridges and their interfaces*
 
         **Test Scenario:**
@@ -803,7 +804,7 @@ class SystemTests(BaseTest):
     @unittest.skip('https://github.com/zero-os/0-core/issues/474')
     def test015_add_delete_list_route(self):
 
-        """ g8os-000
+        """ g8os-041
         *Test case for testing adding, deleteing and listing routes*
 
         **Test Scenario:**
@@ -843,5 +844,56 @@ class SystemTests(BaseTest):
         self.lg('Add route for non existing link, should fail')
         with self.assertRaises(RuntimeError):
             client.ip.route.add(self.rand_str(), new_l[0]['dst'])
+
+        self.lg('{} ENDED'.format(self._testID))
+
+    @unittest.skip('https://github.com/zero-os/0-core/issues/475')
+    def test016_open_drop_list_nft(self):
+
+        """ g8os-042
+        *Test case for testing opening, droping ports and listing rules*
+
+        **Test Scenario:**
+        #. Open ssh port, should succeed
+        #. List the ssh port and check if the rule exist, should succeed
+        #. Open ssh port again should fail
+        #. Drop the ssh port, should succeed
+        #. Drop the ssh port again, should fail
+        #. Open fake port which is out of range, should fail
+        #. List the ports and make sure the fake port is not there, should succeed
+        """
+
+        self.lg('{} STARTED'.format(self._testID))
+
+        self.lg('Open ssh port, should succeed')
+        self.client.nft.open_port(22)
+        out = self.client.bash('nft list ruleset -a | grep -F -o "ssh accept"').get()
+        self.assertEqual(self.stdout(out), 'ssh accept')
+
+        self.lg('List the ssh port and check if the rule exist, should succeed')
+        self.assertIn('tcp dport 22 accept', client.nft.list())
+        self.assertEqual(self.client.nft.rule_exists(22), True)
+
+        self.lg('Open ssh port again should fail')
+        with self.assertRaises(RuntimeError):
+            self.client.nft.open_port(22)
+
+        self.lg('Drop the ssh port, should succeed')
+        self.client.nft.drop_port(22)
+        out = self.client.bash('nft list ruleset -a | grep -F -o "ssh accept"').get()
+        self.assertEqual(self.stdout(out), '')
+
+        self.lg('Drop the ssh port again, should fail')
+        with self.assertRaises(RuntimeError):
+            self.client.nft.drop_port(22)
+
+        self.lg('Open fake port which is out of range, should fail)
+        port = randint(666666,777777)
+        with self.assertRaises(RuntimeError):
+            self.client.nft.open_port(port)
+
+        self.lg('List the ports and make sure the fake port is not there, should succeed')
+        self.assertIn('tcp dport {} accept'.format(port), client.nft.list())
+        self.assertEqual(self.client.nft.rule_exists(port), False)
 
         self.lg('{} ENDED'.format(self._testID))
