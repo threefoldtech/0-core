@@ -698,11 +698,11 @@ class SystemTests(BaseTest):
             self.client.ip.addr.add(L1, cidr)
 
         self.lg('List ips of that link, ip1 should be there')
-        self.assertEqual(client.ip.addr.list(L1)[0], cidr)
+        self.assertEqual(self.client.ip.addr.list(L1)[0], cidr)
 
         self.lg('Delete the added ip (ip1) of link L1, should succeed')
         self.client.ip.addr.delete(L1, cidr)
-        self.assertNotEqual(client.ip.addr.list(L1)[0], cidr)
+        self.assertNotEqual(self.client.ip.addr.list(L1)[0], cidr)
 
         self.lg('Delete ip1 again, should fail')
         with self.assertRaises(RuntimeError):
@@ -769,17 +769,18 @@ class SystemTests(BaseTest):
         self.lg('Add a bridge B1, should succeed')
         br = self.rand_str()
         self.client.ip.bridge.add(br)
-        self.assertEqual(client.bridge.list()[-1], br)
+        self.assertEqual(self.client.bridge.list()[-1], br)
 
         self.lg('Add interface to B1, should succeed')
+        l = self.client.ip.link.list()
         inf = [i['name'] for i in l if i['name'].startswith('e') and i['name'].endswith('1')][0]
         self.client.ip.bridge.addif(br, inf)
-        out = self.client.bash('brctl show | grep {} | grep -F -o {}'.format(br, inf)).get()
+        out = self.client.bash('brctl show | grep {} | grep -F -o {}'.format(br, inf))
         self.assertEqual(self.stdout(out), inf)
 
         self.lg('Delete the added interface , should succeed')
         self.client.ip.bridge.delif(br, inf)
-        out = self.client.bash('brctl show | grep {} | grep -F -o {}'.format(br, inf)).get()
+        out = self.client.bash('brctl show | grep {} | grep -F -o {}'.format(br, inf))
         self.assertEqual(self.stdout(out), '')
 
         self.lg('Delete added interface again, should fail')
@@ -790,10 +791,9 @@ class SystemTests(BaseTest):
         with self.assertRaises(RuntimeError):
             self.client.ip.bridge.delif(br, self.rand_str())
 
-
         self.lg('Delete the bridge, should succeed')
         self.client.ip.bridge.delete(br)
-        self.assertNotIn(br, client.bridge.list())
+        self.assertNotIn(br, self.client.bridge.list())
 
         self.lg('Delete the bridge again, should fail')
         with self.assertRaises(RuntimeError):
@@ -820,30 +820,30 @@ class SystemTests(BaseTest):
         self.lg('{} STARTED'.format(self._testID))
 
         self.lg('list all routes then get the etho route, should succeed')
-        l = client.ip.route.list()
+        l = self.client.ip.route.list()
         new_l = [i for i in l if i['dst'] != '' and ':' not in i['dst'] and i['dev'].startswith('e')]
 
         self.lg('Delete route R1, should succeed')
-        client.ip.route.delete(new_l[0]['dev'], new_l[0]['dst'])
+        self.client.ip.route.delete(new_l[0]['dev'], new_l[0]['dst'])
 
         self.lg('Delete route R1 again, should fail')
         with self.assertRaises(RuntimeError):
-            client.ip.route.delete(new_l[0]['dev'], new_l[0]['dst'])
+            self.client.ip.route.delete(new_l[0]['dev'], new_l[0]['dst'])
 
         self.lg('Delete route for non existing link, should fail')
         with self.assertRaises(RuntimeError):
-            client.ip.route.delete(self.rand_str(), new_l[0]['dst'])
+            self.client.ip.route.delete(self.rand_str(), new_l[0]['dst'])
 
         self.lg('Add route R1, should succeed')
-        client.ip.route.add(new_l[0]['dev'], new_l[0]['dst'])
+        self.client.ip.route.add(new_l[0]['dev'], new_l[0]['dst'])
 
         self.lg('Add route R1 again, should fail')
         with self.assertRaises(RuntimeError):
-            client.ip.route.add(new_l[0]['dev'], new_l[0]['dst'])
+            self.client.ip.route.add(new_l[0]['dev'], new_l[0]['dst'])
 
         self.lg('Add route for non existing link, should fail')
         with self.assertRaises(RuntimeError):
-            client.ip.route.add(self.rand_str(), new_l[0]['dst'])
+            self.client.ip.route.add(self.rand_str(), new_l[0]['dst'])
 
         self.lg('{} ENDED'.format(self._testID))
 
@@ -867,7 +867,7 @@ class SystemTests(BaseTest):
 
         self.lg('Open ssh port, should succeed')
         self.client.nft.open_port(22)
-        out = self.client.bash('nft list ruleset -a | grep -F -o "ssh accept"').get()
+        out = self.client.bash('nft list ruleset -a | grep -F -o "ssh accept"')
         self.assertEqual(self.stdout(out), 'ssh accept')
 
         self.lg('List the ssh port and check if the rule exist, should succeed')
@@ -880,20 +880,20 @@ class SystemTests(BaseTest):
 
         self.lg('Drop the ssh port, should succeed')
         self.client.nft.drop_port(22)
-        out = self.client.bash('nft list ruleset -a | grep -F -o "ssh accept"').get()
+        out = self.client.bash('nft list ruleset -a | grep -F -o "ssh accept"')
         self.assertEqual(self.stdout(out), '')
 
         self.lg('Drop the ssh port again, should fail')
         with self.assertRaises(RuntimeError):
             self.client.nft.drop_port(22)
 
-        self.lg('Open fake port which is out of range, should fail)
+        self.lg('Open fake port which is out of range, should fail')
         port = randint(666666,777777)
         with self.assertRaises(RuntimeError):
             self.client.nft.open_port(port)
 
         self.lg('List the ports and make sure the fake port is not there, should succeed')
-        self.assertIn('tcp dport {} accept'.format(port), client.nft.list())
+        self.assertIn('tcp dport {} accept'.format(port), self.client.nft.list())
         self.assertEqual(self.client.nft.rule_exists(port), False)
 
         self.lg('{} ENDED'.format(self._testID))
