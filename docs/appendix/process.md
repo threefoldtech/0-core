@@ -10,5 +10,5 @@
         - automated monitoring routines
     - Start listening for commands
 
-#Joining AYS grid
+# Joining AYS grid
 > TODO
