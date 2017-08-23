@@ -9,6 +9,3 @@
         - zero-tier daemon
         - automated monitoring routines
     - Start listening for commands
-
-#Joining AYS grid
-> TODO
