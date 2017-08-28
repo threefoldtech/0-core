@@ -88,10 +88,10 @@ func (p *containerProcessImpl) Channel() Channel {
 
 func (p *containerProcessImpl) Signal(sig syscall.Signal) error {
 	if p.process != nil {
-		return syscall.Kill(int(p.process.Pid), sig)
+		return syscall.Kill(-int(p.process.Pid), sig)
 	}
 
-	return fmt.Errorf("p not found")
+	return fmt.Errorf("process not found")
 }
 
 //GetStats gets stats of an external process

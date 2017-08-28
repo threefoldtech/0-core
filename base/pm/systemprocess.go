@@ -80,13 +80,21 @@ func (p *systemProcessImpl) Stats() *ProcessStats {
 }
 
 func (p *systemProcessImpl) Signal(sig syscall.Signal) error {
-	if p.process != nil {
-		//send the signal to the entire p group
-		log.Debugf("Signaling p '%v' with %v", p.process.Pid, sig)
-		return syscall.Kill(-int(p.process.Pid), sig)
+	if p.process == nil {
+		return fmt.Errorf("process not found")
 	}
 
-	return fmt.Errorf("p not found")
+	kill := int(p.process.Pid)
+	if !p.cmd.Flags.NoSetPGID {
+		gid, err := syscall.Getpgid(kill)
+		if err != nil {
+			return err
+		}
+		kill = -gid
+	}
+
+	return syscall.Kill(kill, sig)
+
 }
 
 func (p *systemProcessImpl) Run() (ch <-chan *stream.Message, err error) {
