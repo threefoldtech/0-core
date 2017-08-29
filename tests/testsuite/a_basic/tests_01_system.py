@@ -801,7 +801,6 @@ class SystemTests(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
-    @unittest.skip('https://github.com/zero-os/0-core/issues/474')
     def test015_add_delete_list_route(self):
 
         """ g8os-041
@@ -847,7 +846,6 @@ class SystemTests(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
-    @unittest.skip('https://github.com/zero-os/0-core/issues/475')
     def test016_open_drop_list_nft(self):
 
         """ g8os-042
@@ -871,7 +869,7 @@ class SystemTests(BaseTest):
         self.assertEqual(self.stdout(out), 'ssh accept')
 
         self.lg('List the ssh port and check if the rule exist, should succeed')
-        self.assertIn('tcp dport 22 accept', client.nft.list())
+        self.assertIn('tcp dport 22 accept', self.client.nft.list())
         self.assertEqual(self.client.nft.rule_exists(22), True)
 
         self.lg('Open ssh port again should fail')
@@ -893,7 +891,7 @@ class SystemTests(BaseTest):
             self.client.nft.open_port(port)
 
         self.lg('List the ports and make sure the fake port is not there, should succeed')
-        self.assertIn('tcp dport {} accept'.format(port), self.client.nft.list())
+        self.assertNotIn('tcp dport {} accept'.format(port), self.client.nft.list())
         self.assertEqual(self.client.nft.rule_exists(port), False)
 
         self.lg('{} ENDED'.format(self._testID))
