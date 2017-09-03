@@ -32,16 +32,16 @@ def delete_device(manager):
         for dev in devices:
             if dev.hostname == hostname:
                 device_id = dev.id
-        params = {
-                 "hostname": hostname,
-                 "description": "string",
-                 "billing_cycle": "hourly",
-                 "userdata": "",
-                 "locked": False,
-                 "tags": []
-                 }
-        if device_id:
-            manager.call_api('devices/%s' % device_id, type='DELETE', params=params)
+                params = {
+                         "hostname": hostname,
+                         "description": "string",
+                         "billing_cycle": "hourly",
+                         "userdata": "",
+                         "locked": False,
+                         "tags": []
+                         }
+                if device_id:
+                    manager.call_api('devices/%s' % device_id, type='DELETE', params=params)
 
 
 def mount_disks(config):
