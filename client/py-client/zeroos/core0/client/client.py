@@ -17,15 +17,10 @@ DefaultTimeout = 10  # seconds
 logger = logging.getLogger('g8core')
 
 
-class Timeout(Exception):
+class JobNotFoundError(Exception):
     pass
 
-
-class JobNotFound(Exception):
-    pass
-
-
-class ResultException(Exception):
+class ResultError(Exception):
     def __init__(self, msg, code=0):
         super().__init__(msg)
         self._code = code
@@ -259,7 +254,7 @@ class Response:
         maxwait = timeout
         while maxwait > 0:
             if not self.exists:
-                raise JobNotFound(self.id)
+                raise JobNotFoundError(self.id)
             v = r.brpoplpush(self._queue, self._queue, min(maxwait, 10))
             if v is not None:
                 payload = json.loads(v.decode())
@@ -269,7 +264,7 @@ class Response:
                 return r
             logger.debug('%s still waiting (%ss)', self._id, int(time.time() - start))
             maxwait -= 10
-        raise Timeout()
+        raise TimeoutError()
 
 
 class JSONResponse(Response):
@@ -285,9 +280,9 @@ class JSONResponse(Response):
         """
         result = super().get(timeout)
         if result.state != 'SUCCESS':
-            raise ResultException(result.data, result.code)
+            raise ResultError(result.data, result.code)
         if result.level != 20:
-            raise ResultException('not a json response: %d' % result.level, 406)
+            raise ResultError('not a json response: %d' % result.level, 406)
 
         return json.loads(result.data)
 
@@ -2620,7 +2615,7 @@ class Client(BaseClient):
                     pass
                 else:
                     return
-            raise RuntimeError("Could not connect to remote host %s" % host)
+            raise ConnectionError("Could not connect to remote host %s" % host)
 
     @property
     def container(self):
@@ -2735,7 +2730,7 @@ class Client(BaseClient):
         flag = 'result:{}:flag'.format(id)
         self._redis.rpush('core:default', json.dumps(payload))
         if self._redis.brpoplpush(flag, flag, DefaultTimeout) is None:
-            Timeout('failed to queue job {}'.format(id))
+            TimeoutError('failed to queue job {}'.format(id))
         logger.debug('%s >> g8core.%s(%s)', id, command, ', '.join(("%s=%s" % (k, v) for k, v in arguments.items())))
 
         return Response(self, id)
