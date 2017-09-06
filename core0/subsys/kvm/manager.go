@@ -1406,6 +1406,12 @@ func (m *kvmManager) monitor(cmd *pm.Command) (interface{}, error) {
 			pm.Tag{"type", "virt"},
 		)
 
+		pm.Aggregate(
+			pm.AggreagteDifference,
+			"kvm.cpu.time", float64(info.Cpu.Time)/1000000000., name,
+			pm.Tag{"type", "virt"},
+		)
+
 		for i, vcpu := range info.Vcpu {
 			nr := fmt.Sprintf("%d", i)
 			pm.Aggregate(
@@ -1415,7 +1421,7 @@ func (m *kvmManager) monitor(cmd *pm.Command) (interface{}, error) {
 			)
 
 			pm.Aggregate(
-				pm.AggreagteAverage,
+				pm.AggreagteDifference,
 				"kvm.vcpu.time", float64(vcpu.Time)/1000000000., name,
 				pm.Tag{"type", "virt"}, pm.Tag{"nr", nr},
 			)
