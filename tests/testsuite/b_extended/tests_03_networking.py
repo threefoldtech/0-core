@@ -37,7 +37,7 @@ class ExtendedNetworking(BaseTest):
         self.lg('{} STARTED'.format(self._testID))
 
         self.lg('Get NetworkId using zerotier API')
-        networkId = self.getZtNetworkID()
+        networkId = self.create_zerotier_network()
 
         self.lg('Join zerotier network (N1)')
         self.client.zerotier.join(networkId)
@@ -98,6 +98,7 @@ class ExtendedNetworking(BaseTest):
         self.lg('Terminate c1, c2')
         self.client.container.terminate(cid_1)
         self.client.container.terminate(cid_2)
+        self.delete_zerotier_network(networkId)
 
         self.lg('{} ENDED'.format(self._testID))
 

@@ -25,7 +25,7 @@ class BasicNetworking(BaseTest):
         self.lg('{} STARTED'.format(self._testID))
 
         self.lg('Get NetworkId using zerotier API')
-        networkId = self.getZtNetworkID()
+        networkId = self.create_zerotier_network()
 
         self.lg('Join zerotier network (N1), should succeed')
         self.client.zerotier.join(networkId)
@@ -48,6 +48,7 @@ class BasicNetworking(BaseTest):
         self.lg('Leave zerotier network (N1), should fail')
         with self.assertRaises(RuntimeError):
             self.client.zerotier.leave(networkId)
+        self.delete_zerotier_network(networkId)
 
         self.lg('{} ENDED'.format(self._testID))
 
