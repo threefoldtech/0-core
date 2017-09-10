@@ -25,29 +25,32 @@ class BasicNetworking(BaseTest):
         self.lg('{} STARTED'.format(self._testID))
 
         self.lg('Get NetworkId using zerotier API')
-        networkId = self.getZtNetworkID()
+        networkId = self.create_zerotier_network()
 
-        self.lg('Join zerotier network (N1), should succeed')
-        self.client.zerotier.join(networkId)
+        try:
+            self.lg('Join zerotier network (N1), should succeed')
+            self.client.zerotier.join(networkId)
 
-        self.lg('List zerotier network')
-        r = self.client.zerotier.list()
-        self.assertIn(networkId, [x['nwid'] for x in r])
+            self.lg('List zerotier network')
+            r = self.client.zerotier.list()
+            self.assertIn(networkId, [x['nwid'] for x in r])
 
-        self.lg('Join fake zerotier network (N1), should fail')
-        with self.assertRaises(RuntimeError):
-            self.client.zerotier.join(self.rand_str())
+            self.lg('Join fake zerotier network (N1), should fail')
+            with self.assertRaises(RuntimeError):
+                self.client.zerotier.join(self.rand_str())
 
-        self.lg('Leave zerotier network (N1), should succeed')
-        self.client.zerotier.leave(networkId)
-
-        self.lg('List zerotier networks, N1 should be gone')
-        r = self.client.zerotier.list()
-        self.assertNotIn(networkId, [x['nwid'] for x in r])
-
-        self.lg('Leave zerotier network (N1), should fail')
-        with self.assertRaises(RuntimeError):
+            self.lg('Leave zerotier network (N1), should succeed')
             self.client.zerotier.leave(networkId)
+
+            self.lg('List zerotier networks, N1 should be gone')
+            r = self.client.zerotier.list()
+            self.assertNotIn(networkId, [x['nwid'] for x in r])
+
+            self.lg('Leave zerotier network (N1), should fail')
+            with self.assertRaises(RuntimeError):
+                self.client.zerotier.leave(networkId)
+        finally:
+            self.delete_zerotier_network(networkId)
 
         self.lg('{} ENDED'.format(self._testID))
 

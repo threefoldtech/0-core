@@ -81,6 +81,23 @@ class BaseTest(unittest.TestCase):
     def stdout(self, resource):
         return resource.get().stdout.replace('\n', '').lower()
 
+    def create_zerotier_network(self, private=False):
+        url = 'https://my.zerotier.com/api/network'
+        data = {'config': {'ipAssignmentPools': [{'ipRangeEnd': '10.147.17.254',
+                                                  'ipRangeStart': '10.147.17.1'}],
+                           'private': private,
+                           'routes': [{'target': '10.147.17.0/24', 'via': None}],
+                           'v4AssignMode': {'zt': True}}}
+
+        response = self.session.post(url=url, json=data)
+        response.raise_for_status()
+        nwid = response.json()['id']
+        return nwid
+
+    def delete_zerotier_network(self, nwid):
+        url = 'https://my.zerotier.com/api/network/{}'.format(nwid)
+        self.session.delete(url=url)
+
     def getZtNetworkID(self):
         url = 'https://my.zerotier.com/api/network'
         r = self.session.get(url)
