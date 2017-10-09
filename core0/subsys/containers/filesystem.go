@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"crypto/md5"
 	"fmt"
-	"github.com/pborman/uuid"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/zero-os/0-core/base/pm"
 	"github.com/zero-os/0-core/base/pm/stream"
