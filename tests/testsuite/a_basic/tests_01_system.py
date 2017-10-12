@@ -856,7 +856,6 @@ class SystemTests(BaseTest):
         #. List the ssh port and check if the rule exist, should succeed
         #. Open ssh port again should fail
         #. Drop the ssh port, should succeed
-        #. Drop the ssh port again, should fail
         #. Open fake port which is out of range, should fail
         #. List the ports and make sure the fake port is not there, should succeed
         """
