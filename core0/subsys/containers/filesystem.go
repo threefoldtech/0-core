@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"crypto/md5"
 	"fmt"
-	"github.com/pborman/uuid"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/zero-os/0-core/base/pm"
 	"github.com/zero-os/0-core/base/pm/stream"
@@ -217,7 +216,7 @@ func (c *container) mountPList(src string, target string, hooks ...pm.RunnerHook
 
 	g8ufs = append(g8ufs, target)
 	cmd := &pm.Command{
-		ID:      uuid.New(),
+		ID:      fmt.Sprintf("%s-g8ufs-%s", c.name(), target),
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(pm.SystemCommandArguments{
 			Name: "g8ufs",
