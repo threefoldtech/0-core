@@ -80,7 +80,7 @@ class SystemTests(BaseTest):
             diskInfo['device'] = line[0]
             diskInfo['opts'] = line[5][1:-1]
             disks.append(diskInfo)
-        return disks 
+        return disks
 
     def getMemInfo(self, client):
 
@@ -856,7 +856,6 @@ class SystemTests(BaseTest):
         #. List the ssh port and check if the rule exist, should succeed
         #. Open ssh port again should fail
         #. Drop the ssh port, should succeed
-        #. Drop the ssh port again, should fail
         #. Open fake port which is out of range, should fail
         #. List the ports and make sure the fake port is not there, should succeed
         """
@@ -880,10 +879,6 @@ class SystemTests(BaseTest):
         self.client.nft.drop_port(22)
         out = self.client.bash('nft list ruleset -a | grep -F -o "ssh accept"')
         self.assertEqual(self.stdout(out), '')
-
-        self.lg('Drop the ssh port again, should fail')
-        with self.assertRaises(RuntimeError):
-            self.client.nft.drop_port(22)
 
         self.lg('Open fake port which is out of range, should fail')
         port = randint(666666,777777)

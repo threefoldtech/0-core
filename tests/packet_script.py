@@ -12,13 +12,25 @@ import requests
 def create_new_device(manager, hostname, branch='master'):
     project = manager.list_projects()[0]
     ipxe_script_url = 'https://bootstrap.gig.tech/ipxe/{}/abcdef/console=ttyS1,115200n8%20debug'.format(branch)
+    available_facility = None
+    facilities = [x.code for x in manager.list_facilities()]
+    for facility in facilities:
+        if manager.validate_capacity([(facility, 'baremetal_0', 1)]):
+            available_facility = facility
+            break
+
+    if not available_facility:
+        print('No enough resources on packet.net to create nodes')
+        sys.exit(1)
+
+    print("Available facility: %s" % available_facility)
     print('creating new machine  .. ')
     device = manager.create_device(project_id=project.id,
                                    hostname=hostname,
                                    plan='baremetal_0',
                                    operating_system='custom_ipxe',
                                    ipxe_script_url=ipxe_script_url,
-                                   facility='ams1')
+                                   facility=available_facility)
     return device
 
 
