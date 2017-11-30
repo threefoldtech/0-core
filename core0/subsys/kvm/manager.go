@@ -9,12 +9,19 @@ import (
 	"strings"
 	"sync"
 
+	"io/ioutil"
+	"path"
+	"syscall"
+
 	"github.com/libvirt/libvirt-go"
 	"github.com/op/go-logging"
 	"github.com/pborman/uuid"
 	"github.com/zero-os/0-core/base/pm"
+	"github.com/zero-os/0-core/base/settings"
+	"github.com/zero-os/0-core/core0/helper"
 	"github.com/zero-os/0-core/core0/screen"
 	"github.com/zero-os/0-core/core0/subsys/containers"
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -23,6 +30,10 @@ const (
 	BaseIPAddr  = "172.19.%d.%d"
 	metadataKey = "zero-os"
 	metadataUri = "https://github.com/zero-os/0-core"
+
+	//for flist vms
+	VmNamespaceFmt = "vm/%s"
+	VmBaseRoot     = "/mnt"
 )
 
 var (
@@ -159,28 +170,53 @@ type NicParams struct {
 	Nics []Nic       `json:"nics"`
 	Port map[int]int `json:"port"`
 }
+
+type Mount struct {
+	Source   string `json:"source"`
+	Target   string `json:"target"`
+	Readonly bool   `json:"readonly"`
+}
+
 type CreateParams struct {
 	NicParams
 	Name   string  `json:"name"`
 	CPU    int     `json:"cpu"`
 	Memory int     `json:"memory"`
+	FList  string  `json:"flist"`
+	Mount  []Mount `json:"mount"`
 	Media  []Media `json:"media"`
 	Tags   pm.Tags `json:"tags"`
+}
+
+type FListBootConfig struct {
+	Root    string
+	Kernel  string
+	InitRD  string
+	Cmdline string
 }
 
 func (c *CreateParams) Valid() error {
 	if err := c.NicParams.Valid(); err != nil {
 		return err
 	}
-	if len(c.Media) < 1 {
-		return fmt.Errorf("At least a boot disk has to be provided")
+
+	if len(c.Media) == 0 && len(c.FList) == 0 {
+		return fmt.Errorf("At least one boot media has to be provided (via media or an flist)")
 	}
+
 	if c.CPU == 0 {
 		return fmt.Errorf("CPU is a required parameter")
 	}
 	if c.Memory == 0 {
 		return fmt.Errorf("Memory is a required parameter")
 	}
+
+	for _, mnt := range c.Mount {
+		if mnt.Target == "root" {
+			return fmt.Errorf("mount target 'root' is reserved")
+		}
+	}
+
 	return nil
 }
 
@@ -697,6 +733,18 @@ func (m *kvmManager) mkDomain(seq uint16, params *CreateParams) (*Domain, error)
 		domain.Devices.Disks = append(domain.Devices.Disks, m.mkDisk(idx, media))
 	}
 
+	for _, mount := range params.Mount {
+		fs := Filesystem{
+			Source: FilesystemDir{mount.Source},
+			Target: FilesystemDir{mount.Target},
+		}
+		if mount.Readonly {
+			fs.Readonly = &Bool{}
+		}
+
+		domain.Devices.Filesystems = append(domain.Devices.Filesystems, fs)
+	}
+
 	return &domain, nil
 }
 
@@ -742,6 +790,66 @@ func (m *kvmManager) updateView() {
 	screen.Refresh()
 }
 
+func (m *kvmManager) mountFList(name, src string) (config FListBootConfig, err error) {
+	namespace := fmt.Sprintf(VmNamespaceFmt, name)
+	storage := settings.Settings.Globals.Get("storage", "ardb://hub.gig.tech:16379")
+
+	target := path.Join(VmBaseRoot, name)
+	onExit := &pm.ExitHook{
+		Action: func(e bool) {
+			//destroy this machine, if fs exited
+			conn, err := m.libvirt.getConnection()
+			if err != nil {
+				log.Errorf("failed to get libvirt connection: %s", err)
+				return
+			}
+			domain, err := conn.LookupDomainByName(name)
+			if err != nil {
+				return
+			}
+			log.Warningf("VM (%s) filesystem exited while running, destorying the machine", name)
+			uuid, _ := domain.GetUUIDString()
+			m.destroyDomain(uuid, domain)
+		},
+	}
+
+	if err = helper.MountFList(namespace, storage, src, target, onExit); err != nil {
+		return
+	}
+
+	defer func() {
+		if err != nil {
+			m.unmountFList(name)
+		}
+	}()
+
+	//load entry config
+	cfg, err := ioutil.ReadFile(path.Join(target, "boot", "boot.yaml"))
+	if err != nil {
+		return config, fmt.Errorf("failed to open boot/boot.yaml: %s", err)
+	}
+
+	err = yaml.Unmarshal(cfg, &config)
+	config.Root = target
+	return
+}
+
+func (m *kvmManager) unmountFList(name string) error {
+	target := path.Join(VmBaseRoot, name)
+	err := syscall.Unmount(target, syscall.MNT_FORCE)
+	if err == nil {
+		return nil
+	}
+
+	if errno, ok := err.(syscall.Errno); ok {
+		if errno == syscall.EINVAL {
+			return nil
+		}
+	}
+
+	return err
+}
+
 func (m *kvmManager) create(cmd *pm.Command) (interface{}, error) {
 	defer m.updateView()
 	var params CreateParams
@@ -759,6 +867,28 @@ func (m *kvmManager) create(cmd *pm.Command) (interface{}, error) {
 	domain, err := m.mkDomain(seq, &params)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(params.FList) != 0 {
+		config, err := m.mountFList(params.Name, params.FList)
+		if err != nil {
+			return nil, err
+		}
+		cmdline := "rootfstype=9p rootflags=rw,trans=virtio,cache=loose root=root"
+		if len(config.Cmdline) != 0 {
+			cmdline = fmt.Sprintf("%s %s", cmdline, config.Cmdline)
+		}
+
+		domain.OS.Kernel = path.Join(config.Root, config.Kernel)
+		domain.OS.InitRD = path.Join(config.Root, config.InitRD)
+		domain.OS.Cmdline = cmdline
+
+		fs := Filesystem{
+			Source: FilesystemDir{config.Root},
+			Target: FilesystemDir{"root"}, //the <root> here matches the one in the cmdline root=<root>
+		}
+
+		domain.Devices.Filesystems = append(domain.Devices.Filesystems, fs)
 	}
 
 	if err := m.setNetworking(&params.NicParams, seq, domain); err != nil {
@@ -845,18 +975,23 @@ func (m *kvmManager) getDomain(cmd *pm.Command) (*libvirt.Domain, string, error)
 	return domain, params.UUID, err
 }
 
+func (m *kvmManager) destroyDomain(uuid string, domain *libvirt.Domain) error {
+	if err := domain.Destroy(); err != nil {
+		return fmt.Errorf("failed to destroy machine: %s", err)
+	}
+
+	m.unPortForward(uuid)
+	return nil
+}
+
 func (m *kvmManager) destroy(cmd *pm.Command) (interface{}, error) {
 	defer m.updateView()
 	domain, uuid, err := m.getDomain(cmd)
 	if err != nil {
 		return nil, err
 	}
-	if err := domain.Destroy(); err != nil {
-		return nil, fmt.Errorf("failed to destroy machine: %s", err)
-	}
-	m.unPortForward(uuid)
 
-	return nil, nil
+	return nil, m.destroyDomain(uuid, domain)
 }
 
 func (m *kvmManager) shutdown(cmd *pm.Command) (interface{}, error) {

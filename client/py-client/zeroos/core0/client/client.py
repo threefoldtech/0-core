@@ -758,7 +758,7 @@ class BaseClient:
             if not result.code:
                 result.code = 500
             raise ResultError(msg='%s' % result.data, code=result.code)
-                
+
 
         return result
 
@@ -2021,7 +2021,8 @@ class KvmManager:
     }
     _create_chk = typchk.Checker({
         'name': str,
-        'media': typchk.Length([_media_dict], 1),
+        'media': typchk.Or([_media_dict], typchk.IsNone()),
+        'flist': typchk.Or(str, typchk.IsNone()),
         'cpu': int,
         'memory': int,
         'nics': [{
@@ -2033,6 +2034,10 @@ class KvmManager:
             typchk.Map(int, int),
             typchk.IsNone()
         ),
+        'mount': typchk.Or(
+            [{'source': str, 'target': str, 'readonly': typchk.Or(bool, typchk.Missing())}],
+            typchk.IsNone(),
+        )
     })
 
     _migrate_network_chk = typchk.Checker({
@@ -2081,12 +2086,14 @@ class KvmManager:
     def __init__(self, client):
         self._client = client
 
-    def create(self, name, media, cpu=2, memory=512, nics=None, port=None, tags=None):
+    def create(self, name, media=None, flist=None, cpu=2, memory=512, nics=None, port=None, mount=None, tags=None):
         """
         :param name: Name of the kvm domain
-        :param media: array of media objects to attach to the machine, where the first object is the boot device
+        :param media: (optional) array of media objects to attach to the machine, where the first object is the boot device
                       each media object is a dict of {url, type} where type can be one of 'disk', or 'cdrom', or empty (default to disk)
                       example: [{'url': 'nbd+unix:///test?socket=/tmp/ndb.socket'}, {'type': 'cdrom': '/somefile.iso'}
+        :param flist: (optional) VM flist. A special bootable flist witch has a correct boot.yaml file
+                     example: http://hub.gig.tech/azmy/ubuntu-zesty.flist
         :param cpu: number of vcpu cores
         :param memory: memory in MiB
         :param port: A dict of host_port: container_port pairs
@@ -2099,6 +2106,10 @@ class KvmManager:
                         'type': nic_type # default, bridge, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
                         'id': id # depends on the type, bridge name (bridge type) zerotier network id (zertier type), the vlan tag or the vxlan id
                      }
+        :param port: Configure port forwards to vm, this only works if default network nic is added. Is a dict of {host-port: guest-port}
+        :param mount: A list of host shared folders in the format {'source': '/host/path', 'target': '/guest/path', 'readonly': True|False}
+
+        :note: At least one media or an flist must be provided.
         :return: uuid of the virtual machine
         """
 
@@ -2109,11 +2120,16 @@ class KvmManager:
             'name': name,
             'media': media,
             'cpu': cpu,
+            'flist': flist,
             'memory': memory,
             'nics': nics,
             'port': port,
+            'mount': mount,
         }
         self._create_chk.check(args)
+
+        if media is None and flist is None:
+            raise ValueError('need at least one boot media via media or an flist')
 
         return self._client.sync('kvm.create', args, tags=tags)
 
