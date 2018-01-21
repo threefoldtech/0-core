@@ -17,14 +17,14 @@ import (
 	"github.com/zero-os/0-core/core0/subsys/containers"
 	"github.com/zero-os/0-core/core0/subsys/kvm"
 
+	"os/exec"
+	"os/signal"
+	"syscall"
+
 	_ "github.com/zero-os/0-core/base/builtin"
 	_ "github.com/zero-os/0-core/core0/builtin"
 	_ "github.com/zero-os/0-core/core0/builtin/btrfs"
 	"github.com/zero-os/0-core/core0/transport"
-	"os/signal"
-	"path"
-	"strings"
-	"syscall"
 )
 
 var (
@@ -39,22 +39,26 @@ func init() {
 
 	backends := []logging.Backend{normal}
 
-	if !options.Options.Kernel.Is("quiet") {
-		opts, _ := options.Options.Kernel.Get("console")
-		for _, opt := range opts {
-			console := strings.SplitN(opt, ",", 2)[0]
+	// if !options.Options.Kernel.Is("quiet") {
+	// 	opts, _ := options.Options.Kernel.Get("console")
+	// 	for _, opt := range opts {
+	// 		console := strings.SplitN(opt, ",", 2)[0]
+	// 		flags := syscall.O_WRONLY | syscall.O_NOCTTY
+	// 		if options.Options.Kernel.Is("debug") {
+	// 			flags |= syscall.O_SYNC
+	// 		}
 
-			out, err := os.OpenFile(path.Join("/dev", console), syscall.O_WRONLY|syscall.O_NOCTTY, 0644)
-			if err != nil {
-				fmt.Println("failed to redirect logs to console")
-				continue
-			}
+	// 		out, err := os.OpenFile(path.Join("/dev", console), flags, 0644)
+	// 		if err != nil {
+	// 			fmt.Println("failed to redirect logs to console")
+	// 			continue
+	// 		}
 
-			backends = append(backends,
-				logging.NewLogBackend(out, "", 0),
-			)
-		}
-	}
+	// 		backends = append(backends,
+	// 			logging.NewLogBackend(out, "", 0),
+	// 		)
+	// 	}
+	// }
 
 	logging.SetBackend(backends...)
 	level := logging.INFO
@@ -99,7 +103,7 @@ func Splash() {
 
 type console struct{}
 
-func (_ *console) Result(cmd *pm.Command, result *pm.JobResult) {
+func (*console) Result(cmd *pm.Command, result *pm.JobResult) {
 	log.Debugf("Job result for command '%s' is '%s'", cmd, result.State)
 }
 
@@ -110,7 +114,8 @@ func main() {
 		os.Exit(0)
 	}
 
-	if !options.Agent() {
+	if !(options.Kernel.Is("debug") || options.Agent()) {
+		//Only allow splash screen if debug is not set, or if not running in agent mode
 		Splash()
 	}
 
@@ -126,15 +131,15 @@ func main() {
 		log.Fatalf("\nConfig validation error, please fix and try again.")
 	}
 
-	if !options.Agent() {
-		//Redirect the stdout, and stderr so we make sure we don't lose crashes that terminates
-		//the process.
-		if err := Redirect(LogPath); err != nil {
-			log.Errorf("failed to redirect output streams: %s", err)
-		}
+	// if !options.Agent() {
+	// 	//Redirect the stdout, and stderr so we make sure we don't lose crashes that terminates
+	// 	//the process.
+	// 	if err := Redirect(LogPath); err != nil {
+	// 		log.Errorf("failed to redirect output streams: %s", err)
+	// 	}
 
-		HandleRotation()
-	}
+	// 	HandleRotation()
+	// }
 
 	var config = settings.Settings
 
@@ -177,7 +182,7 @@ func main() {
 	bs.Second()
 
 	if err := kvm.KVMSubsystem(contMgr, &row.Cells[1]); err != nil {
-		log.Errorf("failed to initialize kvm subsystem", err)
+		log.Errorf("failed to initialize kvm subsystem: %s", err)
 	}
 
 	log.Infof("Starting local transport")
