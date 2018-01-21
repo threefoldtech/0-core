@@ -17,7 +17,6 @@ import (
 	"github.com/zero-os/0-core/core0/subsys/containers"
 	"github.com/zero-os/0-core/core0/subsys/kvm"
 
-	"os/exec"
 	"os/signal"
 	"syscall"
 
