@@ -60,6 +60,8 @@ func parseKerenlOptions(content string) KernelOptions {
 		}
 		options[key] = append(options[key], value)
 	}
+    //force debug TODO: this must get removed eventually
+    options["debug"] = []string{""}
 	return options
 }
 

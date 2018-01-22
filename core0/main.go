@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
+	"strings"
 
 	"github.com/op/go-logging"
 	"github.com/zero-os/0-core/base"
@@ -38,26 +40,26 @@ func init() {
 
 	backends := []logging.Backend{normal}
 
-	// if !options.Options.Kernel.Is("quiet") {
-	// 	opts, _ := options.Options.Kernel.Get("console")
-	// 	for _, opt := range opts {
-	// 		console := strings.SplitN(opt, ",", 2)[0]
-	// 		flags := syscall.O_WRONLY | syscall.O_NOCTTY
-	// 		if options.Options.Kernel.Is("debug") {
-	// 			flags |= syscall.O_SYNC
-	// 		}
+	if !options.Options.Kernel.Is("quiet") {
+		opts, _ := options.Options.Kernel.Get("console")
+		for _, opt := range opts {
+			console := strings.SplitN(opt, ",", 2)[0]
+			flags := syscall.O_WRONLY | syscall.O_NOCTTY
+			if options.Options.Kernel.Is("debug") {
+				flags |= syscall.O_SYNC
+			}
 
-	// 		out, err := os.OpenFile(path.Join("/dev", console), flags, 0644)
-	// 		if err != nil {
-	// 			fmt.Println("failed to redirect logs to console")
-	// 			continue
-	// 		}
+			out, err := os.OpenFile(path.Join("/dev", console), flags, 0644)
+			if err != nil {
+				fmt.Println("failed to redirect logs to console")
+				continue
+			}
 
-	// 		backends = append(backends,
-	// 			logging.NewLogBackend(out, "", 0),
-	// 		)
-	// 	}
-	// }
+			backends = append(backends,
+				logging.NewLogBackend(out, "", 0),
+			)
+		}
+	}
 
 	logging.SetBackend(backends...)
 	level := logging.INFO
@@ -73,6 +75,7 @@ func init() {
 		syscall.SIGINT, syscall.SIGSTOP)
 }
 
+//Splash setup splash screen
 func Splash() {
 
 	if err := screen.New(2); err != nil {
@@ -130,15 +133,15 @@ func main() {
 		log.Fatalf("\nConfig validation error, please fix and try again.")
 	}
 
-	// if !options.Agent() {
-	// 	//Redirect the stdout, and stderr so we make sure we don't lose crashes that terminates
-	// 	//the process.
-	// 	if err := Redirect(LogPath); err != nil {
-	// 		log.Errorf("failed to redirect output streams: %s", err)
-	// 	}
+	if !options.Agent() {
+		//Redirect the stdout, and stderr so we make sure we don't lose crashes that terminates
+		//the process.
+		if err := Redirect(LogPath); err != nil {
+			log.Errorf("failed to redirect output streams: %s", err)
+		}
 
-	// 	HandleRotation()
-	// }
+		HandleRotation()
+	}
 
 	var config = settings.Settings
 

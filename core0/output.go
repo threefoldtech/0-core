@@ -31,10 +31,6 @@ func Redirect(p string) error {
 
 	output = f
 
-	if err := syscall.Dup2(int(f.Fd()), int(os.Stdout.Fd())); err != nil {
-		return err
-	}
-
 	return syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
 }
 
@@ -51,7 +47,7 @@ func Rotate(p string) error {
 	return Redirect(p)
 }
 
-//HandleRotation force log rotation on signal
+//HandleRotation force log rotation on
 func HandleRotation() {
 	ch := make(chan os.Signal)
 	signal.Notify(ch, syscall.SIGUSR1)
