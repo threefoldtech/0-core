@@ -116,7 +116,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	if !(options.Kernel.Is("debug") || options.Agent()) {
+	if !options.Agent() {
 		//Only allow splash screen if debug is not set, or if not running in agent mode
 		Splash()
 	}
