@@ -2,9 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"github.com/google/shlex"
 	"io/ioutil"
 	"strings"
+
+	"github.com/google/shlex"
 )
 
 type KernelOptions map[string][]string
@@ -60,12 +61,11 @@ func parseKerenlOptions(content string) KernelOptions {
 		}
 		options[key] = append(options[key], value)
 	}
-    //force debug TODO: this must get removed eventually
-    options["debug"] = []string{""}
+
 	return options
 }
 
-//GetCmdLine Get kernel cmdline arguments
+//GetKernelOptions Get kernel cmdline arguments
 func GetKernelOptions() KernelOptions {
 	content, err := ioutil.ReadFile("/proc/cmdline")
 	if err != nil {
