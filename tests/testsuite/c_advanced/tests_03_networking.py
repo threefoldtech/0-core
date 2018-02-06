@@ -91,6 +91,7 @@ class AdvancedNetworking(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
+    @unittest.skip('line 123 has a problem related to packet machines locations.. please execute it manually')
     def test002_vlans_connections(self):
         """ g8os-030
         *Test case for testing vlans connections*
