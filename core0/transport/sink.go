@@ -2,6 +2,9 @@ package transport
 
 import (
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/garyburd/redigo/redis"
 	"github.com/siddontang/ledisdb/config"
 	"github.com/siddontang/ledisdb/ledis"
@@ -9,8 +12,6 @@ import (
 	"github.com/zero-os/0-core/base/pm"
 	"github.com/zero-os/0-core/core0/assets"
 	"github.com/zero-os/0-core/core0/options"
-	"sync"
-	"time"
 )
 
 const (
@@ -39,6 +40,8 @@ func NewSink(c SinkConfig) (*Sink, error) {
 	cfg.DBName = "memory"
 	cfg.DataDir = "/var/core0"
 	cfg.Addr = fmt.Sprintf(":%d", c.Port)
+	cfg.ConnKeepaliveInterval = 300 //seconds
+
 	if orgs, ok := options.Options.Kernel.Get("organization"); ok {
 		org := orgs[len(orgs)-1]
 		auth, err := AuthMethod(org, string(assets.MustAsset("text/itsyouonline.pub")))
@@ -170,9 +173,19 @@ func (sink *Sink) Forward(result *pm.JobResult) error {
 func (sink *Sink) Flag(id string) error {
 	return sink.ch.Flag(id)
 }
+func (sink *Sink) compaction() {
+	ticker := time.NewTicker(10 * time.Minute)
+	for range ticker.C {
+		log.Info("DB compaction")
+		if err := sink.server.Ledis().CompactStore(); err != nil {
+			log.Errorf("DB compaction error: %s", err)
+		}
+	}
+}
 
 func (sink *Sink) Start() {
 	go sink.server.Run()
+	go sink.compaction()
 	go sink.process()
 }
 
