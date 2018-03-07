@@ -2,15 +2,10 @@ package transport
 
 import (
 	"fmt"
-	"github.com/garyburd/redigo/redis"
-	"github.com/siddontang/ledisdb/config"
-	"github.com/siddontang/ledisdb/ledis"
-	"github.com/siddontang/ledisdb/server"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/core0/assets"
-	"github.com/zero-os/0-core/core0/options"
-	"sync"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
+	"github.com/zero-os/0-core/base/pm"
 )
 
 const (
@@ -19,11 +14,8 @@ const (
 )
 
 type Sink struct {
-	ch     *channel
-	server *server.App
-	db     *ledis.DB
-
-	l sync.RWMutex
+	ch   *channel
+	pool *redis.Pool
 }
 
 type SinkConfig struct {
@@ -35,44 +27,10 @@ func (c *SinkConfig) Local() string {
 }
 
 func NewSink(c SinkConfig) (*Sink, error) {
-	cfg := config.NewConfigDefault()
-	cfg.DBName = "memory"
-	cfg.DataDir = "/var/core0"
-	cfg.Addr = fmt.Sprintf(":%d", c.Port)
-	if orgs, ok := options.Options.Kernel.Get("organization"); ok {
-		org := orgs[len(orgs)-1]
-		auth, err := AuthMethod(org, string(assets.MustAsset("text/itsyouonline.pub")))
-		if err != nil {
-			return nil, err
-		}
-		cfg.AuthMethod = auth
-	}
-
-	crt, key, err := generateCRT()
-	if err != nil {
-		return nil, err
-	}
-
-	cfg.TLS = config.TLS{
-		Enabled:     true,
-		Certificate: crt,
-		Key:         key,
-	}
-
-	server, err := server.NewApp(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	db, err := server.Ledis().Select(DBIndex)
-	if err != nil {
-		return nil, err
-	}
-
+	pool := newPool()
 	sink := &Sink{
-		server: server,
-		db:     db,
-		ch:     newChannel(db),
+		pool: newPool(),
+		ch:   newChannel(pool),
 	}
 
 	pm.AddHandle(sink)
@@ -80,43 +38,69 @@ func NewSink(c SinkConfig) (*Sink, error) {
 	return sink, nil
 }
 
-func (sink *Sink) RPush(key []byte, args ...[]byte) (int64, error) {
-	sink.l.RLock()
-	defer sink.l.RUnlock()
-	return sink.db.RPush(key, args...)
+//RPush pushes values to the right
+func (sink *Sink) RPush(key string, args ...[]byte) (int64, error) {
+	conn := sink.pool.Get()
+	defer conn.Close()
+	input := make([]interface{}, 0, len(args)+1)
+	input = append(input, key)
+	for _, arg := range args {
+		input = append(input, arg)
+	}
+
+	return redis.Int64(conn.Do("RPUSH", input...))
 }
 
-func (sink *Sink) LTrim(key []byte, start, stop int64) error {
-	sink.l.RLock()
-	defer sink.l.RUnlock()
-	return sink.db.LTrim(key, start, stop)
+//LTrim trims a list
+func (sink *Sink) LTrim(key string, start, stop int64) error {
+	conn := sink.pool.Get()
+	defer conn.Close()
+
+	_, err := conn.Do("LTRIM", key, start, stop)
+	return err
 }
 
-func (sink *Sink) Get(key []byte) ([]byte, error) {
-	sink.l.RLock()
-	defer sink.l.RUnlock()
-	return sink.db.Get(key)
+//Get gets value from key
+func (sink *Sink) Get(key string) ([]byte, error) {
+	conn := sink.pool.Get()
+	defer conn.Close()
+	result, err := redis.Bytes(conn.Do("GET", key))
+	//we do the next, because this is how ledis used
+	//to behave
+	if err == redis.ErrNil {
+		return nil, nil
+	}
+	return result, err
 }
 
-func (sink *Sink) Set(key []byte, value []byte) error {
-	sink.l.RLock()
-	defer sink.l.RUnlock()
-	return sink.db.Set(key, value)
+//Set sets a value to a key
+func (sink *Sink) Set(key string, value []byte) error {
+	conn := sink.pool.Get()
+	defer conn.Close()
+	_, err := conn.Do("SET", key, value)
+	return err
 }
 
-func (sink *Sink) Del(keys ...[]byte) (int64, error) {
-	sink.l.RLock()
-	defer sink.l.RUnlock()
-	return sink.db.Del(keys...)
+//Del delets keys
+func (sink *Sink) Del(keys ...string) (int64, error) {
+	conn := sink.pool.Get()
+	defer conn.Close()
+	input := make([]interface{}, 0, len(keys))
+	for _, key := range keys {
+		input = append(input, key)
+	}
+
+	return redis.Int64(conn.Do("DEL", input...))
 }
 
-func (sink *Sink) LExpire(key []byte, duration int64) (int64, error) {
-	sink.l.RLock()
-	defer sink.l.RUnlock()
-	return sink.db.LExpire(key, duration)
+//LExpire sets TTL on a list
+func (sink *Sink) LExpire(key string, duration int64) (int64, error) {
+	conn := sink.pool.Get()
+	defer conn.Close()
+	return redis.Int64(conn.Do("EXPIRE", key, duration))
 }
 
-//ResultHandler implementation
+//Result handler implementation
 func (sink *Sink) Result(cmd *pm.Command, result *pm.JobResult) {
 	if err := sink.Forward(result); err != nil {
 		log.Errorf("failed to forward result: %s", cmd.ID)
@@ -156,6 +140,7 @@ func (sink *Sink) process() {
 	}
 }
 
+//Forward forwards job result
 func (sink *Sink) Forward(result *pm.JobResult) error {
 	if result.State != pm.StateDuplicateID {
 		/*
@@ -167,19 +152,21 @@ func (sink *Sink) Forward(result *pm.JobResult) error {
 	return sink.ch.Respond(result)
 }
 
+//Flag marks a job ID as running
 func (sink *Sink) Flag(id string) error {
 	return sink.ch.Flag(id)
 }
 
+//Start sink
 func (sink *Sink) Start() {
-	go sink.server.Run()
 	go sink.process()
 }
 
+//GetResult gets a result of a job if it exists
 func (sink *Sink) GetResult(job string, timeout int) (*pm.JobResult, error) {
 	if sink.ch.Flagged(job) {
 		return sink.ch.GetResponse(job, timeout)
-	} else {
-		return nil, fmt.Errorf("unknown job id '%s' (may be it has expired)", job)
 	}
+
+	return nil, fmt.Errorf("unknown job id '%s' (may be it has expired)", job)
 }

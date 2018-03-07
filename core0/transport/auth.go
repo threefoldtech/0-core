@@ -3,11 +3,10 @@ package transport
 import (
 	"fmt"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/siddontang/ledisdb/config"
+	jwt "github.com/dgrijalva/jwt-go"
 )
 
-func AuthMethod(organization string, key string) (config.AuthMethod, error) {
+func AuthMethod(organization string, key string) (func(string) bool, error) {
 	scope := fmt.Sprintf("user:memberof:%s", organization)
 
 	pub, err := jwt.ParseECPublicKeyFromPEM([]byte(key))
@@ -15,7 +14,7 @@ func AuthMethod(organization string, key string) (config.AuthMethod, error) {
 		return nil, err
 	}
 
-	return func(_ *config.Config, token string) bool {
+	return func(token string) bool {
 		log.Debugf("checking token: %s", token)
 		t, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
 			m, ok := t.Method.(*jwt.SigningMethodECDSA)

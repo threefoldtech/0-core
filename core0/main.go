@@ -17,14 +17,13 @@ import (
 	"github.com/zero-os/0-core/core0/subsys/containers"
 	"github.com/zero-os/0-core/core0/subsys/kvm"
 
+	"os/signal"
+	"syscall"
+
 	_ "github.com/zero-os/0-core/base/builtin"
 	_ "github.com/zero-os/0-core/core0/builtin"
 	_ "github.com/zero-os/0-core/core0/builtin/btrfs"
 	"github.com/zero-os/0-core/core0/transport"
-	"os/signal"
-	"path"
-	"strings"
-	"syscall"
 )
 
 var (
@@ -35,41 +34,21 @@ func init() {
 	formatter := logging.MustStringFormatter("%{time}: %{color}%{module} %{level:.1s} > %{message} %{color:reset}")
 	logging.SetFormatter(formatter)
 
-	normal := logging.NewLogBackend(os.Stderr, "", 0)
-
-	backends := []logging.Backend{normal}
-
-	if !options.Options.Kernel.Is("quiet") {
-		opts, _ := options.Options.Kernel.Get("console")
-		for _, opt := range opts {
-			console := strings.SplitN(opt, ",", 2)[0]
-
-			out, err := os.OpenFile(path.Join("/dev", console), syscall.O_WRONLY|syscall.O_NOCTTY, 0644)
-			if err != nil {
-				fmt.Println("failed to redirect logs to console")
-				continue
-			}
-
-			backends = append(backends,
-				logging.NewLogBackend(out, "", 0),
-			)
-		}
-	}
-
-	logging.SetBackend(backends...)
-	level := logging.INFO
-	if options.Options.Kernel.Is("debug") {
-		level = logging.DEBUG
-	}
-
-	logging.SetLevel(level, "")
-
 	//we don't use signal.Ignore because the Ignore is actually inherited by children
 	//even after execve which makes all child process not exit when u send them a sigterm or sighup
-	signal.Notify(make(chan os.Signal), syscall.SIGABRT, syscall.SIGHUP, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGQUIT,
-		syscall.SIGINT, syscall.SIGSTOP)
+	var signals []os.Signal
+	for i := 1; i <= 31; i++ {
+		if syscall.Signal(i) == syscall.SIGUSR1 ||
+			syscall.Signal(i) == syscall.SIGCHLD {
+			continue
+		}
+		signals = append(signals, syscall.Signal(i))
+	}
+
+	signal.Notify(make(chan os.Signal), signals...)
 }
 
+//Splash setup splash screen
 func Splash() {
 
 	if err := screen.New(2); err != nil {
@@ -99,7 +78,7 @@ func Splash() {
 
 type console struct{}
 
-func (_ *console) Result(cmd *pm.Command, result *pm.JobResult) {
+func (*console) Result(cmd *pm.Command, result *pm.JobResult) {
 	log.Debugf("Job result for command '%s' is '%s'", cmd, result.State)
 }
 
@@ -111,6 +90,7 @@ func main() {
 	}
 
 	if !options.Agent() {
+		//Only allow splash screen if debug is not set, or if not running in agent mode
 		Splash()
 	}
 
@@ -135,6 +115,13 @@ func main() {
 
 		HandleRotation()
 	}
+
+	level := logging.INFO
+	if options.Kernel.Is("debug") {
+		level = logging.DEBUG
+	}
+
+	logging.SetLevel(level, "")
 
 	var config = settings.Settings
 
@@ -177,7 +164,7 @@ func main() {
 	bs.Second()
 
 	if err := kvm.KVMSubsystem(contMgr, &row.Cells[1]); err != nil {
-		log.Errorf("failed to initialize kvm subsystem", err)
+		log.Errorf("failed to initialize kvm subsystem: %s", err)
 	}
 
 	log.Infof("Starting local transport")
@@ -199,6 +186,7 @@ func main() {
 		pm.AddHandle(aggregator)
 	}
 
-	//wait
-	select {}
+	if err := transport.Listen(); err != nil {
+		log.Fatal(err)
+	}
 }

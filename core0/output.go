@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/zero-os/0-core/core0/options"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/op/go-logging"
+	"github.com/zero-os/0-core/core0/options"
 )
 
 const (
@@ -17,29 +19,26 @@ var (
 	output *os.File
 )
 
+//Redirect stdout logs to file
 func Redirect(p string) error {
-	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND
-	if options.Options.Kernel.Is("debug") {
-		flags |= os.O_SYNC
-	}
-	f, err := os.OpenFile(p, flags, 0600)
-	if err != nil {
-		return err
+	var backends []logging.Backend
+	if !options.Options.Kernel.Is("quiet") {
+		normal := logging.NewLogBackend(os.Stderr, "", 0)
+		backends = append(backends, normal)
 	}
 
-	output = f
-
-	if err := syscall.Dup2(int(f.Fd()), int(os.Stdout.Fd())); err != nil {
-		return err
+	if log, err := os.Create(p); err == nil {
+		output = log
+		backends = append(backends,
+			logging.NewLogBackend(log, "", 0),
+		)
 	}
 
-	if err := syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd())); err != nil {
-		return err
-	}
-
+	logging.SetBackend(backends...)
 	return nil
 }
 
+//Rotate logs
 func Rotate(p string) error {
 	if output != nil {
 		output.Close()
@@ -52,6 +51,7 @@ func Rotate(p string) error {
 	return Redirect(p)
 }
 
+//HandleRotation force log rotation on
 func HandleRotation() {
 	ch := make(chan os.Signal)
 	signal.Notify(ch, syscall.SIGUSR1)

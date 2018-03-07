@@ -1,0 +1,11 @@
+[startup.redis]
+name = "core.system"
+after = ["init"]
+protected = true
+
+[startup.redis.args]
+name = "redis-server"
+args = [
+    "--port", "0",
+    "--unixsocket", "/tmp/redis.sock"
+]
