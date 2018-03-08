@@ -8,18 +8,21 @@ base = github.com/zero-os/0-core/base
 ldflags0 = '-w -s -X $(base).Branch=$(branch) -X $(base).Revision=$(revision) -X $(base).Dirty=$(dirty)'
 ldflagsX = '-w -s -X $(base).Branch=$(branch) -X $(base).Revision=$(revision) -X $(base).Dirty=$(dirty) -extldflags "-static"'
 
-all: core0 coreX corectl
+all: core0 coreX corectl redis-proxy
 
 core0: $(OUTPUT)
-	cd core0 && go build -ldflags $(ldflags0) -o ../$(OUTPUT)/$@
+	cd apps/core0 && go build -ldflags $(ldflags0) -o ../../$(OUTPUT)/$@
 
 coreX: $(OUTPUT)
-	cd coreX && GOOS=linux go build -ldflags $(ldflagsX) -o ../$(OUTPUT)/$@
+	cd apps/coreX && GOOS=linux go build -ldflags $(ldflagsX) -o ../../$(OUTPUT)/$@
 
 corectl: $(OUTPUT)
-	cd corectl && go build -ldflags $(ldflags0) -o ../$(OUTPUT)/$@
+	cd apps/corectl && go build -ldflags $(ldflags0) -o ../../$(OUTPUT)/$@
+
+redis-proxy: $(OUTPUT)
+	cd apps/redis-proxy && go build -ldflags $(ldflags0) -o ../../$(OUTPUT)/$@
 
 $(OUTPUT):
 	mkdir -p $(OUTPUT)
 
-.PHONY: $(OUTPUT) core0 coreX corectl
+.PHONY: $(OUTPUT) core0 coreX corectl redis-proxy
