@@ -139,12 +139,23 @@ func (r *redisProxy) proxy(conn redcon.Conn, cmd redcon.Command) {
 }
 
 func (r *redisProxy) handler(conn redcon.Conn, cmd redcon.Command) {
-	switch strings.ToLower(string(cmd.Args[0])) {
-	case "auth":
+	command := strings.ToLower(string(cmd.Args[0]))
+	if command == "auth" {
 		r.auth(conn, cmd)
-	default:
-		r.proxy(conn, cmd)
+		return
 	}
+
+	// translation for compatability with ledis
+	switch command {
+	// the next 2 cases are for compatibility with
+	// older client that worked against ledis
+	case "lkeyexists":
+		cmd.Args[0] = []byte("exists")
+	case "lttl":
+		cmd.Args[0] = []byte("ttl")
+	}
+
+	r.proxy(conn, cmd)
 }
 
 func (r *redisProxy) accept(conn redcon.Conn) bool {
