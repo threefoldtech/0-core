@@ -1,34 +1,36 @@
 package stream
 
 import (
-	"bytes"
+	"bufio"
 	"io"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+
+	logging "github.com/op/go-logging"
 )
 
 var (
+	log             = logging.MustGetLogger("stream")
 	pmMsgPattern, _ = regexp.Compile("^(\\d+)(:{2,3})(.*)$")
 )
-
-type Consumer interface {
-	Write(p []byte) (n int, err error)
-}
 
 type consumerImpl struct {
 	level   uint16
 	handler MessageHandler
 
-	last  []byte
 	multi *Message
+
+	buffer *bufio.Reader
 }
 
-func NewConsumer(wg *sync.WaitGroup, source io.ReadCloser, level uint16, handler MessageHandler) Consumer {
+//Consume consumes a stream to the end, and calls the handler with the parsed stream messages
+func Consume(wg *sync.WaitGroup, source io.ReadCloser, level uint16, handler MessageHandler) {
 	c := &consumerImpl{
 		level:   level,
 		handler: handler,
+		buffer:  bufio.NewReaderSize(source, 32*1024),
 	}
 
 	go func() {
@@ -36,55 +38,42 @@ func NewConsumer(wg *sync.WaitGroup, source io.ReadCloser, level uint16, handler
 			defer wg.Done()
 		}
 
-		io.Copy(c, source)
-		source.Close()
-		c.flush()
-	}()
-
-	return c
-}
-
-func (c *consumerImpl) Write(p []byte) (n int, err error) {
-	n = len(p)
-	if len(c.last) > 0 {
-		p = append(c.last, p...)
-	}
-
-	reader := bytes.NewBuffer(p)
-	for {
-		line, err := reader.ReadString('\n')
-
-		if err == io.EOF {
-			//reached end of current chunk. we need to wait until we
-			//get more data.
-			c.last = []byte(line)
-			return n, nil
-		} else if err != nil {
-			return 0, err
+		if err := c.consume(); err != nil {
+			log.Errorf("failed to read stream: %s", err)
 		}
-		c.processLine(line)
-	}
+
+		source.Close()
+	}()
 }
 
-func (c *consumerImpl) flush() {
-	if len(c.last) > 0 {
-		c.processLine(string(c.last))
+func (c *consumerImpl) consume() error {
+	for {
+		line, err := c.buffer.ReadString('\n')
+		if err == io.EOF {
+			if len(line) != 0 {
+				c.processLine(line)
+			}
+			return nil
+		} else if err != nil {
+			return err
+		}
+
+		c.processLine(line)
 	}
 }
 
 func (c *consumerImpl) processLine(line string) {
 	line = strings.TrimRight(line, "\n")
+
 	if c.multi != nil {
 		if line == ":::" {
 			//last, flush mult
 			c.handler(c.multi)
 			c.multi = nil
 			return
-			//return n, nil
-		} else {
-			c.multi.Message += "\n" + line
 		}
 
+		c.multi.Message += "\n" + line
 		return
 	}
 

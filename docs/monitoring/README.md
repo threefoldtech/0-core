@@ -17,7 +17,7 @@ Here's an example of a statistics log message:
 10::{monitoring-metric}:23.12|A
 ```
 
-This example level 10 (statistics) log message reports that the metric `{monitoring-metric}` is `23.12` and that the reported values should be averaged over the defined aggregator period (usually 5 minutes), as indicated by the `A`; see [Statistics Log Message Format](stats-msg-format.md) for more details about this statistics log message format.
+This example level 10 (statistics) log message reports that the metric `{monitoring-metric}` is `23.12` and that the reported values should be averaged over the defined aggregator period (usually 5 minutes), as indicated by the `A`; see [Statistics Log Message Format](stats.md) for more details about this statistics log message format.
 
 
 ## Monitoring metrics
