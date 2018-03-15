@@ -294,7 +294,8 @@ func parseMountCmd(mount string) map[string][]diskMount {
 
 	lines := strings.Split(mount, "\n")
 	for _, line := range lines {
-		if len(line) == 1 {
+		line = strings.TrimSpace(line)
+		if line == "" {
 			continue
 		}
 
