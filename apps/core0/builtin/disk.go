@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strconv"
 
+	"strings"
+
 	"github.com/zero-os/0-core/base/pm"
 )
 
@@ -26,6 +28,7 @@ func init() {
 	d := (*diskMgr)(nil)
 	pm.RegisterBuiltIn("disk.getinfo", d.info)
 	pm.RegisterBuiltIn("disk.list", d.list)
+	pm.RegisterBuiltIn("disk.mounts", d.mounts)
 }
 
 type diskInfo struct {
@@ -99,6 +102,12 @@ type lsblkResult struct {
 	Rev        interface{}   `json:"rev"`
 	Vendor     interface{}   `json:"vendor"`
 	Children   []lsblkResult `json:"children,omitempty"`
+}
+
+type diskMount struct {
+	Mountpoint string            `json:"mountpoint"`
+	Filesystem string            `json:"filesystem"`
+	Options    map[string]string `json:"options"`
 }
 
 func (d *diskMgr) readUInt64(p string) (uint64, error) {
@@ -269,4 +278,54 @@ func (d *diskMgr) list(cmd *pm.Command) (interface{}, error) {
 	}
 	disks.BlockDevices = ret
 	return disks, nil
+}
+
+func (d *diskMgr) mounts(cmd *pm.Command) (interface{}, error) {
+	result, err := pm.System("mount")
+	if err != nil {
+		return nil, err
+	}
+	return parseMountCmd(result.Streams.Stdout()), nil
+
+}
+
+func parseMountCmd(mount string) map[string][]diskMount {
+	mountpoints := make(map[string][]diskMount)
+
+	lines := strings.Split(mount, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		parts := strings.Split(line, " ")
+		device := parts[0]
+		mountpoint := parts[2]
+		fs := parts[4]
+
+		optionsMap := make(map[string]string)
+		options := strings.TrimPrefix(parts[5], "(")
+		options = strings.TrimSuffix(options, ")")
+		optionsList := strings.Split(options, ",")
+
+		for _, option := range optionsList {
+			optionList := strings.Split(option, "=")
+			if len(optionList) == 1 {
+				optionsMap[optionList[0]] = "1"
+			} else {
+				optionsMap[optionList[0]] = optionList[1]
+			}
+		}
+
+		mount := diskMount{
+			mountpoint,
+			fs,
+			optionsMap,
+		}
+		mountpoints[device] = append(mountpoints[device], mount)
+
+	}
+
+	return mountpoints
 }
