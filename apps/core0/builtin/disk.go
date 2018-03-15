@@ -22,6 +22,8 @@ var (
 	partTableRegex = regexp.MustCompile(`Partition Table: (\w+)`)
 )
 
+const mountsFile = "/proc/mounts"
+
 type diskMgr struct{}
 
 func init() {
@@ -281,11 +283,11 @@ func (d *diskMgr) list(cmd *pm.Command) (interface{}, error) {
 }
 
 func (d *diskMgr) mounts(cmd *pm.Command) (interface{}, error) {
-	result, err := pm.System("mount")
+	file, err := ioutil.ReadFile(mountsFile)
 	if err != nil {
 		return nil, err
 	}
-	return parseMountCmd(result.Streams.Stdout()), nil
+	return parseMountCmd(string(file)), nil
 
 }
 
@@ -301,13 +303,11 @@ func parseMountCmd(mount string) map[string][]diskMount {
 
 		parts := strings.Split(line, " ")
 		device := parts[0]
-		mountpoint := parts[2]
-		fs := parts[4]
+		mountpoint := parts[1]
+		fs := parts[2]
 
 		optionsMap := make(map[string]string)
-		options := strings.TrimPrefix(parts[5], "(")
-		options = strings.TrimSuffix(options, ")")
-		optionsList := strings.Split(options, ",")
+		optionsList := strings.Split(parts[3], ",")
 
 		for _, option := range optionsList {
 			optionList := strings.Split(option, "=")
