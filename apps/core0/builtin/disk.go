@@ -307,9 +307,7 @@ func parseMountCmd(mount string) map[string][]diskMount {
 		fs := parts[2]
 
 		optionsMap := make(map[string]string)
-		options := strings.TrimPrefix(parts[3], "(")
-		options = strings.TrimSuffix(options, ")")
-		optionsList := strings.Split(options, ",")
+		optionsList := strings.Split(parts[3], ",")
 
 		for _, option := range optionsList {
 			optionList := strings.Split(option, "=")
