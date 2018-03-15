@@ -105,9 +105,9 @@ type lsblkResult struct {
 }
 
 type diskMount struct {
-	Mountpoint string `json:"mountpoint"`
-	Filesystem string `json:"filesystem"`
-	Options    string `json:"options"`
+	Mountpoint string            `json:"mountpoint"`
+	Filesystem string            `json:"filesystem"`
+	Options    map[string]string `json:"options"`
 }
 
 func (d *diskMgr) readUInt64(p string) (uint64, error) {
@@ -281,30 +281,50 @@ func (d *diskMgr) list(cmd *pm.Command) (interface{}, error) {
 }
 
 func (d *diskMgr) mounts(cmd *pm.Command) (interface{}, error) {
-	mountpoints := make(map[string][]diskMount)
 	result, err := pm.System("mount")
 	if err != nil {
 		return nil, err
 	}
+	return parseMountCmd(result.Streams.Stdout()), nil
 
-	lines := strings.Split(result.Streams.Stdout(), "\n")
-	for _, line := range lines[:len(lines)-1] {
+}
+
+func parseMountCmd(mount string) map[string][]diskMount {
+	mountpoints := make(map[string][]diskMount)
+
+	lines := strings.Split(mount, "\n")
+	for _, line := range lines {
+		if len(line) == 1 {
+			continue
+		}
+
 		parts := strings.Split(line, " ")
 		device := parts[0]
 		mountpoint := parts[2]
 		fs := parts[4]
-		options := parts[5]
+
+		optionsMap := make(map[string]string)
+		options := strings.TrimPrefix(parts[5], "(")
+		options = strings.TrimSuffix(options, ")")
+		optionsList := strings.Split(options, ",")
+
+		for _, option := range optionsList {
+			optionList := strings.Split(option, "=")
+			if len(optionList) == 1 {
+				optionsMap[optionList[0]] = "1"
+			} else {
+				optionsMap[optionList[0]] = optionList[1]
+			}
+		}
+
 		mount := diskMount{
 			mountpoint,
 			fs,
-			options,
+			optionsMap,
 		}
-		if _, ok := mountpoints[device]; ok {
-			mountpoints[device] = append(mountpoints[device], mount)
-		} else {
-			mountpoints[device] = []diskMount{mount}
-		}
+		mountpoints[device] = append(mountpoints[device], mount)
+
 	}
 
-	return mountpoints, nil
+	return mountpoints
 }
