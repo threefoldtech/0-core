@@ -16,11 +16,11 @@ import (
 	"github.com/libvirt/libvirt-go"
 	"github.com/op/go-logging"
 	"github.com/pborman/uuid"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/settings"
 	"github.com/zero-os/0-core/apps/core0/helper"
 	"github.com/zero-os/0-core/apps/core0/screen"
 	"github.com/zero-os/0-core/apps/core0/subsys/containers"
+	"github.com/zero-os/0-core/base/pm"
+	"github.com/zero-os/0-core/base/settings"
 	"gopkg.in/yaml.v2"
 )
 
@@ -87,6 +87,8 @@ const (
 	kvmListCommand            = "kvm.list"
 	kvmMonitorCommand         = "kvm.monitor"
 	kvmEventsCommand          = "kvm.events"
+	kvmCreateImage            = "kvm.create_image"
+	kvmConvertImage           = "kvm.convert_image"
 
 	DefaultBridgeName = "kvm0"
 )
@@ -132,6 +134,8 @@ func KVMSubsystem(conmgr containers.ContainerManager, cell *screen.RowCell) erro
 	pm.RegisterBuiltIn(kvmMigrateCommand, mgr.migrate)
 	pm.RegisterBuiltIn(kvmListCommand, mgr.list)
 	pm.RegisterBuiltIn(kvmPrepareMigrationTarget, mgr.prepareMigrationTarget)
+	pm.RegisterBuiltIn(kvmCreateImage, mgr.createImage)
+	pm.RegisterBuiltIn(kvmConvertImage, mgr.convertImage)
 
 	//those next 2 commands should never be called by the client, unfortunately we don't have
 	//support for internal commands yet.
@@ -1685,4 +1689,42 @@ func (m *kvmManager) infops(cmd *pm.Command) (interface{}, error) {
 	}
 
 	return data, nil
+}
+
+type ConvertImageParams struct {
+	InputFile    string `json:"input_file"`
+	OutPutFile   string `json:"output_file"`
+	OutPutFormat string `json:"output_format"`
+}
+
+type CreateImageParams struct {
+	FileName string `json:"file_name"`
+	Format   string `json:"format"`
+	Size     string `json:"size"`
+}
+
+func (m *kvmManager) createImage(cmd *pm.Command) (interface{}, error) {
+	var params CreateImageParams
+	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
+		return nil, err
+	}
+
+	if _, err := pm.System("qemu-img", "create", "-f", params.Format, params.FileName, params.Size); err != nil {
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+func (m *kvmManager) convertImage(cmd *pm.Command) (interface{}, error) {
+	var params ConvertImageParams
+	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
+		return nil, err
+	}
+
+	if _, err := pm.System("qemu-img", "convert", "-O", params.OutPutFormat, params.InputFile, params.OutPutFile); err != nil {
+		return nil, err
+	}
+
+	return nil, nil
 }
