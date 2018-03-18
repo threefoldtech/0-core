@@ -87,8 +87,8 @@ const (
 	kvmListCommand            = "kvm.list"
 	kvmMonitorCommand         = "kvm.monitor"
 	kvmEventsCommand          = "kvm.events"
-	kvmCreateImage            = "kvm.create_image"
-	kvmConvertImage           = "kvm.convert_image"
+	kvmCreateImage            = "kvm.create-image"
+	kvmConvertImage           = "kvm.convert-image"
 
 	DefaultBridgeName = "kvm0"
 )
@@ -1691,20 +1691,12 @@ func (m *kvmManager) infops(cmd *pm.Command) (interface{}, error) {
 	return data, nil
 }
 
-type ConvertImageParams struct {
-	InputFile    string `json:"input_file"`
-	OutPutFile   string `json:"output_file"`
-	OutPutFormat string `json:"output_format"`
-}
-
-type CreateImageParams struct {
-	FileName string `json:"file_name"`
-	Format   string `json:"format"`
-	Size     string `json:"size"`
-}
-
 func (m *kvmManager) createImage(cmd *pm.Command) (interface{}, error) {
-	var params CreateImageParams
+	var params struct {
+		FileName string `json:"file_name"`
+		Format   string `json:"format"`
+		Size     string `json:"size"`
+	}
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
@@ -1717,7 +1709,11 @@ func (m *kvmManager) createImage(cmd *pm.Command) (interface{}, error) {
 }
 
 func (m *kvmManager) convertImage(cmd *pm.Command) (interface{}, error) {
-	var params ConvertImageParams
+	var params struct {
+		InputFile    string `json:"input_file"`
+		OutPutFile   string `json:"output_file"`
+		OutPutFormat string `json:"output_format"`
+	}
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
