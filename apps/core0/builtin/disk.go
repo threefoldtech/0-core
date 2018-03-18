@@ -26,6 +26,7 @@ func init() {
 	d := (*diskMgr)(nil)
 	pm.RegisterBuiltIn("disk.getinfo", d.info)
 	pm.RegisterBuiltIn("disk.list", d.list)
+	pm.RegisterBuiltIn("disk.protect", d.protect)
 }
 
 type diskInfo struct {
@@ -269,4 +270,46 @@ func (d *diskMgr) list(cmd *pm.Command) (interface{}, error) {
 	}
 	disks.BlockDevices = ret
 	return disks, nil
+}
+
+func (d *diskMgr) protect(cmd *pm.Command) (interface{}, error) {
+	var args struct {
+		Partuuid string `json:"partuuid"`
+	}
+
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+
+	if args.Partuuid == "" {
+		return nil, fmt.Errorf("partuuid is required")
+	}
+
+	result, err := d.list(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	list, ok := result.(lsblkListResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected return from list!")
+	}
+
+	for _, dev := range list.BlockDevices {
+		for _, part := range dev.Children {
+			if part.Partuuid != args.Partuuid {
+				continue
+			}
+			//protect the partition and protect the device
+			if _, err := pm.System("blockdev", "--setro", fmt.Sprintf("/dev/%s", part.Name)); err != nil {
+				return nil, err
+			}
+
+			if _, err := pm.System("blockdev", "--setro", fmt.Sprintf("/dev/%s", dev.Name)); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return nil, nil
 }
