@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strconv"
 
+	"strings"
+
 	"github.com/zero-os/0-core/base/pm"
 )
 
@@ -20,6 +22,8 @@ var (
 	partTableRegex = regexp.MustCompile(`Partition Table: (\w+)`)
 )
 
+const mountsFile = "/proc/mounts"
+
 type diskMgr struct{}
 
 func init() {
@@ -27,6 +31,7 @@ func init() {
 	pm.RegisterBuiltIn("disk.getinfo", d.info)
 	pm.RegisterBuiltIn("disk.list", d.list)
 	pm.RegisterBuiltIn("disk.protect", d.protect)
+	pm.RegisterBuiltIn("disk.mounts", d.mounts)
 }
 
 type diskInfo struct {
@@ -100,6 +105,12 @@ type lsblkResult struct {
 	Rev        interface{}   `json:"rev"`
 	Vendor     interface{}   `json:"vendor"`
 	Children   []lsblkResult `json:"children,omitempty"`
+}
+
+type diskMount struct {
+	Mountpoint string            `json:"mountpoint"`
+	Filesystem string            `json:"filesystem"`
+	Options    map[string]string `json:"options"`
 }
 
 func (d *diskMgr) readUInt64(p string) (uint64, error) {
@@ -262,14 +273,107 @@ func (d *diskMgr) list(cmd *pm.Command) (interface{}, error) {
 	if err := json.Unmarshal([]byte(result.Streams.Stdout()), &disks); err != nil {
 		return nil, err
 	}
-	ret := []lsblkResult{}
+
+	parentDiskName := ""
+	ret := []*DiskInfoResult{}
 	for _, disk := range disks.BlockDevices {
-		if disk.Type == "disk" {
-			ret = append(ret, disk)
+		diskInfo := DiskInfoResult{
+			lsblkResult: disk,
 		}
+
+		diskInfo.BlockSize, err = d.blockSize(disk.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		if disk.Type == "disk" {
+			parentDiskName = disk.Name
+
+			size, err := d.readUInt64(fmt.Sprintf("/sys/block/%s/size", disk.Name))
+			if err != nil {
+				return nil, err
+			}
+			diskInfo.Size = size * diskInfo.BlockSize
+			diskInfo.End = (size * diskInfo.BlockSize) - 1
+
+			//get free blocks.
+			table, blocks, err := d.getTableInfo(disk.Name)
+			if err != nil {
+				return nil, err
+			}
+			diskInfo.Table = table
+			diskInfo.Free = blocks
+
+		} else if disk.Type == "part" {
+
+			start, err := d.readUInt64(fmt.Sprintf("/sys/block/%s/%s/start", parentDiskName, disk.Name))
+			if err != nil {
+				return nil, err
+			}
+
+			size, err := d.readUInt64(fmt.Sprintf("/sys/block/%s/%s/size", parentDiskName, disk.Name))
+			if err != nil {
+				return nil, err
+			}
+
+			diskInfo.Start = start * diskInfo.BlockSize
+			diskInfo.Size = size * diskInfo.BlockSize
+			diskInfo.End = diskInfo.Start + diskInfo.Size - 1
+
+			diskInfo.Free = make([]DiskFreeBlock, 0) //this is just to make the return consistent
+		}
+		ret = append(ret, &diskInfo)
 	}
-	disks.BlockDevices = ret
-	return disks, nil
+
+	return ret, nil
+}
+
+func (d *diskMgr) mounts(cmd *pm.Command) (interface{}, error) {
+	file, err := ioutil.ReadFile(mountsFile)
+	if err != nil {
+		return nil, err
+	}
+	return parseMountCmd(string(file)), nil
+
+}
+
+func parseMountCmd(mount string) map[string][]diskMount {
+	mountpoints := make(map[string][]diskMount)
+
+	lines := strings.Split(mount, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		parts := strings.Split(line, " ")
+		device := parts[0]
+		mountpoint := parts[1]
+		fs := parts[2]
+
+		optionsMap := make(map[string]string)
+		optionsList := strings.Split(parts[3], ",")
+
+		for _, option := range optionsList {
+			optionList := strings.Split(option, "=")
+			if len(optionList) == 1 {
+				optionsMap[optionList[0]] = "1"
+			} else {
+				optionsMap[optionList[0]] = optionList[1]
+			}
+		}
+
+		mount := diskMount{
+			mountpoint,
+			fs,
+			optionsMap,
+		}
+		mountpoints[device] = append(mountpoints[device], mount)
+
+	}
+
+	return mountpoints
 }
 
 func (d *diskMgr) protect(cmd *pm.Command) (interface{}, error) {
