@@ -170,6 +170,6 @@ func Exists(name string) bool {
 //SafeNormalize avoids relative path hacks by making sure the path does not have any ../ in it before normalization
 func SafeNormalize(p string) string {
 	return path.Clean(
-		strings.Replace(p, "..", "", -1),
+		path.Join("/", p),
 	)
 }
