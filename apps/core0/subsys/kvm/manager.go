@@ -1601,7 +1601,7 @@ func (m *kvmManager) get(cmd *pm.Command) (interface{}, error) {
 		return nil, err
 	}
 
-	if (params.Name != "" && params.UUID != "") ||  (params.Name == "" && params.UUID == ""){
+	if (len(params.Name) == 0) == (len(params.UUID) ==0){
 		return nil, fmt.Errorf("Must supply either Name or UUID")
 	}
 
