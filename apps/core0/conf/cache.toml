@@ -5,4 +5,4 @@ running_delay = -1
 
 [startup.cache.args]
 name = "/bin/sh"
-args = ["-c", "/usr/bin/ensurecache.sh"]
+args = ["/usr/bin/ensurecache.sh"]
