@@ -11,20 +11,15 @@ import (
 	"strings"
 	"sync"
 
-	"io/ioutil"
 	"path"
-	"syscall"
 
 	"github.com/libvirt/libvirt-go"
 	"github.com/op/go-logging"
 	"github.com/pborman/uuid"
-	"github.com/zero-os/0-core/apps/core0/helper"
 	"github.com/zero-os/0-core/apps/core0/screen"
 	"github.com/zero-os/0-core/apps/core0/subsys/containers"
 	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/settings"
 	"github.com/zero-os/0-core/base/utils"
-	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -35,8 +30,8 @@ const (
 	metadataUri = "https://github.com/zero-os/0-core"
 
 	//for flist vms
-	VmNamespaceFmt = "vm/%s"
-	VmBaseRoot     = "/mnt"
+	VmNamespaceFmt = "vms/%s"
+	VmBaseRoot     = "/mnt/vms"
 )
 
 var (
@@ -188,13 +183,14 @@ type Mount struct {
 
 type CreateParams struct {
 	NicParams
-	Name   string  `json:"name"`
-	CPU    int     `json:"cpu"`
-	Memory int     `json:"memory"`
-	FList  string  `json:"flist"`
-	Mount  []Mount `json:"mount"`
-	Media  []Media `json:"media"`
-	Tags   pm.Tags `json:"tags"`
+	Name   string            `json:"name"`
+	CPU    int               `json:"cpu"`
+	Memory int               `json:"memory"`
+	FList  string            `json:"flist"`
+	Mount  []Mount           `json:"mount"`
+	Media  []Media           `json:"media"`
+	Config map[string]string `json:"config"` //overrides vm config (from flist)
+	Tags   pm.Tags           `json:"tags"`
 }
 
 type FListBootConfig struct {
@@ -846,66 +842,6 @@ func (m *kvmManager) updateView() {
 	screen.Refresh()
 }
 
-func (m *kvmManager) mountFList(name, src string) (config FListBootConfig, err error) {
-	namespace := fmt.Sprintf(VmNamespaceFmt, name)
-	storage := settings.Settings.Globals.Get("storage", "ardb://hub.gig.tech:16379")
-
-	target := path.Join(VmBaseRoot, name)
-	onExit := &pm.ExitHook{
-		Action: func(e bool) {
-			//destroy this machine, if fs exited
-			conn, err := m.libvirt.getConnection()
-			if err != nil {
-				log.Errorf("failed to get libvirt connection: %s", err)
-				return
-			}
-			domain, err := conn.LookupDomainByName(name)
-			if err != nil {
-				return
-			}
-			log.Warningf("VM (%s) filesystem exited while running, destorying the machine", name)
-			uuid, _ := domain.GetUUIDString()
-			m.destroyDomain(uuid, domain)
-		},
-	}
-
-	if err = helper.MountFList(namespace, storage, src, target, onExit); err != nil {
-		return
-	}
-
-	defer func() {
-		if err != nil {
-			m.unmountFList(name)
-		}
-	}()
-
-	//load entry config
-	cfg, err := ioutil.ReadFile(path.Join(target, "boot", "boot.yaml"))
-	if err != nil {
-		return config, fmt.Errorf("failed to open boot/boot.yaml: %s", err)
-	}
-
-	err = yaml.Unmarshal(cfg, &config)
-	config.Root = target
-	return
-}
-
-func (m *kvmManager) unmountFList(name string) error {
-	target := path.Join(VmBaseRoot, name)
-	err := syscall.Unmount(target, syscall.MNT_FORCE)
-	if err == nil {
-		return nil
-	}
-
-	if errno, ok := err.(syscall.Errno); ok {
-		if errno == syscall.EINVAL {
-			return nil
-		}
-	}
-
-	return err
-}
-
 func (m *kvmManager) create(cmd *pm.Command) (interface{}, error) {
 	defer m.updateView()
 	var params CreateParams
@@ -926,7 +862,7 @@ func (m *kvmManager) create(cmd *pm.Command) (interface{}, error) {
 	}
 
 	if len(params.FList) != 0 {
-		config, err := m.mountFList(params.Name, params.FList)
+		config, err := m.flistMount(domain.UUID, params.FList, params.Config)
 		if err != nil {
 			return nil, err
 		}
@@ -953,6 +889,8 @@ func (m *kvmManager) create(cmd *pm.Command) (interface{}, error) {
 
 		domain.Devices.Filesystems = append(domain.Devices.Filesystems, fs)
 	}
+
+	//TODO: after this point, if an error occured, we need to rollback filesystem mount
 
 	if err := m.setNetworking(&params.NicParams, seq, domain); err != nil {
 		return nil, err
@@ -1044,7 +982,7 @@ func (m *kvmManager) destroyDomain(uuid string, domain *libvirt.Domain) error {
 	}
 
 	m.unPortForward(uuid)
-	return nil
+	return m.flistUnmount(uuid)
 }
 
 func (m *kvmManager) destroy(cmd *pm.Command) (interface{}, error) {
