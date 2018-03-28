@@ -1,6 +1,6 @@
 set -e
 
-LABEL="zos-cache"
+LABEL="sp-zos-cache"
 CACHE="/var/cache"
 STORAGEPOOL="/mnt/storagepool"
 
