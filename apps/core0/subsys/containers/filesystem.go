@@ -13,18 +13,18 @@ import (
 	"syscall"
 
 	"github.com/shirou/gopsutil/disk"
+	"github.com/zero-os/0-core/apps/core0/helper"
 	"github.com/zero-os/0-core/base/pm"
 	"github.com/zero-os/0-core/base/settings"
-	"github.com/zero-os/0-core/apps/core0/helper"
 )
 
 const (
 	BackendBaseDir       = "/var/cache/containers"
-	ContainerBaseRootDir = "/mnt"
+	ContainerBaseRootDir = "/mnt/containers"
 )
 
 func (c *container) name() string {
-	return fmt.Sprintf("container-%d", c.id)
+	return fmt.Sprintf("%d", c.id)
 }
 
 func (c *container) mountFList(src string, target string, hooks ...pm.RunnerHook) error {
@@ -89,6 +89,16 @@ func (c *container) getFSType(dir string) string {
 	return ""
 }
 
+func (c *container) touch(p string) error {
+	f, err := os.Create(p)
+
+	if err != nil {
+		return err
+	}
+
+	return f.Close()
+}
+
 func (c *container) sandbox() error {
 	//mount root flist.
 	//prepare root folder.
@@ -120,9 +130,7 @@ func (c *container) sandbox() error {
 
 	for src, dst := range c.Args.Mount {
 		target := path.Join(root, dst)
-		if err := os.MkdirAll(target, 0755); err != nil {
-			return fmt.Errorf("mkdirAll(%s)", err)
-		}
+
 		//src can either be a location on HD, or another flist
 		u, err := url.Parse(src)
 		if err != nil {
@@ -130,10 +138,25 @@ func (c *container) sandbox() error {
 		}
 
 		if u.Scheme == "" {
+			info, err := os.Stat(src)
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				os.MkdirAll(target, 0755)
+			} else {
+				os.MkdirAll(path.Dir(target), 07555)
+				if err := c.touch(target); err != nil {
+					return err
+				}
+			}
 			if err := syscall.Mount(src, target, "", syscall.MS_BIND, ""); err != nil {
 				return fmt.Errorf("mount-bind(%s)", err)
 			}
 		} else {
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return err
+			}
 			//assume a flist
 			if err := c.mountFList(src, target); err != nil {
 				return fmt.Errorf("mount-bind-flist(%s)", err)
@@ -142,10 +165,8 @@ func (c *container) sandbox() error {
 	}
 
 	coreXTarget := path.Join(root, coreXBinaryName)
-	if f, err := os.Create(coreXTarget); err == nil {
-		f.Close()
-	} else {
-		log.Errorf("Failed to touch file '%s': %s", coreXTarget, err)
+	if err := c.touch(coreXTarget); err != nil {
+		return err
 	}
 
 	coreXSrc, err := exec.LookPath(coreXBinaryName)

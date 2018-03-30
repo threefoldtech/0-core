@@ -23,7 +23,7 @@ func main() {
 		cli.StringFlag{
 			Name:  "organization, o",
 			Value: "",
-			Usage: "IYO organization that has to be valid in the jwt calims, if not provided, it will be parsed from kerenel cmdline, otherwise no authentication will be applied",
+			Usage: "IYO organization that has to be valid in the jwt claims, if not provided, it will be parsed from kernel cmdline, otherwise no authentication will be applied",
 		},
 		cli.StringFlag{
 			Name:  "listen, l",
@@ -35,6 +35,20 @@ func main() {
 			Value: "/var/run/redis.sock",
 			Usage: "redis unix socket to proxy",
 		},
+		cli.BoolFlag{
+			Name:  "debug",
+			Usage: "enable debug logging",
+		},
+	}
+
+	app.Before = func(ctx *cli.Context) error {
+		if ctx.GlobalBool("debug") {
+			logging.SetLevel(logging.DEBUG, "")
+		} else {
+			logging.SetLevel(logging.INFO, "")
+		}
+
+		return nil
 	}
 
 	app.Action = func(ctx *cli.Context) error {
