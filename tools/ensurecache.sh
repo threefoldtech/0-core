@@ -17,7 +17,7 @@ function labelmount {
 
 function preparedisk {
     DISK=""
-    for disk in `lsblk -pdn -o NAME,ROTA|sort -nk 2|cut -d " " -f 1`; do
+    for disk in `lsblk -pdn -o NAME,ROTA,TYPE,TRAN|grep -v rom|grep -v usb|sort -nk 2|cut -d " " -f 1`; do
         if ! lsblk -n -o TYPE ${disk} | grep part > /dev/null; then
             # disk does not have any parition
             DISK=$disk
