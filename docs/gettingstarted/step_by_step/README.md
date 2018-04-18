@@ -1,6 +1,6 @@
 # Step by step getting started with Zero-OS
 
-Also see the recorded session on Zoom: [Getting started with Zero-OS](https://zoom.us/recording/share/QsaoowavN_yODSx6kxxrnfd3Jee_9UNr2ZxHkhxynkawIumekTziMw ) 
+Also see the recorded session on Zoom: [Getting started with Zero-OS](https://zoom.us/recording/play/Px0ZhKXKRGKSUdfac_J1-S9TS24YS1aBdI1iItnKJSz4RnP1SLgBIG0ABSEDdyQE) 
 
 Here are the steps:
 - [Create ZeroTier network](#create-zt)
