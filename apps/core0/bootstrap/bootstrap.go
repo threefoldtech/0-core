@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	InternetTestAddress = "http://1.1.1.1/"
+	InternetTestAddress = "http://google.com/"
 
 	screenStateLine = "->%25s: %s %s"
 )

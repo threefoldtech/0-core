@@ -46,6 +46,10 @@ function hook {
     btrfs subvol create $1/cache || true
     mount $1/cache /var/cache/
 
+    # clean up old container, and vms working directories
+    rm -rf /var/cache/containers
+    rm -rf /var/cache/vms
+
     logs=$1/logs
     btrfs subvol create ${logs} || true
     current="log-$(date +%Y%m%d-%H%M)"
@@ -66,7 +70,7 @@ function main {
     if ! labelmount ${LABEL} ${MNT}; then
         # no parition found with that label
         # prepare the first availabel disk
-	echo "${LABEL} not mounted, search for available disk"
+	    echo "${LABEL} not mounted, search for available disk"
         preparedisk
         labelmount ${LABEL} ${MNT}
     fi
