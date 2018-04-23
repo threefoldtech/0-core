@@ -21,7 +21,16 @@ will be allowed
 ## Booting modes
 Different booting modes can be achieved by mixing and matching the boot params documented above.
 
-production: -no flags- or zerotier=<network-id>
-debug: development or development zerotier=<network-id> the later case will only accept client connection from zerotier.
+### production:
+```
+zerotier=<network-id>
+```
+
+### development:
+```
+development [zerotier=<networkd-id>]
+```
+zerotier if not set, both the robot and the redis server can be reached over all interfaces
+
 
 > Adding `debug` param to any of the above flag combinations will output verbose logs.
