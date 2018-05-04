@@ -962,7 +962,7 @@ class ContainerClient(BaseClient):
 
 class ContainerManager:
     _nic = {
-        'type': typchk.Enum('default', 'bridge', 'zerotier', 'vlan', 'vxlan'),
+        'type': typchk.Enum('default', 'bridge', 'zerotier', 'vlan', 'vxlan', 'macvlan'),
         'id': typchk.Or(str, typchk.Missing()),
         'name': typchk.Or(str, typchk.Missing()),
         'hwaddr': typchk.Or(str, typchk.Missing()),
@@ -988,6 +988,7 @@ class ContainerManager:
         'nics': [_nic],
         'port': typchk.Or(
             typchk.Map(int, int),
+            typchk.Map(str, int),
             typchk.IsNone()
         ),
         'privileged': bool,
@@ -1017,8 +1018,6 @@ class ContainerManager:
 
     DefaultNetworking = object()
 
-
-
     def __init__(self, client):
         self._client = client
 
@@ -1036,8 +1035,8 @@ class ContainerManager:
         :param nics: Configure the attached nics to the container
                      each nic object is a dict of the format
                      {
-                        'type': nic_type # default, bridge, zerotier, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
-                        'id': id # depends on the type, bridge name, zerotier network id, the vlan tag or the vxlan id
+                        'type': nic_type # default, bridge, zerotier, macvlan, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
+                        'id': id # depends on the type, bridge name, zerotier network id, the parent link (macvlan), the vlan tag or the vxlan id
                         'name': name of the nic inside the container (ignored in zerotier type)
                         'hwaddr': Mac address of nic.
                         'config': { # config is only honored for bridge, vlan, and vxlan types
@@ -1126,8 +1125,8 @@ class ContainerManager:
 
         :param container: container ID
         :param nic: {
-                        'type': nic_type # default, bridge, zerotier, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
-                        'id': id # depends on the type, bridge name, zerotier network id, the vlan tag or the vxlan id
+                        'type': nic_type # default, bridge, zerotier, macvlan, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
+                        'id': id # depends on the type, bridge name, zerotier network id, the parent link (macvlan), the vlan tag or the vxlan id
                         'name': name of the nic inside the container (ignored in zerotier type)
                         'hwaddr': Mac address of nic.
                         'config': { # config is only honored for bridge, vlan, and vxlan types
@@ -1575,6 +1574,11 @@ class DiskManager:
         'source': str,
     })
 
+    _spindown_chk = typchk.Checker({
+        'disk': str,
+        'spindown': int,
+    })
+
     def __init__(self, client):
         self._client = client
 
@@ -1601,7 +1605,7 @@ class DiskManager:
     def mktable(self, disk, table_type='gpt'):
         """
         Make partition table on block device.
-        :param disk: device name (sda, sdb, etc...)
+        :param disk: device path (/dev/sda, /dev/disk/by-id/ata-Samsung..., etc...)
         :param table_type: Partition table type as accepted by parted
         """
         args = {
@@ -1622,8 +1626,8 @@ class DiskManager:
         """
         Get more info about a disk or a disk partition
 
-        :param disk: (sda, sdb, etc..)
-        :param part: (sda1, sdb2, etc...)
+        :param disk: (/dev/sda, /dev/sdb, etc..)
+        :param part: (/dev/sda1, /dev/sdb2, etc...)
         :return: a dict with {"blocksize", "start", "size", and "free" sections}
         """
         args = {
@@ -1652,7 +1656,7 @@ class DiskManager:
     def mkpart(self, disk, start, end, part_type='primary'):
         """
         Make partition on disk
-        :param disk: device name (sda, sdb, etc...)
+        :param disk: device path (/dev/sda, /dev/sdb, etc...)
         :param start: partition start as accepted by parted mkpart
         :param end: partition end as accepted by parted mkpart
         :param part_type: partition type as accepted by parted mkpart
@@ -1676,7 +1680,7 @@ class DiskManager:
     def rmpart(self, disk, number):
         """
         Remove partion from disk
-        :param disk: device name (sda, sdb, etc...)
+        :param disk: device path (/dev/sda, /dev/sdb, etc...)
         :param number: Partition number (starting from 1)
         """
         args = {
@@ -1736,6 +1740,22 @@ class DiskManager:
         if result.state != 'SUCCESS':
             raise RuntimeError('failed to umount partition: %s' % result.stderr)
 
+    def spindown(self, disk, spindown=1):
+        """
+        Spindown a disk
+        :param disk str: Full path to a disk like /dev/sda
+        :param spindown int: spindown value should be in [1, 240]
+        """
+        args = {
+            "disk": disk,
+            "spindown": spindown
+        }
+        self._spindown_chk.check(args)
+        response = self._client.raw('disk.spindown', args)
+
+        result = response.get()
+        if result.state != 'SUCCESS':
+            raise RuntimeError("Failed to spindown disk {} to {}.".format(disk, spindown))
 
 class BtrfsManager:
     _create_chk = typchk.Checker({
@@ -2032,6 +2052,7 @@ class KvmManager:
         }],
         'port': typchk.Or(
             typchk.Map(int, int),
+            typchk.Map(str, int),
             typchk.IsNone()
         ),
         'mount': typchk.Or(
@@ -2056,6 +2077,7 @@ class KvmManager:
         }],
         'port': typchk.Or(
             typchk.Map(int, int),
+            typchk.Map(str, int),
             typchk.IsNone()
         ),
         'uuid': str
