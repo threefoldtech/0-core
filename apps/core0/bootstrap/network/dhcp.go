@@ -39,8 +39,9 @@ func (d *dhcpProtocol) Configure(mgr NetworkManager, inf string) error {
 	// if err := d.isPlugged(inf); err != nil {
 	// 	return err
 	// }
-
-	hostid, _ := os.Hostname()
+	
+	hostname, _ := os.Hostname()
+	hostid := fmt.Sprintf("hostname:zero-os-%s", hostname)
 
 	cmd := &pm.Command{
 		ID:      fmt.Sprintf("udhcpc/%s", inf),
