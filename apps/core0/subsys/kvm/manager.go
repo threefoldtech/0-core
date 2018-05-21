@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"path"
 
@@ -45,7 +46,9 @@ type DomainInfo struct {
 }
 
 type LibvirtConnection struct {
-	handler libvirt.DomainEventLifecycleCallback
+	lifeCycleHandler           libvirt.DomainEventLifecycleCallback
+	deviceRemovedHandler       libvirt.DomainEventDeviceRemovedCallback
+	deviceRemovedFailedHandler libvirt.DomainEventDeviceRemovalFailedCallback
 
 	m    sync.Mutex
 	conn *libvirt.Connect
@@ -61,6 +64,8 @@ type kvmManager struct {
 
 	domainsInfo        map[string]*DomainInfo
 	domainsInfoRWMutex sync.RWMutex
+
+	devDeleteEvent *Sync
 }
 
 var (
@@ -114,13 +119,16 @@ func KVMSubsystem(conmgr containers.ContainerManager, cell *screen.RowCell) erro
 	}()
 
 	mgr := &kvmManager{
-		conmgr:      conmgr,
-		cell:        cell,
-		evch:        make(chan map[string]interface{}, 100), //buffer 100 event
-		domainsInfo: make(map[string]*DomainInfo),
+		conmgr:         conmgr,
+		cell:           cell,
+		evch:           make(chan map[string]interface{}, 100), //buffer 100 event
+		domainsInfo:    make(map[string]*DomainInfo),
+		devDeleteEvent: NewSync(),
 	}
 
-	mgr.libvirt.handler = mgr.handle
+	mgr.libvirt.lifeCycleHandler = mgr.domaineLifeCycleHandler
+	mgr.libvirt.deviceRemovedHandler = mgr.deviceRemovedHandler
+	mgr.libvirt.deviceRemovedFailedHandler = mgr.deviceRemovedFailedHandler
 
 	cell.Text = "Virtual Machines: 0"
 	if err := mgr.setupDefaultGateway(); err != nil {
@@ -470,9 +478,19 @@ func IOTuneParamsToIOTune(inp IOTuneParams) IOTune {
 }
 
 func (c *LibvirtConnection) register(conn *libvirt.Connect) {
-	_, err := conn.DomainEventLifecycleRegister(nil, c.handler)
+	_, err := conn.DomainEventLifecycleRegister(nil, c.lifeCycleHandler)
 	if err != nil {
-		log.Errorf("failed to regist event handler: %s", err)
+		log.Errorf("failed to regist domain lifecycle event handler: %s", err)
+	}
+
+	_, err = conn.DomainEventDeviceRemovedRegister(nil, c.deviceRemovedHandler)
+	if err != nil {
+		log.Errorf("failed to regist device removed event handler: %s", err)
+	}
+
+	_, err = conn.DomainEventDeviceRemovalFailedRegister(nil, c.deviceRemovedFailedHandler)
+	if err != nil {
+		log.Errorf("failed to regist device removed failed event handler: %s", err)
 	}
 }
 
@@ -498,6 +516,7 @@ func (c *LibvirtConnection) getConnection() (*libvirt.Connect, error) {
 }
 
 func (m *kvmManager) getDomainStruct(uuid string) (*Domain, error) {
+	// m.libvirt.conn = nil // force new connection
 	conn, err := m.libvirt.getConnection()
 	if err != nil {
 		return nil, err
@@ -510,13 +529,25 @@ func (m *kvmManager) getDomainStruct(uuid string) (*Domain, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot get domain xml: %v", err)
 	}
+
 	domainstruct := Domain{}
 	err = xml.Unmarshal([]byte(domainxml), &domainstruct)
+
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse the domain xml: %v", err)
 	}
 
 	return &domainstruct, nil
+}
+
+func (m *kvmManager) getDomainInfo(uuid string) (*DomainInfo, error) {
+	m.domainsInfoRWMutex.RLock()
+	defer m.domainsInfoRWMutex.RUnlock()
+	domaininfo, exists := m.domainsInfo[uuid]
+	if !exists {
+		return domaininfo, fmt.Errorf("couldnt find domaininfo with uuid %s", uuid)
+	}
+	return domaininfo, nil
 }
 
 func (m *kvmManager) setupDefaultGateway() error {
@@ -823,7 +854,18 @@ func (m *kvmManager) mkDomain(seq uint16, params *CreateParams) (*Domain, error)
 func (m *kvmManager) setPortForward(uuid string, seq uint16, host string, container int) error {
 	ip := m.ipAddr(seq)
 	id := m.forwardId(uuid)
-	return socat.SetPortForward(id, ip, host, container)
+	var err error
+
+	if err = socat.SetPortForward(id, ip, host, container); err != nil {
+		return err
+	}
+
+	domaininfo, err := m.getDomainInfo(uuid)
+	if err != nil {
+		return err
+	}
+	domaininfo.Port[host] = container
+	return err
 }
 
 func (m *kvmManager) setPortForwards(uuid string, seq uint16, port map[string]int) error {
@@ -832,7 +874,6 @@ func (m *kvmManager) setPortForwards(uuid string, seq uint16, port map[string]in
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -931,6 +972,20 @@ func (m *kvmManager) create(cmd *pm.Command) (uuid interface{}, err error) {
 		return nil, fmt.Errorf("failed to create machine: %s", err)
 	}
 
+	// ENSURE TO UPDATE macaddress of domaininfo nics in this stage.
+	domainstruct, err := m.getDomainStruct(domain.UUID)
+	if err != nil {
+		return nil, err
+	}
+	domaininfo, err := m.getDomainInfo(domain.UUID)
+	if err != nil {
+		return nil, err
+	}
+	for i, inf := range domainstruct.Devices.Interfaces {
+		domaininfo.Nics[i].HWAddress = inf.Mac.Address
+	}
+	//
+
 	return domain.UUID, nil
 }
 
@@ -955,6 +1010,7 @@ func (m *kvmManager) prepareMigrationTarget(cmd *pm.Command) (interface{}, error
 	if err := m.setNetworking(&params.NicParams, seq, &domain); err != nil {
 		return nil, err
 	}
+
 	return nil, nil
 }
 
@@ -985,7 +1041,6 @@ func (m *kvmManager) destroy(cmd *pm.Command) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return nil, m.destroyDomain(uuid, domain)
 }
 
@@ -1112,14 +1167,13 @@ func (m *kvmManager) attachDevice(uuid, xml string) error {
 	if err != nil {
 		return fmt.Errorf("couldn't find domain with the uuid %s", uuid)
 	}
-	if err := domain.AttachDeviceFlags(xml, libvirt.DOMAIN_DEVICE_MODIFY_LIVE); err != nil {
+	if err = domain.AttachDeviceFlags(xml, libvirt.DOMAIN_DEVICE_MODIFY_LIVE); err != nil {
 		return fmt.Errorf("failed to attach device: %s", err)
 	}
-
 	return nil
 }
 
-func (m *kvmManager) detachDevice(uuid, xml string) error {
+func (m *kvmManager) detachDevice(uuid, alias, ifxml string) error {
 	conn, err := m.libvirt.getConnection()
 	if err != nil {
 		return err
@@ -1128,9 +1182,15 @@ func (m *kvmManager) detachDevice(uuid, xml string) error {
 	if err != nil {
 		return fmt.Errorf("couldn't find domain with the uuid %s", uuid)
 	}
+	m.devDeleteEvent.Expect(uuid, alias)
+	defer m.devDeleteEvent.Unexpect(uuid, alias)
 
-	if err := domain.DetachDeviceFlags(xml, libvirt.DOMAIN_DEVICE_MODIFY_CURRENT); err != nil {
-		return fmt.Errorf("failed to attach device: %s", err)
+	if err := domain.DetachDeviceFlags(ifxml, libvirt.DOMAIN_DEVICE_MODIFY_LIVE); err != nil {
+		return fmt.Errorf("failed to detach device: %s", err)
+	}
+
+	if err := m.devDeleteEvent.Wait(uuid, alias, 3*time.Second); err != nil {
+		return fmt.Errorf("failed to detach device: %v", err)
 	}
 
 	return nil
@@ -1187,7 +1247,7 @@ func (m *kvmManager) detachDisk(cmd *pm.Command) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal disk to xml")
 	}
-	return nil, m.detachDevice(params.UUID, string(diskxml[:]))
+	return nil, m.detachDevice(params.UUID, disk.Alias.Name, string(diskxml))
 }
 
 func (m *kvmManager) addNic(cmd *pm.Command) (interface{}, error) {
@@ -1204,8 +1264,12 @@ func (m *kvmManager) addNic(cmd *pm.Command) (interface{}, error) {
 		ID:        params.ID,
 		HWAddress: params.HWAddress,
 	}
-
 	domainstruct, err := m.getDomainStruct(params.UUID)
+	if err != nil {
+		return nil, err
+	}
+
+	domainInfo, err := m.getDomainInfo(params.UUID)
 	if err != nil {
 		return nil, err
 	}
@@ -1218,14 +1282,6 @@ func (m *kvmManager) addNic(cmd *pm.Command) (interface{}, error) {
 			}
 		}
 		// TODO: use the ports that the domain was created with initially
-
-		m.domainsInfoRWMutex.Lock()
-		defer m.domainsInfoRWMutex.Unlock()
-		domainInfo, exists := m.domainsInfo[params.UUID]
-		if !exists {
-			return nil, fmt.Errorf("in setup networking couldn't get domaininfo for domain %s", params.UUID)
-		}
-
 		inf, err = m.prepareDefaultNetwork(params.UUID, domainInfo.Sequence, map[string]int{})
 	case "bridge":
 		if nic.ID == DefaultBridgeName {
@@ -1257,7 +1313,44 @@ func (m *kvmManager) addNic(cmd *pm.Command) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal nic to xml")
 	}
-	return nil, m.attachDevice(params.UUID, string(ifxml[:]))
+	if err = m.attachDevice(params.UUID, string(ifxml)); err != nil {
+		return nil, err
+	}
+
+	domainstruct, err = m.getDomainStruct(params.UUID)
+	if err != nil {
+		return nil, err
+	}
+	infs := domainstruct.Devices.Interfaces
+	nic.HWAddress = infs[len(infs)-1].Mac.Address
+	domainInfo.Nics = append(domainInfo.Nics, nic)
+
+	return nil, err
+}
+
+// used to reflect the removed nics in the domaininfo metadata from the domain struct.
+func (m *kvmManager) updateNics(uuid string) error {
+	interfaceMacs := map[string]bool{}
+	domainInfo, err := m.getDomainInfo(uuid)
+	if err != nil {
+		return err
+	}
+	var newNics []Nic
+	domainstruct, err := m.getDomainStruct(uuid)
+	if err != nil {
+		return err
+	}
+	for _, inf := range domainstruct.Devices.Interfaces {
+
+		interfaceMacs[inf.Mac.Address] = true
+	}
+	for _, nic := range domainInfo.Nics {
+		if _, exists := interfaceMacs[nic.HWAddress]; exists {
+			newNics = append(newNics, nic)
+		}
+	}
+	domainInfo.Nics = newNics
+	return nil
 }
 
 func (m *kvmManager) removeNic(cmd *pm.Command) (interface{}, error) {
@@ -1271,6 +1364,7 @@ func (m *kvmManager) removeNic(cmd *pm.Command) (interface{}, error) {
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
+
 	nic := Nic{
 		Type:      params.Type,
 		ID:        params.ID,
@@ -1282,6 +1376,7 @@ func (m *kvmManager) removeNic(cmd *pm.Command) (interface{}, error) {
 		source = InterfaceDeviceSource{
 			Bridge: DefaultBridgeName,
 		}
+
 	case "bridge":
 		source = InterfaceDeviceSource{
 			Bridge: nic.ID,
@@ -1307,8 +1402,10 @@ func (m *kvmManager) removeNic(cmd *pm.Command) (interface{}, error) {
 	for _, nic := range domainstruct.Devices.Interfaces {
 		if nic.Source == source {
 			inf = &nic
+			break
 		}
 	}
+
 	if inf == nil {
 		return nil, fmt.Errorf("The nic you tried is not attached to the vm")
 	}
@@ -1317,7 +1414,12 @@ func (m *kvmManager) removeNic(cmd *pm.Command) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal nic to xml")
 	}
-	return nil, m.detachDevice(params.UUID, string(ifxml[:]))
+
+	if err = m.detachDevice(params.UUID, inf.Alias.Name, string(ifxml)); err != nil {
+		return nil, err
+	}
+
+	return nil, err
 }
 
 func (m *kvmManager) limitDiskIO(cmd *pm.Command) (interface{}, error) {
@@ -1457,6 +1559,7 @@ func (m *kvmManager) getMachine(domain *libvirt.Domain) (Machine, error) {
 	if err != nil {
 		return Machine{}, err
 	}
+
 	domainstruct, err := m.getDomainStruct(uuid)
 	if err != nil {
 		return Machine{}, err
@@ -1486,12 +1589,11 @@ func (m *kvmManager) getMachine(domain *libvirt.Domain) (Machine, error) {
 		targets = append(targets, ifc.Target.Dev)
 
 	}
-	m.domainsInfoRWMutex.Lock()
-	defer m.domainsInfoRWMutex.Unlock()
-	domainInfo, exists := m.domainsInfo[uuid]
-	if !exists {
-		return Machine{}, fmt.Errorf("couldn't get domaininfo for domain %s", uuid)
+	domainInfo, err := m.getDomainInfo(uuid)
+	if err != nil {
+		return Machine{}, err
 	}
+	m.updateNics(uuid)
 	return Machine{
 		ID:         int(id),
 		UUID:       uuid,
@@ -1780,13 +1882,11 @@ func (m *kvmManager) portforwardAdd(cmd *pm.Command) (interface{}, error) {
 	if !defaultNic {
 		return nil, fmt.Errorf("KVM doesn't have a default nic")
 	}
-	m.domainsInfoRWMutex.Lock()
-	defer m.domainsInfoRWMutex.Unlock()
-	domainInfo, exists := m.domainsInfo[params.UUID]
-	if !exists {
-		return nil, fmt.Errorf("couldn't get domaininfo for domain %s", params.UUID)
-	}
 
+	domainInfo, err := m.getDomainInfo(params.UUID)
+	if err != nil {
+		return nil, err
+	}
 	return nil, m.setPortForward(params.UUID, domainInfo.Sequence, params.HostPort, params.ContainerPort)
 }
 
@@ -1803,5 +1903,16 @@ func (m *kvmManager) portforwardRemove(cmd *pm.Command) (interface{}, error) {
 	if _, err := conn.LookupDomainByUUIDString(params.UUID); err != nil {
 		return nil, fmt.Errorf("couldn't find domain with the uuid %s", params.UUID)
 	}
-	return nil, socat.RemovePortForward(m.forwardId(params.UUID), params.HostPort, params.ContainerPort)
+	err = socat.RemovePortForward(m.forwardId(params.UUID), params.HostPort, params.ContainerPort)
+	if err != nil {
+		return nil, err
+	}
+	domainInfo, err := m.getDomainInfo(params.UUID)
+	if err != nil {
+		return nil, err
+	}
+	delete(domainInfo.Port, params.HostPort)
+
+	return nil, err
+
 }
