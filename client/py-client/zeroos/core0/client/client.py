@@ -1334,6 +1334,21 @@ class IPManager:
             }
             return self._client.json('ip.link.name', args)
 
+        def mtu(self, link, mtu):
+            """
+            Rename link
+
+            :param link: link to rename
+            :param mtu: mtu value
+            :return:
+            """
+            args = {
+                'name': link,
+                'mtu': mtu,
+            }
+
+            return self._client.json('ip.link.mtu', args)
+
         def list(self):
             return self._client.json('ip.link.list', {})
 
