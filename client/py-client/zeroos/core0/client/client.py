@@ -1336,7 +1336,7 @@ class IPManager:
 
         def mtu(self, link, mtu):
             """
-            Rename link
+            Update link MTU
 
             :param link: link to rename
             :param mtu: mtu value
