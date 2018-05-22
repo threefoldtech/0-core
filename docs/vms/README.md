@@ -1,6 +1,8 @@
 # Virtual Machines
 
-While starting virtual machines by using the [KVM Commands](../interacting/commands/kvm.md), we rather recommend to start virtual machines using the Orchestrator, as discussed in the tutorial [Boot a Virtual Machine using the Zero-OS Orchestrator](https://github.com/zero-os/home/blob/master/docs/tutorials/Boot_VM_using_Orchestrator.md).
+Virtual machines support is built natively in zero-os. It internally uses libvirt/qemu to run the machines and only providing a very simple API for VM creactions and management that can be called like any other zero-os command. Please check the [KVM commands here](../interacting/commands/kvm.md)
+
+A better way to manage the virtual machines specially in a complex setup is using the node robot and deploy a [VM primitive](https://github.com/zero-os/0-templates). Also check out [interacting with zero-os](../interacting/0-robot.md)
 
 # Libvirt events
 You can subscribe to libvirt events by subscribing to a special job that has ID `kvm.events`
