@@ -347,6 +347,14 @@ class InfoManager:
         """
         return self._client.json('info.version', {})
 
+    def dmi(self, *types):
+        """
+        Get dmi output
+        :return: dict
+        """
+
+        return self._client.json('info.dmi', {'types': types})
+
 
 class JobManager:
     _job_chk = typchk.Checker({

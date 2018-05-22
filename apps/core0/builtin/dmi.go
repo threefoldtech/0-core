@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
 	"github.com/zero-os/0-core/base/pm"
 )
 
@@ -135,7 +136,7 @@ var dmiTypeRegex = regexp.MustCompile("DMI type ([0-9]+)")
 var kvRegex = regexp.MustCompile("(.+?):(.*)")
 
 func init() {
-	pm.RegisterBuiltIn("core.dmidecode", dmidecodeRunAndParse)
+	pm.RegisterBuiltIn("info.dmi", dmidecodeRunAndParse)
 }
 
 func dmidecodeRunAndParse(cmd *pm.Command) (interface{}, error) {
@@ -173,7 +174,6 @@ func dmidecodeRunAndParse(cmd *pm.Command) (interface{}, error) {
 	output = result.Streams.Stdout()
 
 	return ParseDMI(output)
-
 
 }
 
@@ -235,8 +235,8 @@ func newSection() DMISection {
 	}
 }
 
-func readSection(section *DMISection, lines []string, start int) (int, error){
-	if (start+2) > len(lines) {
+func readSection(section *DMISection, lines []string, start int) (int, error) {
+	if (start + 2) > len(lines) {
 		return 0, fmt.Errorf("invalid section size")
 	}
 
@@ -253,8 +253,7 @@ func readSection(section *DMISection, lines []string, start int) (int, error){
 	section.Type = dmitype
 	section.TypeStr = DMITypeToString(dmitype)
 
-
-	for start < len(lines){
+	for start < len(lines) {
 		line := lines[start]
 		if strings.TrimSpace(line) == "" {
 			return start, nil
@@ -264,8 +263,8 @@ func readSection(section *DMISection, lines []string, start int) (int, error){
 		if err != nil {
 			return 0, err
 		}
-	    nxtIndentLevel := 0
-		if len(lines) > start + 1 {
+		nxtIndentLevel := 0
+		if len(lines) > start+1 {
 			nxtIndentLevel = getLineLevel(lines[start+1])
 		}
 
@@ -279,12 +278,12 @@ func readSection(section *DMISection, lines []string, start int) (int, error){
 	return start, nil
 }
 
-func readList(propertyData *PropertyData, lines []string, start int)( int){
+func readList(propertyData *PropertyData, lines []string, start int) int {
 	startIndentLevel := getLineLevel(lines[start])
-	for start <len(lines) {
+	for start < len(lines) {
 		line := lines[start]
 		indentLevel := getLineLevel(line)
-		
+
 		if indentLevel == startIndentLevel {
 			propertyData.Items = append(propertyData.Items, strings.TrimSpace(line))
 		} else {
@@ -292,16 +291,15 @@ func readList(propertyData *PropertyData, lines []string, start int)( int){
 		}
 		start++
 	}
-	return start 
+	return start
 }
-
 
 // ParseDMI Parses dmidecode output into DMI structure
 func ParseDMI(input string) (DMI, error) {
 	lines := strings.Split(input, "\n")
 	secs := make(map[string]DMISection)
 
-	for start := 0; start<len(lines) ; start++ {
+	for start := 0; start < len(lines); start++ {
 		line := lines[start]
 		if strings.HasPrefix(line, "Handle") {
 			section := newSection()
@@ -311,7 +309,7 @@ func ParseDMI(input string) (DMI, error) {
 				return DMI{}, err
 			}
 			secs[section.Title] = section
-		}	
+		}
 	}
 	return secs, nil
 }
