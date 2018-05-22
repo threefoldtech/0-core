@@ -3,9 +3,10 @@ package builtin
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+
 	"github.com/vishvananda/netlink"
 	"github.com/zero-os/0-core/base/pm"
-	"net"
 )
 
 type ipmgr struct{}
@@ -21,6 +22,7 @@ func init() {
 	pm.RegisterBuiltIn("ip.link.down", mgr.linkDown)
 	pm.RegisterBuiltIn("ip.link.name", mgr.linkName)
 	pm.RegisterBuiltIn("ip.link.list", mgr.linkList)
+	pm.RegisterBuiltIn("ip.link.mtu", mgr.linkMTU)
 
 	pm.RegisterBuiltIn("ip.addr.add", mgr.addrAdd)
 	pm.RegisterBuiltIn("ip.addr.del", mgr.addrDel)
@@ -170,6 +172,11 @@ type LinkNameArguments struct {
 	New string `json:"new"`
 }
 
+type LinkMTUArguments struct {
+	LinkArguments
+	MTU int `json:"mtu"`
+}
+
 func (_ *ipmgr) linkName(cmd *pm.Command) (interface{}, error) {
 	var args LinkNameArguments
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
@@ -182,6 +189,20 @@ func (_ *ipmgr) linkName(cmd *pm.Command) (interface{}, error) {
 	}
 
 	return nil, netlink.LinkSetName(link, args.New)
+}
+
+func (_ *ipmgr) linkMTU(cmd *pm.Command) (interface{}, error) {
+	var args LinkMTUArguments
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, pm.BadRequestError(err)
+	}
+
+	link, err := netlink.LinkByName(args.Name)
+	if err != nil {
+		return nil, pm.NotFoundError(err)
+	}
+
+	return nil, netlink.LinkSetMTU(link, args.MTU)
 }
 
 func (_ *ipmgr) linkDown(cmd *pm.Command) (interface{}, error) {
@@ -204,6 +225,7 @@ type Link struct {
 	HwAddr string `json:"hwaddr"`
 	Master string `json:"master"`
 	Up     bool   `json:"up"`
+	MTU    int    `json:"mtu"`
 }
 
 func (_ *ipmgr) linkList(cmd *pm.Command) (interface{}, error) {
@@ -223,13 +245,16 @@ func (_ *ipmgr) linkList(cmd *pm.Command) (interface{}, error) {
 			}
 		}
 
+		attrs := link.Attrs()
+
 		result = append(result,
 			Link{
 				Type:   link.Type(),
-				Name:   link.Attrs().Name,
-				HwAddr: link.Attrs().HardwareAddr.String(),
+				Name:   attrs.Name,
+				HwAddr: attrs.HardwareAddr.String(),
 				Master: master,
-				Up:     link.Attrs().Flags&net.FlagUp != 0,
+				Up:     attrs.Flags&net.FlagUp != 0,
+				MTU:    attrs.MTU,
 			},
 		)
 	}
