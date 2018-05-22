@@ -1419,6 +1419,8 @@ func (m *kvmManager) removeNic(cmd *pm.Command) (interface{}, error) {
 		return nil, err
 	}
 
+	m.updateNics(params.UUID)
+
 	return nil, err
 }
 
@@ -1593,7 +1595,7 @@ func (m *kvmManager) getMachine(domain *libvirt.Domain) (Machine, error) {
 	if err != nil {
 		return Machine{}, err
 	}
-	m.updateNics(uuid)
+
 	return Machine{
 		ID:         int(id),
 		UUID:       uuid,
