@@ -1551,6 +1551,7 @@ type Machine struct {
 	Vnc        int          `json:"vnc"`
 	Tags       pm.Tags      `json:"tags"`
 	IfcTargets []string     `json:"ifctargets"`
+	DefaultIP  string       `json:"default_ip"`
 	Params     CreateParams `json:"params"`
 }
 
@@ -1602,6 +1603,7 @@ func (m *kvmManager) getMachine(domain *libvirt.Domain) (Machine, error) {
 		Vnc:        port,
 		Tags:       domainInfo.CreateParams.Tags, //we keep this here also for backward compatibility
 		IfcTargets: targets,
+		DefaultIP:  m.ipAddr(domainInfo.Sequence),
 		Params:     domainInfo.CreateParams,
 	}, nil
 }
