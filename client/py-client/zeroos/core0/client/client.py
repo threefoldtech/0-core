@@ -347,6 +347,14 @@ class InfoManager:
         """
         return self._client.json('info.version', {})
 
+    def dmi(self, *types):
+        """
+        Get dmi output
+        :return: dict
+        """
+
+        return self._client.json('info.dmi', {'types': types})
+
 
 class JobManager:
     _job_chk = typchk.Checker({
@@ -1333,6 +1341,21 @@ class IPManager:
                 'new': name,
             }
             return self._client.json('ip.link.name', args)
+
+        def mtu(self, link, mtu):
+            """
+            Update link MTU
+
+            :param link: link to rename
+            :param mtu: mtu value
+            :return:
+            """
+            args = {
+                'name': link,
+                'mtu': mtu,
+            }
+
+            return self._client.json('ip.link.mtu', args)
 
         def list(self):
             return self._client.json('ip.link.list', {})
