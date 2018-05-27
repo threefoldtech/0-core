@@ -14,6 +14,7 @@ import (
 	"github.com/zero-os/0-core/apps/core0/screen"
 	"github.com/zero-os/0-core/base/pm"
 	"github.com/zero-os/0-core/base/settings"
+	"github.com/zero-os/0-core/base/utils"
 )
 
 const (
@@ -163,13 +164,17 @@ func (b *Bootstrap) screen() {
 		section.Sections = []screen.Section{}
 
 		for _, link := range links {
-			if link.Attrs().Name == "lo" || link.Type() != "device" {
+			name := link.Attrs().Name
+			if name == "lo" || !utils.InString([]string{"device", "tun", "tap"}, link.Type()) {
+				continue
+			}
+			if strings.HasPrefix(name, "tun") || strings.HasPrefix(name, "tap") {
 				continue
 			}
 
 			ips, _ := netlink.AddrList(link, netlink.FAMILY_V4)
 			section.Sections = append(section.Sections, &screen.TextSection{
-				Text: fmt.Sprintf(screenStateLine, link.Attrs().Name, link.Attrs().HardwareAddr, b.ipsAsString(ips)),
+				Text: fmt.Sprintf(screenStateLine, name, link.Attrs().HardwareAddr, b.ipsAsString(ips)),
 			})
 		}
 
