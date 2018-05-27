@@ -327,7 +327,8 @@ loop:
 
 		if r.command.Flags.Protected {
 			//immediate restart
-			log.Debugf("Re-spawning protected service")
+			log.Debugf("Re-spawning protected service '%s' in 1 second", r.command.ID)
+			<-time.After(1 * time.Second)
 			continue
 		}
 
