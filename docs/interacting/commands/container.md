@@ -2,11 +2,13 @@
 
 Available commands:
 
-- [create](#create)
-- [list](#list)
-- [terminate](#terminate)
-- [client](#client)
-- [dispatch](#dispatch)
+- [Container Commands](#container-commands)
+  - [create](#create)
+  - [list](#list)
+  - [find](#find)
+  - [terminate](#terminate)
+    - [client](#client)
+  - [dispatch](#dispatch)
 
 
 ## create
@@ -55,14 +57,19 @@ Values:
     - `default`
     - `bridge`
     - `zerotier`
+    - `macvlan`
+    - `passthrough`
     - `vlan` (only supported by Open vSwitch)
     - `vxlan` (only supported by Open vSwitch)
 
   - **{id}**: (optional) Depending on the value for {nice_type}:
-    - Name of the bridge
-    - ZeroTier network id
-    - VLAM tag
-    - VXLAM network identifier (VNID)
+    - `default`: empty
+    - `bridge`: name of the bridge
+    - `zerotier`: ZeroTier network id
+    - `macvlan`: the physical network card name
+    - `passthrough`: the physical network card name
+    - `vlan`: VLAM tag
+    - `vxlan`: VXLAM network identifier (VNID)
 
   - **{name}**: Name of the NIC inside the container
 

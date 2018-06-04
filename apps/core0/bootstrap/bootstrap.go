@@ -164,13 +164,17 @@ func (b *Bootstrap) screen() {
 		section.Sections = []screen.Section{}
 
 		for _, link := range links {
-			if link.Attrs().Name == "lo" || !utils.InString([]string{"device", "tun", "tap"}, link.Type()) {
+			name := link.Attrs().Name
+			if name == "lo" || !utils.InString([]string{"device", "tun", "tap"}, link.Type()) {
+				continue
+			}
+			if strings.HasPrefix(name, "tun") || strings.HasPrefix(name, "tap") {
 				continue
 			}
 
 			ips, _ := netlink.AddrList(link, netlink.FAMILY_V4)
 			section.Sections = append(section.Sections, &screen.TextSection{
-				Text: fmt.Sprintf(screenStateLine, link.Attrs().Name, link.Attrs().HardwareAddr, b.ipsAsString(ips)),
+				Text: fmt.Sprintf(screenStateLine, name, link.Attrs().HardwareAddr, b.ipsAsString(ips)),
 			})
 		}
 
@@ -191,28 +195,38 @@ func (b *Bootstrap) screen() {
 }
 
 func (b *Bootstrap) watchers() {
+	//uptime watcher
+
+	//zerotier watcher
 	screen.Push(&screen.SplitterSection{
-		Title: "Zerotier Info",
+		Title: "Watchers",
 	})
-	section := screen.TextSection{}
-	screen.Push(&section)
+
+	zerotier := &screen.TextSection{}
+	uptime := &screen.TextSection{}
+	screen.Push(zerotier)
+	screen.Push(uptime)
 
 	go func() {
 		for {
 			result, err := pm.System("zerotier-cli", "-D/tmp/zt", "info")
-			var current string
+			ztstatus := result.Streams.Stdout()
 			if err != nil {
-				current = fmt.Sprintf("Cannot show zerotier info due too error: %s",
-					strings.TrimSpace(result.Streams.Stderr()),
-				)
+				ztstatus = result.Streams.Stderr()
 			}
 
-			current = strings.TrimSpace(result.Streams.Stdout())
+			ztstatus = strings.TrimSpace(ztstatus)
+			zerotier.Text = fmt.Sprintf(screenStateLine, "Zerotier", ztstatus, "")
 
-			if current != section.Text {
-				section.Text = current
-				screen.Refresh()
+			result, err = pm.System("uptime")
+			uptimestatus := result.Streams.Stdout()
+			if err != nil {
+				uptimestatus = result.Streams.Stderr()
 			}
+
+			uptime.Text = fmt.Sprintf(screenStateLine, "Uptime", uptimestatus, "")
+
+			screen.Refresh()
 
 			<-time.After(30 * time.Second)
 		}
