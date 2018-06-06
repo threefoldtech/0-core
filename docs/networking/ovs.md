@@ -9,6 +9,8 @@ Following network types are supported through the create commands:
 |default         | X          | X          |
 |bridge          | X          | X          |
 |ZeroTier        | X          |            |
+|macvlan         | X          |            |
+|passthrough     | X          |            |
 |VLAN            | X          | X          |
 |VXLAN           | X          | X          |
 
@@ -84,6 +86,8 @@ Values:
 |default         | ignored             |
 |bridge          | bridge name         |
 |ZeroTier        | zerotier network id |
+|macvlan         | the physical network card name|
+|passthrough     | the physical network card name|
 |VLAN            | VLAN tag            |
 |VXLAN           | VXLAN id            |
 

@@ -1,6 +1,6 @@
 # Network Configuration
 
-Zero-OS applies the network configuration as defined in the `/etc/zero-od/network.toml`, structured as follows:
+Zero-OS applies the network configuration as defined in the `/etc/zero-os/network.toml`, structured as follows:
 
 ```toml
 [network]

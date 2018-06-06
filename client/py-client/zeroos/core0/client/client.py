@@ -347,6 +347,14 @@ class InfoManager:
         """
         return self._client.json('info.version', {})
 
+    def dmi(self, *types):
+        """
+        Get dmi output
+        :return: dict
+        """
+
+        return self._client.json('info.dmi', {'types': types})
+
 
 class JobManager:
     _job_chk = typchk.Checker({
@@ -962,7 +970,7 @@ class ContainerClient(BaseClient):
 
 class ContainerManager:
     _nic = {
-        'type': typchk.Enum('default', 'bridge', 'zerotier', 'vlan', 'vxlan', 'macvlan'),
+        'type': typchk.Enum('default', 'bridge', 'zerotier', 'vlan', 'vxlan', 'macvlan', 'passthrough'),
         'id': typchk.Or(str, typchk.Missing()),
         'name': typchk.Or(str, typchk.Missing()),
         'hwaddr': typchk.Or(str, typchk.Missing()),
@@ -1035,8 +1043,14 @@ class ContainerManager:
         :param nics: Configure the attached nics to the container
                      each nic object is a dict of the format
                      {
-                        'type': nic_type # default, bridge, zerotier, macvlan, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
-                        'id': id # depends on the type, bridge name, zerotier network id, the parent link (macvlan), the vlan tag or the vxlan id
+                        'type': nic_type # one of default, bridge, zerotier, macvlan, passthrough, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
+                        'id': id # depends on the type
+                            bridge: bridge name,
+                            zerotier: network id,
+                            macvlan: the parent link name,
+                            passthrough: the link name,
+                            vlan: the vlan tag,
+                            vxlan: the vxlan id
                         'name': name of the nic inside the container (ignored in zerotier type)
                         'hwaddr': Mac address of nic.
                         'config': { # config is only honored for bridge, vlan, and vxlan types
@@ -1125,8 +1139,14 @@ class ContainerManager:
 
         :param container: container ID
         :param nic: {
-                        'type': nic_type # default, bridge, zerotier, macvlan, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
-                        'id': id # depends on the type, bridge name, zerotier network id, the parent link (macvlan), the vlan tag or the vxlan id
+                        'type': nic_type # one of default, bridge, zerotier, macvlan, passthrough, vlan, or vxlan (note, vlan and vxlan only supported by ovs)
+                        'id': id # depends on the type
+                            bridge: bridge name,
+                            zerotier: network id,
+                            macvlan: the parent link name,
+                            passthrough: the link name,
+                            vlan: the vlan tag,
+                            vxlan: the vxlan id
                         'name': name of the nic inside the container (ignored in zerotier type)
                         'hwaddr': Mac address of nic.
                         'config': { # config is only honored for bridge, vlan, and vxlan types
@@ -1322,6 +1342,21 @@ class IPManager:
             }
             return self._client.json('ip.link.name', args)
 
+        def mtu(self, link, mtu):
+            """
+            Update link MTU
+
+            :param link: link to rename
+            :param mtu: mtu value
+            :return:
+            """
+            args = {
+                'name': link,
+                'mtu': mtu,
+            }
+
+            return self._client.json('ip.link.mtu', args)
+
         def list(self):
             return self._client.json('ip.link.list', {})
 
@@ -1459,8 +1494,17 @@ class BridgeManager:
         }
     })
 
-    _bridge_delete_chk = typchk.Checker({
+    _bridge_chk = typchk.Checker({
         'name': str,
+    })
+
+    _nic_add_chk = typchk.Checker({
+        'name': str,
+        'nic': str,
+    })
+
+    _nic_remove_chk = typchk.Checker({
+        'nic': str,
     })
 
     def __init__(self, client):
@@ -1500,26 +1544,14 @@ class BridgeManager:
 
         self._bridge_create_chk.check(args)
 
-        response = self._client.raw('bridge.create', args)
-
-        result = response.get()
-        if result.state != 'SUCCESS':
-            raise RuntimeError('failed to create bridge %s' % result.data)
-
-        return json.loads(result.data)
+        return self._client.json('bridge.create', args)
 
     def list(self):
         """
         List all available bridges
         :return: list of bridge names
         """
-        response = self._client.raw('bridge.list', {})
-
-        result = response.get()
-        if result.state != 'SUCCESS':
-            raise RuntimeError('failed to list bridges: %s' % result.data)
-
-        return json.loads(result.data)
+        return self._client.json('bridge.list', {})
 
     def delete(self, bridge):
         """
@@ -1532,14 +1564,56 @@ class BridgeManager:
             'name': bridge,
         }
 
-        self._bridge_delete_chk.check(args)
+        self._bridge_chk.check(args)
 
-        response = self._client.raw('bridge.delete', args)
+        return self._client.json('bridge.delete', args)
 
-        result = response.get()
-        if result.state != 'SUCCESS':
-            raise RuntimeError('failed to list delete: %s' % result.data)
+    def nic_add(self, bridge, nic):
+        """
+        Attach a nic to a bridge
 
+        :param bridge: bridge name
+        :param nic: nic name
+        """
+
+        args = {
+            'name': bridge,
+            'nic': nic,
+        }
+
+        self._nic_add_chk.check(args)
+
+        return self._client.json('bridge.nic-add', args)
+
+    def nic_remove(self, nic):
+        """
+        Detach a nic from a bridge
+
+        :param nic: nic name to detach
+        """
+
+        args = {
+            'nic': nic,
+        }
+
+        self._nic_remove_chk.check(args)
+
+        return self._client.json('bridge.nic-remove', args)
+
+    def nic_list(self, bridge):
+        """
+        List nics attached to bridge
+
+        :param bridge: bridge name
+        """
+
+        args = {
+            'name': bridge,
+        }
+
+        self._bridge_chk.check(args)
+
+        return self._client.json('bridge.nic-list', args)
 
 class DiskManager:
     _mktable_chk = typchk.Checker({
@@ -2104,6 +2178,9 @@ class KvmManager:
         'desturi': str,
     })
 
+    _get_chk = typchk.Checker({
+        'uuid': str,
+    })
     _limit_disk_io_dict = {
         'uuid': str,
         'media': _media_dict,
@@ -2466,6 +2543,16 @@ class KvmManager:
         """
         return self._client.json('kvm.list', {})
 
+    def get(self, uuid):
+        """
+        Get machine info
+         :param uuid str: domain uuid
+
+        :return: machine info
+        """
+        args = {'uuid':uuid}
+        self._get_chk.check(args)
+        return self._client.json('kvm.get', args)
 
 class Logger:
     _level_chk = typchk.Checker({
@@ -2645,6 +2732,62 @@ class AggregatorManager:
 
         return self._client.json('aggregator.query', args)
 
+class RTInfoManager:
+    _rtinfo_start_params_chk = typchk.Checker({
+        'host': str,
+        'port': int,
+        'disks': [str]
+    })
+
+    _rtinfo_stop_params_chk = typchk.Checker({
+        'host': str,
+        'port': int,
+    })
+
+    def __init__(self, client):
+        self._client = client
+
+    def start(self, host="localhost", port=8999, disks=None):
+        """
+        Start rtinfo-client
+        :param host: str rtinfod host address
+        :param port: int rtinfod client port
+        :param disks: list of prefixes of wathable disks (e.g ["sd"])
+
+        """
+        disks = [] if disks is None else disks
+
+        args = {
+            "host": host,
+            "port": port,
+            "disks": disks
+        }
+        self._rtinfo_start_params_chk.check(args)
+
+        return self._client.json("rtinfo.start", args)
+
+    def stop(self, host, port):
+        """
+        Stop rtinfo-client
+        :param host: str rtinfod host address
+        :param port: int rtinfod client port
+        """
+
+        args = {
+            "host": host,
+            "port": port,
+        }
+        self._rtinfo_stop_params_chk.check(args)
+
+        return self._client.json("rtinfo.stop", args)
+
+    def list(self):
+        """
+        List running rtinfo clients
+        """
+        return self._client.json("rtinfo.list", {})
+
+
 
 class Client(BaseClient):
     _raw_chk = typchk.Checker({
@@ -2681,6 +2824,7 @@ class Client(BaseClient):
         self._nft = Nft(self)
         self._config = Config(self)
         self._aggregator = AggregatorManager(self)
+        self._rtinfo = RTInfoManager(self)
 
         if testConnectionAttempts:
             for _ in range(testConnectionAttempts):
@@ -2772,6 +2916,13 @@ class Client(BaseClient):
         """
         return self._aggregator
 
+    @property
+    def rtinfo(self):
+        """
+        RTInfo manager
+        """
+        return self._rtinfo
+
     def raw(self, command, arguments, queue=None, max_time=None, stream=False, tags=None, id=None):
         """
         Implements the low level command call, this needs to build the command structure
@@ -2812,3 +2963,4 @@ class Client(BaseClient):
 
     def response_for(self, id):
         return Response(self, id)
+
