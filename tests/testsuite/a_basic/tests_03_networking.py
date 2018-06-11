@@ -120,7 +120,7 @@ class BasicNetworking(BaseTest):
         nic_name = self.rand_str()
         self.client.bash('ip l a {} type dummy'.format(nic_name)).get()
         nic = [n for n in self.client.info.nic() if n['name'] == nic_name]
-        self.assertTrue(flag)
+        self.assertTrue(nic)
 
         self.lg('Add nic (N1) to bridge (B1), should succeed.')
         self.client.bridge.nic_add(bridge_name, nic_name)
