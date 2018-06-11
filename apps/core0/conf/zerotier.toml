@@ -2,13 +2,22 @@
 # ZT home is /tmp/zt
 
 [startup."zerotier-init"]
-name = "core.system"
+name = "bash"
 running_delay = -1
 after = ["init"]
 
 [startup."zerotier-init".args]
-name = "ztid"
-args = ["-out", "/tmp/zt"]
+"not(ztid)|script" = """
+ztid -out /tmp/zt
+"""
+
+"ztid|script" = """
+set -ex
+mkdir -p /tmp/zt
+
+echo {ztid} > /tmp/zt/identity.secret
+chmod 0400 /tmp/zt/identity.secret
+"""
 
 [startup.zerotier]
 name = "core.system"
