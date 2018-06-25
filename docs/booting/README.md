@@ -15,6 +15,7 @@ Zero-OS handles the following kernel params:
 * `organization=<org>` When set, Zero-OS will only accept ItsYou.online signed JWT tokens that have the `user:memberof:<org>` role set and are valid
 If not provided, zero-os will not require a password
 * `zerotier=<id>` Join this zerotier network on boot
+* `ztid=<identity>` Full zerotier `identity.secret` [optional]. If not provided a one will get generated for you. Zero-OS does the best effort to generate the same one every time it boots.
 * `development` If set, start the redis-proxy allow direct client connections, also opening the required client ports. If not set, no direct client connections
 will be allowed
 
