@@ -13,7 +13,7 @@ type DevicesGroup interface {
 	List() ([]string, error)
 }
 
-func mkDevicesGroup(name, subsys string) Group {
+func mkDevicesGroup(name string, subsys Subsystem) Group {
 	return &devicesCGroup{
 		cgroup{name: name, subsys: subsys},
 	}
@@ -42,3 +42,15 @@ func (g *devicesCGroup) List() ([]string, error) {
 
 	return strings.Split(string(data), "\n"), nil
 }
+
+func (g *devicesCGroup) Root() Group {
+	return &devicesCGroup{
+		cgroup: cgroup{subsys: g.subsys},
+	}
+}
+
+func (g *devicesCGroup) Reset() {
+
+}
+
+var _ DevicesGroup = &devicesCGroup{}

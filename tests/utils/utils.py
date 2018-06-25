@@ -6,6 +6,7 @@ import logging
 import configparser
 import requests
 import json
+import os
 
 
 class BaseTest(unittest.TestCase):
@@ -13,7 +14,7 @@ class BaseTest(unittest.TestCase):
         config = configparser.ConfigParser()
         config.read('config.ini')
         self.target_ip = config['main']['target_ip']
-        self.zt_access_token = config['main']['zt_access_token']
+        self.zt_access_token = config['main']['zt_access_token'] or os.environ["zt_access_token"]
         self.client = client.Client(self.target_ip)
         self.session = requests.Session()
         self.session.headers['Authorization'] = 'Bearer {}'.format(self.zt_access_token)
