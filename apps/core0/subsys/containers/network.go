@@ -430,6 +430,7 @@ func (c *container) getDefaultIP() net.IP {
 }
 
 func (c *container) setDNS(dns string) error {
+	os.MkdirAll(path.Join(c.root(), "etc"), 0755)
 	file, err := os.OpenFile(path.Join(c.root(), "etc", "resolv.conf"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
