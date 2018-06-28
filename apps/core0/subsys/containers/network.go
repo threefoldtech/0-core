@@ -23,10 +23,10 @@ const (
 	containerLinkNameFmt          = "cont%d-%d"
 	containerMonitoredLinkNameFmt = "contm%d-%d"
 	containerPeerNameFmt          = "%sp"
+	hostsFile                     = "127.0.0.1	localhost.localdomain	localhost"
 )
 
 func (c *container) preStartHostNetworking() error {
-	os.MkdirAll(path.Join(c.root(), "etc"), 0755)
 	p := path.Join(c.root(), "etc", "resolv.conf")
 	os.Remove(p)
 	ioutil.WriteFile(p, []byte{}, 0644) //touch the file.
@@ -49,13 +49,13 @@ func (c *container) startZerotier() (pm.Job, error) {
 	var err error
 	hook := &pm.PIDHook{
 		Action: func(_ int) {
-			log.Info("checking for zt availability")
 			for i := 0; i < 10; i++ {
-				_, err = pm.System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "listnetworks")
+				log.Debugf("checking for zt availability container %d", c.ID())
+				_, err = pm.System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "info")
 				if err == nil {
 					break
 				}
-				<-time.After(1 * time.Second)
+				<-time.After(2 * time.Second)
 			}
 
 			cancel()
@@ -69,8 +69,7 @@ func (c *container) startZerotier() (pm.Job, error) {
 		},
 	}
 
-	var job pm.Job
-	job, err = pm.Run(&pm.Command{
+	job, runerr := pm.Run(&pm.Command{
 		ID:      c.zerotierID(),
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(
@@ -83,23 +82,27 @@ func (c *container) startZerotier() (pm.Job, error) {
 		),
 	}, hook, exit)
 
-	if err != nil {
-		return nil, err
+	if runerr != nil {
+		return nil, runerr
 	}
 
 	//wait for it to start
 	select {
 	case <-ctx.Done():
-	case <-time.After(120 * time.Second):
+	case <-time.After(60 * time.Second):
+		job.Signal(syscall.SIGKILL)
 		return nil, fmt.Errorf("timedout waiting for zt daemon to start")
 	}
 
-	return job, nil
+	return job, err
 }
 
 func (c *container) watchZerotier(job pm.Job) {
 	for {
-		job.Wait()
+		if job != nil {
+			job.Wait()
+		}
+
 		if c.terminating {
 			return
 		}
@@ -136,7 +139,6 @@ func (c *container) zerotierDaemon() error {
 		job, c.zterr = c.startZerotier()
 		if c.zterr != nil {
 			log.Errorf("error while starting zerotier daemon for container: %d (%s): re-spawning", c.id, c.zterr)
-			job.Signal(syscall.SIGTERM)
 		}
 		//start the watcher anyway
 		go c.watchZerotier(job)
@@ -430,6 +432,7 @@ func (c *container) getDefaultIP() net.IP {
 }
 
 func (c *container) setDNS(dns string) error {
+	os.MkdirAll(path.Join(c.root(), "etc"), 0755)
 	file, err := os.OpenFile(path.Join(c.root(), "etc", "resolv.conf"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
@@ -632,8 +635,38 @@ func (c *container) postStartNetwork(idx int, network *Nic) (err error) {
 	return
 }
 
+func (c *container) setupLO() error {
+	if _, err := pm.System("ip", "-n", fmt.Sprint(c.id),
+		"a", "a", "127.0.0.1/8", "dev", "lo",
+	); err != nil {
+		return err
+	}
+
+	if _, err := pm.System("ip", "-n", fmt.Sprint(c.id),
+		"a", "a", "::1/128", "dev", "lo",
+	); err != nil {
+		return err
+	}
+
+	if _, err := pm.System("ip", "-n", fmt.Sprint(c.id),
+		"l", "set", "lo", "up",
+	); err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(
+		path.Join(c.root(), "etc", "hosts"),
+		[]byte(hostsFile),
+		0644,
+	)
+}
+
 func (c *container) postStartIsolatedNetworking() error {
 	if err := c.namespace(); err != nil {
+		return err
+	}
+
+	if err := c.setupLO(); err != nil {
 		return err
 	}
 

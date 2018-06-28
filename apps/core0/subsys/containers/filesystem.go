@@ -131,6 +131,8 @@ func (c *container) sandbox() error {
 		return fmt.Errorf("mount-root-flist(%s)", err)
 	}
 
+	os.MkdirAll(path.Join(root, "etc"), 0755)
+
 	for src, dst := range c.Args.Mount {
 		target := path.Join(root, dst)
 
