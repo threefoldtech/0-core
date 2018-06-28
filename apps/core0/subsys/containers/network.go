@@ -51,12 +51,12 @@ func (c *container) startZerotier() (pm.Job, error) {
 		Action: func(_ int) {
 			for i := 0; i < 10; i++ {
 				log.Debugf("checking for zt availability container %d", c.ID())
-				_, err = pm.System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "listnetworks")
+				_, err = pm.System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "info")
 				if err == nil {
 					break
 				}
 				log.Errorf("checking for zt availability container %d: %v", c.ID(), err)
-				<-time.After(1 * time.Second)
+				<-time.After(2 * time.Second)
 			}
 
 			cancel()
