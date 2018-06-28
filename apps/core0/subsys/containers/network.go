@@ -23,10 +23,10 @@ const (
 	containerLinkNameFmt          = "cont%d-%d"
 	containerMonitoredLinkNameFmt = "contm%d-%d"
 	containerPeerNameFmt          = "%sp"
+	hostsFile                     = "127.0.0.1	localhost.localdomain	localhost"
 )
 
 func (c *container) preStartHostNetworking() error {
-	os.MkdirAll(path.Join(c.root(), "etc"), 0755)
 	p := path.Join(c.root(), "etc", "resolv.conf")
 	os.Remove(p)
 	ioutil.WriteFile(p, []byte{}, 0644) //touch the file.
@@ -55,7 +55,6 @@ func (c *container) startZerotier() (pm.Job, error) {
 				if err == nil {
 					break
 				}
-				log.Errorf("checking for zt availability container %d: %v", c.ID(), err)
 				<-time.After(2 * time.Second)
 			}
 
@@ -636,8 +635,38 @@ func (c *container) postStartNetwork(idx int, network *Nic) (err error) {
 	return
 }
 
+func (c *container) setupLO() error {
+	if _, err := pm.System("ip", "-n", fmt.Sprint(c.id),
+		"a", "a", "127.0.0.1/8", "dev", "lo",
+	); err != nil {
+		return err
+	}
+
+	if _, err := pm.System("ip", "-n", fmt.Sprint(c.id),
+		"a", "a", "::1/128", "dev", "lo",
+	); err != nil {
+		return err
+	}
+
+	if _, err := pm.System("ip", "-n", fmt.Sprint(c.id),
+		"l", "set", "lo", "up",
+	); err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(
+		path.Join(c.root(), "etc", "hosts"),
+		[]byte(hostsFile),
+		0644,
+	)
+}
+
 func (c *container) postStartIsolatedNetworking() error {
 	if err := c.namespace(); err != nil {
+		return err
+	}
+
+	if err := c.setupLO(); err != nil {
 		return err
 	}
 
