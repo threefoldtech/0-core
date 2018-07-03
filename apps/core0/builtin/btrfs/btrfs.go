@@ -37,6 +37,7 @@ type btrfsFS struct {
 	TotalDevices int           `json:"total_devices"`
 	Used         int64         `json:"used"`
 	Devices      []btrfsDevice `json:"devices"`
+	Warnings     string        `json:"warnings"`
 }
 
 type btrfsDataInfo struct {
@@ -192,7 +193,6 @@ func (m *btrfsManager) list(cmd *pm.Command, args []string) ([]btrfsFS, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	fss, err := m.parseList(result.Streams.Stdout())
 	if err != nil {
 		return nil, err
@@ -405,13 +405,21 @@ func (m *btrfsManager) parseList(output string) ([]btrfsFS, error) {
 	var fss []btrfsFS
 
 	blocks := strings.Split(output, "\n\n")
-
 	for _, block := range blocks {
+		if strings.TrimSpace(block) == "" {
+			continue
+		}
+		// Ensure that fsLines starts with Label (and collect all warnings into fs.Warnings)
+		labelIdx := strings.Index(block, "Label:")
+		if labelIdx != 0 {
+			block = block[labelIdx:]
+		}
 		fsLines := strings.Split(block, "\n")
 		if len(fsLines) < 3 {
 			continue
 		}
 		fs, err := m.parseFS(fsLines)
+
 		if err != nil {
 			return fss, err
 		}
@@ -437,8 +445,18 @@ func (m *btrfsManager) parseFS(lines []string) (btrfsFS, error) {
 	if _, err := fmt.Sscanf(strings.TrimSpace(lines[1]), "Total devices %d FS bytes used %d", &totDevice, &used); err != nil {
 		return btrfsFS{}, err
 	}
-
-	devs, err := m.parseDevices(lines[2:])
+	var validDevsLines []string
+	var fsWarnings string
+	for _, line := range lines[2:] {
+		trimmedLine := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmedLine, "**") {
+			// a warning
+			fsWarnings += trimmedLine
+		} else {
+			validDevsLines = append(validDevsLines, line)
+		}
+	}
+	devs, err := m.parseDevices(validDevsLines)
 	if err != nil {
 		return btrfsFS{}, err
 	}
@@ -448,6 +466,7 @@ func (m *btrfsManager) parseFS(lines []string) (btrfsFS, error) {
 		TotalDevices: totDevice,
 		Used:         used,
 		Devices:      devs,
+		Warnings:     fsWarnings,
 	}, nil
 }
 
