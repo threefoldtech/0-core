@@ -881,12 +881,110 @@ class SystemTests(BaseTest):
         self.assertEqual(self.stdout(out), '')
 
         self.lg('Open fake port which is out of range, should fail')
-        port = randint(666666,777777)
+        port = randint(666666, 777777)
         with self.assertRaises(RuntimeError):
             self.client.nft.open_port(port)
 
         self.lg('List the ports and make sure the fake port is not there, should succeed')
         self.assertNotIn('tcp dport {} accept'.format(port), self.client.nft.list())
         self.assertEqual(self.client.nft.rule_exists(port), False)
+
+        self.lg('{} ENDED'.format(self._testID))
+
+    def test017_add_list_remove_tasks_cgroups(self):
+
+        """ g8os-046
+        *Test case for adding, listing and removing tasks for cgroups*
+
+        **Test Scenario:**
+        #. Create a cgroup (CG1), should succeed.
+        #. list tasks, should be empty.
+        #. Create a process (P1).
+        #. Add P1 as a task (T1) for cgroup (CG1).
+        #. List tasks, task1 should be found.
+        #. Remove task (T1), should succeed.
+        """
+
+        self.lg('{} STARTED'.format(self._testID))
+
+        self.lg('Create a cgroup, should succeed')
+        cg_name = '100m'
+        subsystem = 'memory'
+        self.client.cgroup.ensure(subsystem, cg_name)
+
+        self.lg('list tasks, should be empty')
+        res = self.client.cgroup.tasks(subsystem, cg_name)
+        self.assertFalse(res)
+
+        self.lg('Create a process P1')
+        command = 'sleep 200'
+        self.client.bash(command)
+        pid = self.get_process_id(command)
+
+        self.lg('Add P1 as a task (T1) for cgroup (CG1)')
+        self.client.cgroup.task_add(subsystem, cg_name, pid)
+
+        self.lg('List tasks, T1 should be found')
+        res = self.client.cgroup.tasks(subsystem, cg_name)
+        self.assertEqual(res[0], pid)
+
+        self.lg('Remove task (T1), should succeed.')
+        self.client.cgroup.task_remove(subsystem, cg_name, pid)
+        res = self.client.cgroup.tasks(subsystem, cg_name)
+        self.assertFalse(res)
+
+        self.lg('{} ENDED'.format(self._testID))
+
+    @unittest.skip('https://github.com/zero-os/0-core/issues/702')
+    def test018_add_list_remove_cgroup_subsystem(self):
+
+        """ g8os-047
+        *Test case for adding, listing and removing subsystem*
+
+        **Test Scenario:**
+        #. list cgroups, should be empty
+        #. Create two cgroups, should succeed
+        #. List cgroups, should find two.
+        #. Remove 1st cgroup, should succeed.
+        #. Set the memory limit for the 2nd cgroup to L1, should succeed.
+        #. Reset the 2nd cgroup, should succeed.
+        """
+
+        self.lg('{} STARTED'.format(self._testID))
+
+        self.lg('list cgroups, should be empty')
+        cg_list = self.client.cgroup.list()
+        self.assertFalse(cg_list)
+
+        self.lg('Create two cgroups, should succeed')
+        cg1_name = '100m'
+        cg2_name = '200m'
+        subsystem = 'memory'
+        self.client.cgroup.ensure(subsystem, cg1_name)
+        self.client.cgroup.ensure(subsystem, cg2_name)
+
+        self.lg('List cgroups, should find two.')
+        cg_list = self.client.cgroup.list()[subsystem]
+        self.assertEqual(len(cg_list), 2)
+        self.assertIn(cg1_name, cg_list)
+        self.assertIn(cg2_name, cg_list)
+
+        self.lg('Remove 1st cgroup, should succeed')
+        self.client.cgroup.remove(subsystem, cg1_name)
+        cg_list = self.client.cgroup.list()[subsystem]
+        self.assertNotIn(cg1_name, cg_list)
+        self.assertEqual(len(cg_list), 1)
+
+        self.lg('Set the memory limit for the 2nd cgroup to L1, should succeed')
+        L1 = 200 * 1024 * 1024
+        res = self.client.cgroup.memory(cg2_name, L1)
+        mem = self.stdout(self.client.bash('cat /sys/fs/cgroup/{}/{}/memory.limit_in_bytes'.format(subsystem, cg2_name)))
+        self.assertEqual(res['mem'], int(mem))
+
+        self.lg('Reset the 2nd cgroup, should succeed')
+        self.client.cgroup.reset('memory', cg2_name)
+        res = self.client.cgroup.memory(cg2_name)
+        self.assertGreater(res['mem'], L1 * 1024)
+        self.assertEqual(res['swap'], 0)
 
         self.lg('{} ENDED'.format(self._testID))
