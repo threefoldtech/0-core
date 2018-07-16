@@ -35,6 +35,7 @@ class Machinetests(BaseTest):
         self.assertGreater(len(vmx), 0)
 
         self.lg('- Create virtual machine {} , should succeed'.format(vm_name))
+        time.sleep(2)
         vm_uuid = self.create_vm(name=vm_name)
 
         self.lg('Create another vm with the same name, should fail')
