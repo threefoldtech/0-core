@@ -83,6 +83,7 @@ class Machinetests(BaseTest):
         self.assertTrue(str(C1) in containers)
 
         self.lg('Destroy C1 {}, should succeed'.format(C1))
+        time.sleep(2)
         res = self.client.container.terminate(C1)
         self.assertEqual(res, None)
 

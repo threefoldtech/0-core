@@ -81,7 +81,7 @@ class BaseTest(unittest.TestCase):
 
     def stdout(self, resource):
         return resource.get().stdout.replace('\n', '').lower()
-        
+
     def create_zerotier_network(self, private=False):
         url = 'https://my.zerotier.com/api/network'
         data = {'config': {'ipAssignmentPools': [{'ipRangeEnd': '10.147.19.254',
@@ -188,7 +188,7 @@ class BaseTest(unittest.TestCase):
             img = self.client.filesystem.exists('{}/{}'.format(img_loc, image))
             if not img:
                 rs = self.client.bash('wget {} -P {}'.format(img_dn_path, img_loc))
-                self.assertEqual(rs.get(100).state, 'SUCCESS')
+                self.assertEqual(rs.get(150).state, 'SUCCESS')
         else:
             rs = self.client.bash('mkdir -p {}'.format(img_loc))
             self.assertEqual(rs.get().state, 'SUCCESS')
