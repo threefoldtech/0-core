@@ -78,6 +78,7 @@ class ExtendedMachines(BaseTest):
             self.client.kvm.add_nic(vm_uuid, 'bridge', id=bn2)
 
         self.lg('Deattach all these nics, should succeed')
+        time.sleep(2)
         self.client.kvm.remove_nic(vm_uuid, 'vlan', id=str(t1))
         self.client.kvm.remove_nic(vm_uuid, 'vxlan', id=str(vx1_id))
         time.sleep(2)
@@ -122,6 +123,7 @@ class ExtendedMachines(BaseTest):
 
         self.lg('Attach L1 to vm1 again, vm1 should still see L1 as one vdisk')
         with self.assertRaises(RuntimeError):
+            time.sleep(2)
             self.client.kvm.attach_disk(vm_uuid, {'url': loop_dev})
         self.assertEqual(len(self.client.kvm.info(vm_uuid)['Block']), l + 1)
 
