@@ -982,7 +982,7 @@ class SystemTests(BaseTest):
         self.assertEqual(res['mem'], int(mem))
 
         self.lg('Reset the 2nd cgroup, should succeed')
-        self.client.cgroup.reset('memory', cg2_name)
+        self.client.cgroup.reset(subsystem, cg2_name)
         res = self.client.cgroup.memory(cg2_name)
         self.assertGreater(res['mem'], L1 * 1024)
         self.assertEqual(res['swap'], 0)
