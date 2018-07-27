@@ -34,7 +34,7 @@ func init() {
 }
 
 var (
-	ruleHandlerP = regexp.MustCompile(`(?m:ip saddr ([\d\./]+) masquerade # handle (\d+))`)
+	ruleHandlerP = regexp.MustCompile(`(?m:ip daddr ([\d\./]+) masquerade # handle (\d+))`)
 	HandlerP     = regexp.MustCompile(`handle (\d+)$`)
 )
 
@@ -441,7 +441,7 @@ func (b *bridgeMgr) setNAT(addr *netlink.Addr) error {
 			Chains: nft.Chains{
 				"post": nft.Chain{
 					Rules: []nft.Rule{
-						{Body: fmt.Sprintf("ip saddr %s masquerade", addr.IPNet.String())},
+						{Body: fmt.Sprintf("ip daddr %s masquerade", addr.IPNet.String())},
 					},
 				},
 			},
