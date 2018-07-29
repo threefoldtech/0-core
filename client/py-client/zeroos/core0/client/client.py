@@ -2168,7 +2168,8 @@ class KvmManager:
         'config': typchk.Or(
             typchk.IsNone(),
             typchk.Map(str, str),
-        )
+        ),
+        'storage': typchk.Or(str, typchk.IsNone())
     })
 
     _migrate_network_chk = typchk.Checker({
@@ -2222,7 +2223,7 @@ class KvmManager:
         self._client = client
 
     def create(self, name, media=None, flist=None, cpu=2, memory=512,
-               nics=None, port=None, mount=None, tags=None, config=None):
+               nics=None, port=None, mount=None, tags=None, config=None, storage=None):
         """
         :param name: Name of the kvm domain
         :param media: (optional) array of media objects to attach to the machine, where the first object is the boot device
@@ -2254,6 +2255,9 @@ class KvmManager:
                        config = {'/root/.ssh/authorized_keys': '<PUBLIC KEYS>'}
 
                        If the machine is not booted from an flist, the config are discarded
+        :param storage: A Url to the ardb storage to use to mount the root flist
+                        if not provided, the default one from core0 configuration will be used. Only applicable
+                        when booting a machine from an flist.
 
         :note: At least one media or an flist must be provided.
         :return: uuid of the virtual machine
@@ -2273,7 +2277,9 @@ class KvmManager:
             'mount': mount,
             'tags': tags,
             'config': config,
+            'storage': storage,
         }
+
         self._create_chk.check(args)
 
         if media is None and flist is None:

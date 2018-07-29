@@ -28,9 +28,12 @@ func (m *kvmManager) flistConfigOverride(target string, cfg map[string]string) e
 	return nil
 }
 
-func (m *kvmManager) flistMount(uuid, src string, cfg map[string]string) (config FListBootConfig, err error) {
+func (m *kvmManager) flistMount(uuid, src, storage string, cfg map[string]string) (config FListBootConfig, err error) {
 	namespace := fmt.Sprintf(VmNamespaceFmt, uuid)
-	storage := settings.Settings.Globals.Get("storage", "ardb://hub.gig.tech:16379")
+
+	if storage == "" {
+		storage = settings.Settings.Globals.Get("storage", "ardb://hub.gig.tech:16379")
+	}
 
 	target := path.Join(VmBaseRoot, uuid)
 	onExit := &pm.ExitHook{

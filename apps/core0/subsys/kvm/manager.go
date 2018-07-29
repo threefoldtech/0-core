@@ -204,14 +204,15 @@ type Mount struct {
 
 type CreateParams struct {
 	NicParams
-	Name   string            `json:"name"`
-	CPU    int               `json:"cpu"`
-	Memory int               `json:"memory"`
-	FList  string            `json:"flist"`
-	Mount  []Mount           `json:"mount"`
-	Media  []Media           `json:"media"`
-	Config map[string]string `json:"config"` //overrides vm config (from flist)
-	Tags   pm.Tags           `json:"tags"`
+	Name    string            `json:"name"`
+	CPU     int               `json:"cpu"`
+	Memory  int               `json:"memory"`
+	FList   string            `json:"flist"`
+	Mount   []Mount           `json:"mount"`
+	Media   []Media           `json:"media"`
+	Config  map[string]string `json:"config"` //overrides vm config (from flist)
+	Tags    pm.Tags           `json:"tags"`
+	Storage string            `json:"storage"` //ardb storage needed for g8ufs mounts.
 }
 
 type FListBootConfig struct {
@@ -913,7 +914,7 @@ func (m *kvmManager) create(cmd *pm.Command) (uuid interface{}, err error) {
 
 	if len(params.FList) != 0 {
 		var config FListBootConfig
-		config, err = m.flistMount(domain.UUID, params.FList, params.Config)
+		config, err = m.flistMount(domain.UUID, params.FList, params.Storage, params.Config)
 		if err != nil {
 			return nil, err
 		}
@@ -1533,7 +1534,7 @@ func (m *kvmManager) removeNic(cmd *pm.Command) (interface{}, error) {
 	if err = m.detachDevice(params.UUID, inf.Alias.Name, string(ifxml)); err != nil {
 		return nil, err
 	}
-  
+
 	return nil, m.updateNics(params.UUID)
 }
 
