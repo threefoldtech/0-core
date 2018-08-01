@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"github.com/vishvananda/netlink"
-	"github.com/zero-os/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 type ipmgr struct{}

@@ -10,8 +10,8 @@ import (
 
 	"github.com/op/go-logging"
 	"github.com/patrickmn/go-cache"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/apps/core0/transport"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/apps/core0/transport"
 )
 
 const (
