@@ -3053,7 +3053,7 @@ class ZFSManager():
         return yaml.load(buf)
 
     def _valid_hash_range(self, hr):
-        m = re.match(r'^([0-9a-f]+)(?::([0-9a-f]+))$', hr)
+        m = re.match(r'^([0-9a-fA-F]+)(?::([0-9a-fA-F]+))$', hr)
         if m is None:
             raise ValueError('invalid hash range "%s"' % hr)
 
@@ -3098,6 +3098,22 @@ class ZFSManager():
         provided by the flist, no local pools or caching will happen.
         """
         self._client.filesystem.remove(self.PATH)
+
+    def set_cache(self, destination):
+        """
+        A simple method to set local cache redis, or zdb in one go. It overrides
+        any entries in the routing table.
+        """
+
+        self.config = {
+            'pools': {
+                'local': {
+                    '00:FF': destination,
+                }
+            },
+            'lookup': ['local'],
+            'cache': ['local'],
+        }
 
 
 class Client(BaseClient):
