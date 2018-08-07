@@ -17,10 +17,12 @@ import (
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/pm/stream"
 	"github.com/threefoldtech/0-core/base/settings"
+	"github.com/threefoldtech/0-core/base/utils"
 )
 
 const (
-	CacheBaseDir = "/var/cache"
+	CacheBaseDir    = "/var/cache"
+	LocalRouterFile = CacheBaseDir + "/router.yaml"
 )
 
 func Hash(s string) string {
@@ -189,7 +191,7 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 			return err
 		}
 	} else {
-		//assume an flist, an flist requires the meat and storage url
+		//assume an flist, an flist requires the meta and storage url
 		db, err := getMetaDB(backend, src)
 		if err != nil {
 			return err
@@ -198,6 +200,13 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 		g8ufs = append(g8ufs,
 			"-meta", db,
 			"-storage-url", storage,
+		)
+	}
+
+	//local router files
+	if utils.Exists(LocalRouterFile) {
+		g8ufs = append(g8ufs,
+			"-local-router", LocalRouterFile,
 		)
 	}
 
