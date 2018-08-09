@@ -13,7 +13,6 @@ import (
 
 	"github.com/op/go-logging"
 	"github.com/pborman/uuid"
-	"github.com/vishvananda/netlink"
 	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
 	"github.com/threefoldtech/0-core/apps/core0/screen"
 	"github.com/threefoldtech/0-core/apps/core0/subsys/cgroups"
@@ -21,6 +20,7 @@ import (
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/settings"
 	"github.com/threefoldtech/0-core/base/utils"
+	"github.com/vishvananda/netlink"
 )
 
 const (
@@ -300,6 +300,9 @@ func ContainerSubsystem(sink *transport.Sink, cell *screen.RowCell) (ContainerMa
 	pm.RegisterBuiltIn(cmdContainerPortForwardRemove, containerMgr.portforwardRemove)
 	pm.RegisterBuiltIn(cmdContainerBackup, containerMgr.backup)
 	pm.RegisterBuiltIn(cmdContainerRestore, containerMgr.restore)
+
+	// flist specific commands
+	pm.RegisterBuiltIn(cmdFlistCreate, containerMgr.flistCreate)
 
 	//container specific info
 	pm.RegisterBuiltIn(cmdContainerZerotierInfo, containerMgr.ztInfo)
