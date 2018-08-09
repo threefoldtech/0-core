@@ -22,6 +22,7 @@ import (
 
 const (
 	CacheBaseDir    = "/var/cache"
+	CacheZeroFSDir  = CacheBaseDir + "/zerofs"
 	LocalRouterFile = CacheBaseDir + "/router.yaml"
 )
 
@@ -176,7 +177,7 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 	os.RemoveAll(backend)
 	os.MkdirAll(backend, 0755)
 
-	cache := settings.Settings.Globals.Get("cache", path.Join(CacheBaseDir, "zerofs"))
+	cache := settings.Settings.Globals.Get("cache", CacheZeroFSDir)
 	g8ufs := []string{
 		"-reset",
 		"-backend", backend,
