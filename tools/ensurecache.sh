@@ -36,7 +36,7 @@ function preparedisk {
 
     if [ "$DISK" == "" ]; then
         error "no free disks found"
-        exit 1
+        return 1
     fi
 
     parted -s ${DISK} mktable gpt
@@ -106,11 +106,15 @@ function main {
         # no parition found with that label
         # prepare the first availabel disk
 	    log "${LABEL} not mounted, search for available disk"
-        preparedisk
-        labelmount ${LABEL} ${MNT}
+        if preparedisk; then
+            labelmount ${LABEL} ${MNT}
+        fi
     fi
 
-    hook $MNT
+    if mountpoint -q ${MNT}; then
+        hook ${MNT}
+    fi
+
     sharedcache
 }
 
