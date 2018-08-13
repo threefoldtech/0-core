@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/tidwall/redcon"
 	"github.com/threefoldtech/0-core/apps/redis-proxy/assets"
+	"github.com/tidwall/redcon"
 )
 
 func newPool(socket string) *redis.Pool {
@@ -30,17 +30,17 @@ type redisProxy struct {
 	doAuth     bool
 }
 
-//liste to core0 port and
-func Proxy(listen, redis, organization string) error {
+//Proxy start redis proxy
+func Proxy(listen, redis string, organizations []string) error {
 	authMethod := func(_ string) bool {
 		return true
 	}
 
 	doAuth := false
 
-	if organization != "" {
+	if len(organizations) > 0 {
 		var err error
-		authMethod, err = AuthMethod(organization, string(assets.MustAsset("text/itsyouonline.pub")))
+		authMethod, err = AuthMethod(organizations, string(assets.MustAsset("text/itsyouonline.pub")))
 		if err != nil {
 			return err
 		}

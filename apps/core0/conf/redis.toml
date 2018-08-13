@@ -12,7 +12,7 @@ args = [
 
 [startup.redis-proxy]
 name = "core.system"
-condition = "development"
+condition = "or(development, support)"
 after = ["redis"]
 protected = true
 
@@ -25,8 +25,7 @@ args = [
 
 [startup.redis-port]
 name = "nft.open_port"
-#open port only if `development`
-condition = "development"
+condition = "or(development, support)"
 
 [startup.redis-port.args]
 port=6379

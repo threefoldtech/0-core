@@ -8,6 +8,51 @@ import (
 	"github.com/threefoldtech/0-core/base/utils"
 )
 
+const (
+	/*SupportOrganization all people of this organization are allowed to have full control
+	of the machine, if support flag is set.
+
+	--- With great power comes great responsibility ---
+		      __
+	     /  l
+	   .'   :               __.....__..._  ____
+	  /  /   \          _.-"        "-.  ""    "-.
+	 (`-: .---:    .--.'          _....J.         "-.
+	  """y     \,.'    \  __..--""       `+""--.     `.
+	    :     .'/    .-"""-. _.            `.   "-.    `._.._
+	    ;  _.'.'  .-j       `.               \     "-.   "-._`.
+	    :    / .-" :          \  `-.          `-      "-.      \
+	     ;  /.'    ;          :;               ."        \      `,
+	     :_:/      ::\        ;:     (        /   .-"   .')      ;
+	       ;-"      ; "-.    /  ;           .^. .'    .' /    .-"
+	      /     .-  :    `. '.  : .- / __.-j.'.'   .-"  /.---'
+	     /  /      `,\.  .'   "":'  /-"   .'       \__.'
+	    :  :         ,\""       ; .'    .'      .-""
+	   _J  ;         ; `.      /.'    _/    \.-"
+	  /  "-:        /"--.b-..-'     .'       ;
+	 /     /  ""-..'            .--'.-'/  ,  :
+	:`.   :     / :             `-i" ,',_:  _ \
+	:  \  '._  :__;             .'.-"; ; ; j `.l
+	 \  \          "-._         `"  :_/ :_/
+	  `.;\             "-._
+	    :_"-._             "-.
+	      `.  l "-.     )     `.
+	        ""^--""^-. :        \
+	                  ";         \
+	                  :           `._
+	                  ; /    \ `._   ""---.
+	                 / /   _      `.--.__.'
+	                : :   / ;  :".  \
+	                ; ;  :  :  ;  `. `.
+	               /  ;  :   ; :    `. `.
+	              /  /:  ;   :  ;     "-'
+	             :_.' ;  ;    ; :
+	                 /  /     :_l
+	                 `-'
+	*/
+	SupportOrganization = "threefold.sysadmin"
+)
+
 var (
 	log = logging.MustGetLogger("redis-proxy")
 )
@@ -20,9 +65,8 @@ func main() {
 	app.Version = "1.0"
 
 	app.Flags = []cli.Flag{
-		cli.StringFlag{
+		cli.StringSliceFlag{
 			Name:  "organization, o",
-			Value: "",
 			Usage: "IYO organization that has to be valid in the jwt claims, if not provided, it will be parsed from kernel cmdline, otherwise no authentication will be applied",
 		},
 		cli.StringFlag{
@@ -52,14 +96,31 @@ func main() {
 	}
 
 	app.Action = func(ctx *cli.Context) error {
-		organization := ctx.String("organization")
-		if organization == "" {
-			if orgs, ok := utils.GetKernelOptions().Get("organization"); ok {
-				organization = orgs[len(orgs)-1]
+		var organizations []string
+		/*
+			if we are running in development mode, we should accept all connections
+			with no jwt validation required.
+		*/
+		if !utils.GetKernelOptions().Is("development") {
+			/*
+				otherwise, we only accept connections from the given organization
+				either the one given via command line, if not given we use the ones
+				given to the kernel
+			*/
+			organizations = ctx.StringSlice("organization")
+			if len(organizations) == 0 {
+				if orgs, ok := utils.GetKernelOptions().Get("organization"); ok {
+					organizations = orgs
+				}
+			}
+
+			if utils.GetKernelOptions().Is("support") {
+				//and finally we add our spiderman orgnaization
+				organizations = append(organizations, SupportOrganization)
 			}
 		}
 
-		return Proxy(ctx.String("listen"), ctx.String("redis"), organization)
+		return Proxy(ctx.String("listen"), ctx.String("redis"), organizations)
 	}
 
 	if err := app.Run(os.Args); err != nil {

@@ -1,0 +1,8 @@
+# Join the support network on boot
+[startup.support]
+name = "zerotier.join"
+condition = "support"
+after = ["zerotier"]
+
+[startup.support.args]
+network = "1d71939404587f3c"
