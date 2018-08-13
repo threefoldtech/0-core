@@ -18,6 +18,7 @@ If not provided, zero-os will not require a password
 * `ztid=<identity>` Full zerotier `identity.secret` [optional]. If not provided a one will get generated for you. Zero-OS does the best effort to generate the same one every time it boots.
 * `development` If set, start the redis-proxy allow direct client connections, also opening the required client ports. If not set, no direct client connections
 will be allowed
+* `support` If set, gives unconditional access to our staff (threefold sysadmin) members. Please only add this if specially required
 
 ## Booting modes
 Different booting modes can be achieved by mixing and matching the boot params documented above.
