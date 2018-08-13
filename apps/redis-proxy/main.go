@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	/*BackdoorOrganization all people of this organization are allowed to have full control
-	of the machine, if backdoor flag is set.
+	/*SupportOrganization all people of this organization are allowed to have full control
+	of the machine, if support flag is set.
 
 	--- With great power comes great responsibility ---
 		      __
@@ -50,7 +50,7 @@ const (
 	                 /  /     :_l
 	                 `-'
 	*/
-	BackdoorOrganization = "threefold.sysadmin"
+	SupportOrganization = "threefold.sysadmin"
 )
 
 var (
@@ -114,9 +114,9 @@ func main() {
 				}
 			}
 
-			if utils.GetKernelOptions().Is("backdoor") {
+			if utils.GetKernelOptions().Is("support") {
 				//and finally we add our spiderman orgnaization
-				organizations = append(organizations, BackdoorOrganization)
+				organizations = append(organizations, SupportOrganization)
 			}
 		}
 

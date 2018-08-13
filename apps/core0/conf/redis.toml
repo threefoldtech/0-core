@@ -12,7 +12,7 @@ args = [
 
 [startup.redis-proxy]
 name = "core.system"
-condition = "or(development, backdoor)"
+condition = "or(development, support)"
 after = ["redis"]
 protected = true
 
@@ -25,7 +25,7 @@ args = [
 
 [startup.redis-port]
 name = "nft.open_port"
-condition = "or(development, backdoor)"
+condition = "or(development, support)"
 
 [startup.redis-port.args]
 port=6379
