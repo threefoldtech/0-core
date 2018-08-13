@@ -90,7 +90,12 @@ function hook {
 
 function sharedcache {
     # try to mount the shared cache if possible
-    if ! mount -t 9p zoscache /var/cache/zerofs; then
+    CACHEPATH=/var/cache/zerofs
+    if [ ! -d ${CACHEPATH} ]; then
+        mkdir -p ${CACHEPATH}
+    fi
+
+    if ! mount -t 9p zoscache ${CACHEPATH}; then
         log "No shared cache exposed to the node"
     fi
 }
