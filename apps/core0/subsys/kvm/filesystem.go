@@ -32,7 +32,7 @@ func (m *kvmManager) flistMount(uuid, src, storage string, cfg map[string]string
 	namespace := fmt.Sprintf(VmNamespaceFmt, uuid)
 
 	if storage == "" {
-		storage = settings.Settings.Globals.Get("storage", "zdb://hub.gig.tf:9900")
+		storage = settings.Settings.Globals.Get("storage", "zdb://hub.grid.tf:9900")
 	}
 
 	target := path.Join(VmBaseRoot, uuid)

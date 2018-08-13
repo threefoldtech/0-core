@@ -33,7 +33,7 @@ func (c *container) mountFList(src string, target string, hooks ...pm.RunnerHook
 	namespace := fmt.Sprintf("containers/%s", c.name())
 	storage := c.Args.Storage
 	if storage == "" {
-		storage = settings.Settings.Globals.Get("storage", "zdb://hub.gig.tf:9900")
+		storage = settings.Settings.Globals.Get("storage", "zdb://hub.grid.tf:9900")
 		c.Args.Storage = storage
 	}
 
