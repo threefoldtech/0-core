@@ -5,8 +5,8 @@ package kvm
 
 import (
 	"github.com/op/go-logging"
-	"github.com/zero-os/0-core/apps/core0/screen"
-	"github.com/zero-os/0-core/apps/core0/subsys/containers"
+	"github.com/threefoldtech/0-core/apps/core0/screen"
+	"github.com/threefoldtech/0-core/apps/core0/subsys/containers"
 )
 
 var (

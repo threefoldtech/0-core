@@ -2,7 +2,7 @@ package filesystem
 
 import (
 	"fmt"
-	"github.com/zero-os/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/pm"
 	"net/url"
 )
 

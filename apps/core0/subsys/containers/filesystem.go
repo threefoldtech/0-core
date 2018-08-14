@@ -13,10 +13,10 @@ import (
 	"syscall"
 
 	"github.com/shirou/gopsutil/disk"
-	"github.com/zero-os/0-core/apps/core0/helper/filesystem"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/settings"
-	"github.com/zero-os/0-core/base/utils"
+	"github.com/threefoldtech/0-core/apps/core0/helper/filesystem"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/settings"
+	"github.com/threefoldtech/0-core/base/utils"
 )
 
 const (
@@ -33,7 +33,7 @@ func (c *container) mountFList(src string, target string, hooks ...pm.RunnerHook
 	namespace := fmt.Sprintf("containers/%s", c.name())
 	storage := c.Args.Storage
 	if storage == "" {
-		storage = settings.Settings.Globals.Get("storage", "ardb://hub.gig.tech:16379")
+		storage = settings.Settings.Globals.Get("storage", "zdb://hub.grid.tf:9900")
 		c.Args.Storage = storage
 	}
 

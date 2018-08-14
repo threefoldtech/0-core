@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zero-os/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm/stream"
 )
 
 //RunnerHook is a per process event handler

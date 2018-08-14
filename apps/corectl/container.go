@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/codegangsta/cli"
 	"github.com/olekukonko/tablewriter"
-	"github.com/zero-os/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/pm"
 	"gopkg.in/yaml.v2"
 	"os"
 	"sort"

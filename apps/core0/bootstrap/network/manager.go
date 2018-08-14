@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/op/go-logging"
 	"github.com/vishvananda/netlink"
-	"github.com/zero-os/0-core/base/utils"
+	"github.com/threefoldtech/0-core/base/utils"
 )
 
 var (

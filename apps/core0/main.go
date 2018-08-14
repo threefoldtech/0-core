@@ -5,26 +5,26 @@ import (
 	"os"
 
 	"github.com/op/go-logging"
-	"github.com/zero-os/0-core/apps/core0/assets"
-	"github.com/zero-os/0-core/apps/core0/bootstrap"
-	"github.com/zero-os/0-core/apps/core0/logger"
-	"github.com/zero-os/0-core/apps/core0/options"
-	"github.com/zero-os/0-core/apps/core0/screen"
-	"github.com/zero-os/0-core/apps/core0/stats"
-	"github.com/zero-os/0-core/apps/core0/subsys/cgroups"
-	"github.com/zero-os/0-core/apps/core0/subsys/containers"
-	"github.com/zero-os/0-core/apps/core0/subsys/kvm"
-	"github.com/zero-os/0-core/base"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/settings"
+	"github.com/threefoldtech/0-core/apps/core0/assets"
+	"github.com/threefoldtech/0-core/apps/core0/bootstrap"
+	"github.com/threefoldtech/0-core/apps/core0/logger"
+	"github.com/threefoldtech/0-core/apps/core0/options"
+	"github.com/threefoldtech/0-core/apps/core0/screen"
+	"github.com/threefoldtech/0-core/apps/core0/stats"
+	"github.com/threefoldtech/0-core/apps/core0/subsys/cgroups"
+	"github.com/threefoldtech/0-core/apps/core0/subsys/containers"
+	"github.com/threefoldtech/0-core/apps/core0/subsys/kvm"
+	"github.com/threefoldtech/0-core/base"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/settings"
 
 	"os/signal"
 	"syscall"
 
-	_ "github.com/zero-os/0-core/apps/core0/builtin"
-	_ "github.com/zero-os/0-core/apps/core0/builtin/btrfs"
-	"github.com/zero-os/0-core/apps/core0/transport"
-	_ "github.com/zero-os/0-core/base/builtin"
+	_ "github.com/threefoldtech/0-core/apps/core0/builtin"
+	_ "github.com/threefoldtech/0-core/apps/core0/builtin/btrfs"
+	"github.com/threefoldtech/0-core/apps/core0/transport"
+	_ "github.com/threefoldtech/0-core/base/builtin"
 )
 
 var (
@@ -70,7 +70,7 @@ func Splash() {
 	screen.Push(&screen.TextSection{
 		Attributes: screen.Attributes{screen.Bold},
 		Text: fmt.Sprintf("Boot Params: %s",
-			options.Options.Kernel.String("debug", "organization", "zerotier", "quiet", "development"), //flags we care about
+			options.Options.Kernel.String("debug", "organization", "zerotier", "quiet", "development", "support"), //flags we care about
 		),
 	})
 	screen.Push(&screen.TextSection{})

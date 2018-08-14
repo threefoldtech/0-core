@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	psutils "github.com/shirou/gopsutil/process"
-	"github.com/zero-os/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm/stream"
 )
 
 type SystemCommandArguments struct {

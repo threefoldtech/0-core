@@ -9,12 +9,12 @@ import (
 
 	"github.com/op/go-logging"
 	"github.com/vishvananda/netlink"
-	"github.com/zero-os/0-core/apps/core0/bootstrap/network"
-	"github.com/zero-os/0-core/apps/core0/options"
-	"github.com/zero-os/0-core/apps/core0/screen"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/settings"
-	"github.com/zero-os/0-core/base/utils"
+	"github.com/threefoldtech/0-core/apps/core0/bootstrap/network"
+	"github.com/threefoldtech/0-core/apps/core0/options"
+	"github.com/threefoldtech/0-core/apps/core0/screen"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/settings"
+	"github.com/threefoldtech/0-core/base/utils"
 )
 
 const (

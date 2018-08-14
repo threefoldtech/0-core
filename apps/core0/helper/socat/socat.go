@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/zero-os/0-core/base/nft"
+	"github.com/threefoldtech/0-core/base/nft"
 
 	"github.com/op/go-logging"
 )

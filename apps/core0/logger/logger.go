@@ -2,7 +2,7 @@ package logger
 
 import (
 	"github.com/op/go-logging"
-	"github.com/zero-os/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm/stream"
 )
 
 var (

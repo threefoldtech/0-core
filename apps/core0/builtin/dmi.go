@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/zero-os/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 //DMIType (allowed types 0 -> 42)

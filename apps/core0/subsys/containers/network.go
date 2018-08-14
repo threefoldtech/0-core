@@ -15,8 +15,8 @@ import (
 
 	"github.com/pborman/uuid"
 	"github.com/vishvananda/netlink"
-	"github.com/zero-os/0-core/apps/core0/helper/socat"
-	"github.com/zero-os/0-core/base/pm"
+	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 const (
