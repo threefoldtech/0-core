@@ -107,13 +107,12 @@ class SystemTests(BaseTest):
         lines = client.bash('dmidecode -t bios').get().stdout.splitlines()
         mapping = {'Vendor':'vendor', 'Version':'version','Release Date':'release date','Address':'address', 
                     'Runtime Size':'runtime size', 'ROM Size':'rom size','BIOS Revision':'bios revision' }
-        keys = mapping.keys()
 
         for line in lines:
             line = line.replace('\t', '')
-            for key in keys:
+            for key in mapping.keys():
                 if key == line[:line.find(':')]:
-                    item = (line[line.index(':')+2:])
+                    item = (line[line.index(':') + 2 :])
                     mapping[key] = item
         
         return mapping
@@ -1019,28 +1018,27 @@ class SystemTests(BaseTest):
 
         self.lg('get dmi_bios info using g8os client')
         bios_info = self.client.info.dmi('bios')['BIOS Information']['properties']
-        
-        keys = ['Vendor','Version','Release Date','Address','Runtime Size','ROM Size','BIOS Revision']
-        bios_info_map = dict()
-        for k in keys:
-            bios_info_map[k] = bios_info[k]['value']
+
+        for k in dmi_bois_info.keys():
+            bios_info_value = bios_info[k]['value']
+            self.assertEqual(dmi_bois_info[k],bios_info_value)
             
-        self.lg('compare g8os results to bash results')
-        self.assertEqual(dmi_bois_info,bios_info_map)
 
     @parameterized.expand(['client', 'container'])
     def test020_mkdir_chown_remove_directory(self, client_type):
         """ g8os-049
-        *Test case for test filesystem mkdir, chown methods*
+        *Test case for testing filesystem mkdir and chown methods*
 
         **Test Scenario:**
         #. Make new directory (D1), should succeed
-        #. Check directory (D1) exists, should succeed
-        #. Add new user (U1) using bash and make sure that it created
+        #. Check directory (D1) exists, should be there
+        #. Get user owner and group owner using bash
+        #. Check directory (D1) user owner and group owner belong to (root) , should succeed
+        #. Add new user (U1) using bash and make sure that it's created
         #. Change directory (D1) user owner and group owner to the new user (U1) using filesystem chown method
         #. Get user owner and group owner using bash
-        #. Check directory (D1) user owner and group owner belong to the new user (U1), should success
-        #. Remove user (U1), should success
+        #. Check if directory (D1) user owner and group owner belong to the new user (U1), should succeed
+        #. Remove user (U1), should succeed
         #. Remove directory (D1), should succeed
         """
         if client_type == 'client':
@@ -1057,31 +1055,33 @@ class SystemTests(BaseTest):
         dir_name = self.rand_str()
         client.filesystem.mkdir(dir_name)
 
-        self.lg('Check directory (D1) is exists, should succeed')
-        ## using bash
-        ls = client.bash('ls').get().stdout.splitlines()
-        self.assertIn(dir_name, ls)
-        ## using bash filesystem.list
-        ls = [x['name'] for x in client.filesystem.list('.')]
-        self.assertIn(dir_name, ls)
+        self.lg('Check if directory (D1) is exists, should be there')
         ## using bash filesystem.exists
         self.assertTrue(client.filesystem.exists(dir_name))
 
-        self.lg('Add new user (U1) using bash and make sure that it created')
+        self.lg('Add new user (U1) using bash and make sure that it is created')
         new_user = self.rand_str()
         state = client.bash('adduser {} {} '.format(adduser_options,new_user)).get().state
         self.assertEqual(state, 'SUCCESS')
 
+        self.lg('Get user owner and group owner using bash')
+        user_owner_1 = client.bash('stat -c %U {}'.format(dir_name)).get().stdout.splitlines()[0]
+        group_owner_1 = client.bash('stat -c %G {}' .format(dir_name)).get().stdout.splitlines()[0]
+
+        self.lg('Check directory (D1) user owner and group owner belong to (root), should succeed')
+        self.assertEqual(user_owner_1, 'root')
+        self.assertEqual(group_owner_1, 'root')
+
         self.lg('Change directory (D1) user owner and group owner to the new user (U1) using filesystem chown method')
-        client.filesystem.chown('{}'.format(dir_name),'{}'.format(new_user),'{}'.format(new_user))
+        client.filesystem.chown('{}'.format(dir_name), '{}'.format(new_user), '{}'.format(new_user))
 
         self.lg('Get user owner and group owner using bash')
-        user_owner = client.bash('stat -c %U {}'.format(dir_name)).get().stdout.splitlines()[0]
-        group_owner = client.bash('stat -c %G {}' .format(dir_name)).get().stdout.splitlines()[0]
+        user_owner_2 = client.bash('stat -c %U {}'.format(dir_name)).get().stdout.splitlines()[0]
+        group_owner_2 = client.bash('stat -c %G {}' .format(dir_name)).get().stdout.splitlines()[0]
 
-        self.lg('Check directory (D1) user owner and group owner belong to the new user (U1), should success')
-        self.assertEqual(user_owner, new_user)
-        self.assertEqual(group_owner, new_user)
+        self.lg('Check directory (D1) user owner and group owner belong to the new user (U1), should succeed')
+        self.assertEqual(user_owner_2, new_user)
+        self.assertEqual(group_owner_2, new_user)
 
         self.lg('Remove directory (D1), should succeed')
         client.filesystem.remove(dir_name)

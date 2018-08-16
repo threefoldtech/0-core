@@ -152,35 +152,26 @@ class Machinetests(BaseTest):
     def test004_pause_resume_get_kvm(self):
         """ g8os-050
 
-        *Test case for testing pause resume VMs*
+        *Test case for testing pausing resuming VMs*
 
         **Test Scenario:**
-
-        #. Check that system support hardware virtualization
         #. Create virtual machine (VM), should succeed
-        #. Pause the VM and check state from get method ,shoud paused 
-        #. Resume the VM and check state from get method, should resumed
+        #. Pause the VM and check state from get method, should be paused 
+        #. Resume the VM and check state from get method, should be resumed
         #. Destroy VM1, should succeed
         """
 
         self.lg('{} STARTED'.format(self._testID))
         vm_name = self.rand_str()
-
-        self.lg('- Check that it support hardware virtualization ')
-        responce = self.client.info.cpu()
-        vmx = ['vmx'or'svm' in dec['flags'] for dec in responce]
-        self.assertGreater(len(vmx), 0)
-
         self.lg('- Create virtual machine {} , should succeed'.format(vm_name))
         vm_uuid = self.create_vm(name=vm_name)
 
-        self.lg('Pause the VM and check state from get method ,shoud paused')
+        self.lg('Pause the VM and check state from get method ,should be paused')
         self.client.kvm.pause(vm_uuid)
         state_1 = self.client.kvm.get(vm_uuid)['state']
         self.assertEqual(state_1,'paused')
         
-
-        self.lg('Resume the VM and check state from get method, should resumed')
+        self.lg('Resume the VM and check state from get method, should be resumed')
         self.client.kvm.resume(vm_uuid)
         state_2 = self.client.kvm.get(vm_uuid)['state']
         self.assertEqual(state_2,'running')
