@@ -1,24 +1,27 @@
 package bootstrap
 
 import (
+	"context"
 	"fmt"
-	"net/http"
+	"net"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/op/go-logging"
-	"github.com/vishvananda/netlink"
+	"github.com/patrickmn/go-cache"
 	"github.com/threefoldtech/0-core/apps/core0/bootstrap/network"
 	"github.com/threefoldtech/0-core/apps/core0/options"
 	"github.com/threefoldtech/0-core/apps/core0/screen"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/settings"
 	"github.com/threefoldtech/0-core/base/utils"
+	"github.com/vishvananda/netlink"
 )
 
 const (
-	InternetTestAddress = "http://google.com/"
+	InternetTestAddress = "google.com"
+	InternetTestPort    = "80"
 
 	screenStateLine = "->%25s: %s %s"
 )
@@ -31,6 +34,7 @@ type Bootstrap struct {
 	i     *settings.IncludedSettings
 	t     settings.StartupTree
 	agent bool
+	rs    *cache.Cache
 }
 
 func NewBootstrap(agent bool) *Bootstrap {
@@ -55,6 +59,7 @@ func NewBootstrap(agent bool) *Bootstrap {
 		i:     included,
 		t:     t,
 		agent: agent,
+		rs:    cache.New(20*time.Minute, 5*time.Minute),
 	}
 
 	return b
@@ -75,12 +80,31 @@ func (b *Bootstrap) startupServices(s, e settings.After) {
 	log.Debugf("'%s' services are booted", s)
 }
 
+func (b *Bootstrap) resolve(host string) (string, error) {
+	if addr, ok := b.rs.Get(host); ok {
+		return addr.(string), nil
+	}
+
+	addresses, err := net.DefaultResolver.LookupHost(context.Background(), host)
+	if err != nil {
+		return "", err
+	}
+
+	b.rs.Set(host, addresses[0], cache.DefaultExpiration)
+	return addresses[0], nil
+}
+
 func (b *Bootstrap) canReachInternet() bool {
-	resp, err := http.Get(InternetTestAddress)
+	addr, err := b.resolve(InternetTestAddress)
+	if err != nil {
+		log.Debugf("failed to resolve '%s': %s", InternetTestAddress, err)
+		return false
+	}
+	con, err := net.Dial("tcp", addr+":"+InternetTestPort)
 	if err != nil {
 		return false
 	}
-	resp.Body.Close()
+	con.Close()
 	return true
 }
 
@@ -128,11 +152,12 @@ func (b *Bootstrap) setupNetworking() error {
 
 	log.Debugf("waiting for internet reachability")
 	now := time.Now()
-	for time.Since(now) < time.Minute {
+	for time.Since(now) < 2*time.Minute {
 		if b.canReachInternet() {
 			log.Info("can reach the internet")
 			return nil
 		}
+		<-time.After(3 * time.Second)
 	}
 
 	log.Warning("can not reach interent, continue booting anyway")
@@ -154,7 +179,9 @@ func (b *Bootstrap) screen() {
 	reachability := &screen.TextSection{
 		Text: fmt.Sprintf(screenStateLine, "Reachability", reachable, ""),
 	}
-
+	const refreshEvery = 5
+	const refreshNetStateEvery = 10 * 60 / refreshEvery //10min
+	netUpdate := refreshNetStateEvery
 	for {
 		links, err := netlink.LinkList()
 		if err != nil {
@@ -179,18 +206,21 @@ func (b *Bootstrap) screen() {
 		}
 
 		section.Sections = append(section.Sections, progress, reachability)
-		progress.Enter()
-		progress.Text = fmt.Sprintf(screenStateLine, "Internet Connectivity", "", "")
-
-		if b.canReachInternet() {
-			progress.Text = fmt.Sprintf(screenStateLine, "Internet Connectivity", "OK", "")
-		} else {
-			progress.Text = fmt.Sprintf(screenStateLine, "Internet Connectivity", "NOT OK", "")
+		netUpdate++
+		if netUpdate >= refreshNetStateEvery {
+			progress.Enter()
+			progress.Text = fmt.Sprintf(screenStateLine, "Internet Connectivity", "", "")
+			if b.canReachInternet() {
+				progress.Text = fmt.Sprintf(screenStateLine, "Internet Connectivity", "OK", "")
+				netUpdate = 0 //reset counter
+			} else {
+				progress.Text = fmt.Sprintf(screenStateLine, "Internet Connectivity", "NOT OK", "")
+			}
 		}
 
 		progress.Leave()
 		screen.Refresh()
-		<-time.After(5 * time.Second)
+		<-time.After(refreshEvery * time.Second)
 	}
 }
 
