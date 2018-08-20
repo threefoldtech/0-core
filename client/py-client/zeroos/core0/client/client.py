@@ -2149,6 +2149,8 @@ class KvmManager:
         'name': str,
         'media': typchk.Or([_media_dict], typchk.IsNone()),
         'flist': typchk.Or(str, typchk.IsNone()),
+        'cmdline': typchk.Or(str, typchk.IsNone()),
+        'share_cache': bool,
         'cpu': int,
         'memory': int,
         'nics': [{
@@ -2227,7 +2229,8 @@ class KvmManager:
         self._client = client
 
     def create(self, name, media=None, flist=None, cpu=2, memory=512,
-               nics=None, port=None, mount=None, tags=None, config=None, storage=None):
+               nics=None, port=None, mount=None, tags=None, config=None, storage=None,
+               cmdline=None, share_cache=False):
         """
         :param name: Name of the kvm domain
         :param media: (optional) array of media objects to attach to the machine, where the first object is the boot device
@@ -2262,6 +2265,10 @@ class KvmManager:
         :param storage: A Url to the ardb storage to use to mount the root flist
                         if not provided, the default one from core0 configuration will be used. Only applicable
                         when booting a machine from an flist.
+        :param cmdline: When booting from an flist, add extra kernel cmdline arguments
+        :param share_cache: if set to true, the /var/cache/zerofs directory will be shared to guest machine
+                        as 'zoscache' in rw mode. It's equavilint to adding {'source': '/var/cache/zerofs', 'target': 'zoscahe', readonly: False}
+                        to the `mount` option.
 
         :note: At least one media or an flist must be provided.
         :return: uuid of the virtual machine
@@ -2275,6 +2282,7 @@ class KvmManager:
             'media': media,
             'cpu': cpu,
             'flist': flist,
+            'cmdline': cmdline,
             'memory': memory,
             'nics': nics,
             'port': port,
@@ -2282,6 +2290,7 @@ class KvmManager:
             'tags': tags,
             'config': config,
             'storage': storage,
+            'share_cache': share_cache,
         }
 
         self._create_chk.check(args)
