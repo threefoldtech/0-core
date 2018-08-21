@@ -87,11 +87,22 @@ func (*console) Result(cmd *pm.Command, result *pm.JobResult) {
 	log.Debugf("Job result for command '%s' is '%s'", cmd, result.State)
 }
 
+func startEntropyGenerator() error {
+	log.Debug("starte haveged to generate entropy")
+	cmd := exec.Command("haveged", "-w 1024", "-d 32", "-i 32", "-v 1")
+	_, err := cmd.CombinedOutput()
+	return err
+}
+
 func main() {
 	var options = options.Options
 	fmt.Println(core.Version())
 	if options.Version() {
 		os.Exit(0)
+	}
+
+	if err := startEntropyGenerator(); err != nil {
+		log.Fatalf("fail to start entropy generator: %v", err)
 	}
 
 	pm.New()
