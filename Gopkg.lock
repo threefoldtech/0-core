@@ -115,11 +115,12 @@
   version = "v2.1.0"
 
 [[projects]]
-  digest = "1:a6d425a7d56bba95917a8da9f00e3b287c4e009121b0c4c35c854185062460bb"
+  digest = "1:361de06aa7ae272616cbe71c3994a654cc6316324e30998e650f7765b20c5b33"
   name = "github.com/pborman/uuid"
   packages = ["."]
   pruneopts = "UT"
-  revision = "dee7705ef7b324f27ceb85a121c61f2c2e8ce988"
+  revision = "e790cca94e6cc75c7064b1332e63811d4aae1a53"
+  version = "v1.1"
 
 [[projects]]
   digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
