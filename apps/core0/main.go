@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/op/go-logging"
 	"github.com/threefoldtech/0-core/apps/core0/assets"
