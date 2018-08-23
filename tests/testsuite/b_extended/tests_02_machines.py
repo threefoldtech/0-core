@@ -7,7 +7,7 @@ class ExtendedMachines(BaseTest):
 
     def __init__(self, *args, **kwargs):
         super(ExtendedMachines, self).__init__(*args, **kwargs)
-        self.check_g8os_connection(ExtendedMachines)
+        self.check_zos_connection(ExtendedMachines)
         containers = self.client.container.find('ovs')
         ovs_exist = [key for key, value in containers.items()]
         if not ovs_exist:
@@ -22,10 +22,10 @@ class ExtendedMachines(BaseTest):
 
     def setUp(self):
         super(ExtendedMachines, self).setUp()
-        self.check_g8os_connection(ExtendedMachines)
+        self.check_zos_connection(ExtendedMachines)
 
     def test001_kvm_add_remove_nics(self):
-        """ g8os-035
+        """ zos-035
 
         *Test case for testing adding and removing nics for vms*
 
@@ -90,7 +90,7 @@ class ExtendedMachines(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test002_kvm_attach_deattach_disks(self):
-        """ g8os-036
+        """ zos-036
 
         *Test case for testing attaching and deattaching disks for vms*
 
@@ -139,7 +139,7 @@ class ExtendedMachines(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test_003_containers_backup_restore(self):
-        """ g8os-037
+        """ zos-037
 
         *Test case for container backup and restore*
 
@@ -205,7 +205,7 @@ class ExtendedMachines(BaseTest):
 
     @unittest.skip('https://github.com/zero-os/0-core/issues/679')
     def test_004_container_passthrough_nic(self):
-        """ g8os-043
+        """ zos-043
 
         *Test case for testing nic of type passthrough of a container*
 
@@ -265,7 +265,7 @@ class ExtendedMachines(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test_005_containers_macvlan_nic(self):
-        """ g8os-044
+        """ zos-044
 
         *Test case for testing nic of type macvlan*
 

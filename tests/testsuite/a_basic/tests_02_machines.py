@@ -7,11 +7,11 @@ class Machinetests(BaseTest):
 
     def setUp(self):
         super(Machinetests, self).setUp()
-        self.check_g8os_connection(Machinetests)
+        self.check_zos_connection(Machinetests)
 
     @unittest.skip("this test doesn't work on travis .. no idea why.. needs to be run manually")
     def test001_create_destroy_list_kvm(self):
-        """ g8os-009
+        """ zos-009
 
         *Test case for testing creating, listing and destroying VMs*
 
@@ -65,7 +65,7 @@ class Machinetests(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test002_create_list_delete_containers(self):
-        """ g8os-010
+        """ zos-010
         *Test case for testing creating, listing and deleting containers*
 
         **Test Scenario:**
@@ -101,7 +101,7 @@ class Machinetests(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test003_deal_with_container_client(self):
-        """ g8os-011
+        """ zos-011
 
         *Test case for testing dealing with container client*
 
@@ -111,7 +111,7 @@ class Machinetests(BaseTest):
         #. Get container(C1) client
         #. Use container client  to create  folder using system, should succeed
         #. Use container client to check folder is exist using bash
-        #. Use G8os client to check the folder is created only in container
+        #. Use zos client to check the folder is created only in container
         #. Use container client to delete created folder
         #. Destroy C1, should succeed
 
@@ -150,7 +150,7 @@ class Machinetests(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test004_pause_resume_get_kvm(self):
-        """ g8os-050
+        """ zos-050
 
         *Test case for testing pausing resuming VMs*
 
@@ -165,6 +165,7 @@ class Machinetests(BaseTest):
         vm_name = self.rand_str()
         self.lg('- Create virtual machine {} , should succeed'.format(vm_name))
         vm_uuid = self.create_vm(name=vm_name)
+        time.sleep(3)
 
         self.lg('Pause the VM and check state from get method ,should be paused')
         self.client.kvm.pause(vm_uuid)

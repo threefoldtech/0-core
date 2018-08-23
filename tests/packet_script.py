@@ -108,7 +108,7 @@ if __name__ == '__main__':
     manager = packet.Manager(auth_token=token)
     print(os.system('echo $TRAVIS_EVENT_TYPE'))
     if action == 'delete':
-        print('deleting the g8os machine ..')
+        print('deleting the zos machine ..')
         delete_device(manager)
     else:
         branch = sys.argv[3]
@@ -118,7 +118,7 @@ if __name__ == '__main__':
         t = check_status(True, branch)
         if t != 'No_build_triggered':
             print('build has been started at {}'.format(t))
-            print('waiting for g8os build to pass ..')
+            print('waiting for zos build to pass ..')
             check_status(False, branch)
             time.sleep(2)
             url2 = 'https://build.gig.tech/build/history'

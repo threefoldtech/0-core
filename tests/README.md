@@ -24,7 +24,7 @@
     ```
     bash trigger_travis.sh master l17-fmjUgycEAcQWWCA
     ```
-### Python G8os Tests
+### Python zos Tests
 - Here is the link for the tests: [testsuite](https://github.com/zero-os/0-core/tree/cron-jobs/tests/testsuite)
-- When travis triggers the python environment, Basically it starts to create packet machine using latest g8os image, then run the tests on it.
+- When travis triggers the python environment, Basically it starts to create packet machine using latest zos image, then run the tests on it.
 - After the tests are done, the packet machine is deleted.

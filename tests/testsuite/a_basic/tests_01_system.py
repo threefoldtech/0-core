@@ -11,7 +11,7 @@ class SystemTests(BaseTest):
 
     def setUp(self):
         super(SystemTests, self).setUp()
-        self.check_g8os_connection(SystemTests)
+        self.check_zos_connection(SystemTests)
 
     def get_permission(self, client, path):
         return int(self.stdout(client.bash('stat -c %a {}'.format(path))))
@@ -102,24 +102,58 @@ class SystemTests(BaseTest):
 
         return memInfo
 
-    def getDmibiosInfo(self, client):
+    def get_dmi_bios_info(self, client):
 
         lines = client.bash('dmidecode -t bios').get().stdout.splitlines()
-        mapping = {'Vendor':'vendor', 'Version':'version','Release Date':'release date','Address':'address', 
+        dmi_info = {'Vendor':'vendor', 'Version':'version','Release Date':'release date','Address':'address', 
                     'Runtime Size':'runtime size', 'ROM Size':'rom size','BIOS Revision':'bios revision' }
 
         for line in lines:
             line = line.replace('\t', '')
-            for key in mapping.keys():
+            for key in dmi_info.keys():
                 if key == line[:line.find(':')]:
                     item = (line[line.index(':') + 2 :])
-                    mapping[key] = item
+                    dmi_info[key] = item
         
-        return mapping
+        return dmi_info
+
+    def get_port_info(self, client, protocol):
+        
+        if protocol == 'tcp':
+            lines_1 = client.bash('netstat -tlpn | tail -n+3 | awk "{print \$4}"').get().stdout.splitlines() #ip:port
+            lines_2 = client.bash('netstat -tlpn | tail -n+3 | awk "{print \$7}"').get().stdout.splitlines() #pid
+
+        elif protocol == 'udp':
+            lines_1 = client.bash('netstat -ulpn | tail -n+3 | awk "{print \$4}"').get().stdout.splitlines() #ip:port
+            lines_2 = client.bash('netstat -ulpn | tail -n+3 | awk "{print \$6}"').get().stdout.splitlines() #pid
+
+        else:
+            return 0
+
+        ip = []
+        port = []
+        pid = []
+        # Separate ip, port from ip:port line 
+        for line in lines_1:
+            line = line.replace('\t', '')
+            ip.append(line[: line.rfind(':')])
+            port.append(line[line.rfind(':') + 1 :])
+
+        # Get pid 
+        for line in lines_2:
+            line = line.replace('\t', '')
+            if line[: line.rfind('/')] == '':
+                pid.append('0')
+            else:
+                pid.append(line[: line.rfind('/')])
+
+        port_info = {'ip' : ip, 'port': port, 'pid': pid}
+        return port_info
+
 
     def test001_execute_commands(self):
 
-        """ g8os-001
+        """ zos-001
         *Test case for testing basic commands using  bash and system*
 
         **Test Scenario:**
@@ -161,7 +195,7 @@ class SystemTests(BaseTest):
 
     def test002_kill_list_processes(self):
 
-        """ g8os-002
+        """ zos-002
         *Test case for testing killing and listing processes*
 
         **Test Scenario:**
@@ -193,13 +227,13 @@ class SystemTests(BaseTest):
     @parameterized.expand(['client', 'container'])
     def test003_os_info(self, client_type):
 
-        """ g8os-003
+        """ zos-003
         *Test case for checking on the system os information*
 
         **Test Scenario:**
-        #. Get the os information using g8os/container client
-        #. Get the hostname and compare it with the g8os/container os insformation
-        #. Get the kernal's name and compare it with the g8os/container os insformation
+        #. Get the os information using zos/container client
+        #. Get the hostname and compare it with the zos/container os insformation
+        #. Get the kernal's name and compare it with the zos/container os insformation
         """
 
         self.lg('{} STARTED'.format(self._testID))
@@ -210,14 +244,14 @@ class SystemTests(BaseTest):
             self.container_create()
             client = self.client_container
 
-        self.lg('Get the os information using g8os/container client')
+        self.lg('Get the os information using zos/container client')
         os_info = client.info.os()
 
-        self.lg('Get the hostname and compare it with the g8os/container os insformation')
+        self.lg('Get the hostname and compare it with the zos/container os insformation')
         hostname = client.system('uname -n').get().stdout.strip()
         self.assertEqual(os_info['hostname'], hostname)
 
-        self.lg('Get the kernal\'s name and compare it with the g8os/container os insformation')
+        self.lg('Get the kernal\'s name and compare it with the zos/container os insformation')
         krn_name = client.system('uname -s').get().stdout.strip()
         self.assertEqual(os_info['os'], krn_name.lower())
 
@@ -226,13 +260,13 @@ class SystemTests(BaseTest):
     @parameterized.expand(['client', 'container'])
     def test004_mem_info(self, client_type):
 
-        """ g8os-004
+        """ zos-004
         *Test case for checking on the system memory information*
 
         **Test Scenario:**
-        #. Get the memory information using g8os/container client
+        #. Get the memory information using zos/container client
         #. Get the memory information using bash
-        #. Compare memory g8os/container  results to that of the bash results, should be the same
+        #. Compare memory zos/container  results to that of the bash results, should be the same
         """
         self.lg('{} STARTED'.format(self._testID))
 
@@ -245,30 +279,30 @@ class SystemTests(BaseTest):
         self.lg('get memory info using bash')
         expected_mem_info = self.getMemInfo(client)
 
-        self.lg('get memory info using g8os/container ')
-        g8os_mem_info = client.info.mem()
+        self.lg('get memory info using zos/container ')
+        zos_mem_info = client.info.mem()
 
-        self.lg('compare g8os/container  results to bash results')
-        self.assertEqual(expected_mem_info['total'], g8os_mem_info['total'])
+        self.lg('compare zos/container  results to bash results')
+        self.assertEqual(expected_mem_info['total'], zos_mem_info['total'])
         params_to_check = ['active', 'available', 'buffers', 'cached', 'free', 'inactive']
         for key in params_to_check:
             threshold = 1024 * 10000  # acceptable threshold (10 MB)
-            g8os_value = g8os_mem_info[key]
+            zos_value = zos_mem_info[key]
             expected_value = expected_mem_info[key]
-            self.assertTrue(expected_value - threshold <= g8os_value <= expected_value + threshold, key)
+            self.assertTrue(expected_value - threshold <= zos_value <= expected_value + threshold, key)
 
         self.lg('{} ENDED'.format(self._testID))
 
     @parameterized.expand(['client', 'container'])
     def test005_cpu_info(self, client_type):
 
-        """ g8os-005
+        """ zos-005
         *Test case for checking on the system CPU information*
 
         **Test Scenario:**
-        #. Get the CPU information using g8os/container client
+        #. Get the CPU information using zos/container client
         #. Get the CPU information using bash
-        #. Compare CPU g8os/container  results to that of the bash results, should be the same
+        #. Compare CPU zos/container  results to that of the bash results, should be the same
         """
         self.lg('{} STARTED'.format(self._testID))
 
@@ -281,28 +315,28 @@ class SystemTests(BaseTest):
         self.lg('get cpu info using bash')
         expected_cpu_info = self.getCpuInfo(client)
 
-        self.lg('get cpu info using g8os')
-        g8os_cpu_info = client.info.cpu()
+        self.lg('get cpu info using zos')
+        zos_cpu_info = client.info.cpu()
 
-        self.lg('compare g8os/container results to bash results')
+        self.lg('compare zos/container results to bash results')
         for key in expected_cpu_info.keys():
             if key == 'cores':
                 continue
-            g8os_param_list = [x[key] for x in g8os_cpu_info]
-            self.assertEqual(expected_cpu_info[key], g8os_param_list)
+            zos_param_list = [x[key] for x in zos_cpu_info]
+            self.assertEqual(expected_cpu_info[key], zos_param_list)
 
         self.lg('{} ENDED'.format(self._testID))
 
     @parameterized.expand(['client', 'container'])
     def test006_disk_info(self, client_type):
 
-        """ g8os-006
+        """ zos-006
         *Test case for checking on the disks information*
 
         **Test Scenario:**
-        #. Get the disks information using g8os client
+        #. Get the disks information using zos client
         #. Get the disks information using bas
-        #. Compare disks g8os results to that of the bash results, should be the same
+        #. Compare disks zos results to that of the bash results, should be the same
         """
         self.lg('{} STARTED'.format(self._testID))
 
@@ -315,44 +349,44 @@ class SystemTests(BaseTest):
         self.lg('get disks info using linux bash command (mount)')
         expected_disk_info = self.getDiskInfo(client)
 
-        self.lg('get cpu info using g8os')
-        g8os_disk_info = client.info.disk()
+        self.lg('get cpu info using zos')
+        zos_disk_info = client.info.disk()
 
-        self.lg('compare g8os results to bash results')
-        for disk in g8os_disk_info:
+        self.lg('compare zos results to bash results')
+        for disk in zos_disk_info:
             self.assertIn(disk, expected_disk_info)
 
         self.lg('{} ENDED'.format(self._testID))
 
     def test007_nic_info(self):
 
-        """ g8os-007
+        """ zos-007
         *Test case for checking on the system nic information*
 
         **Test Scenario:**
-        #. Get the nic information using g8os client
+        #. Get the nic information using zos client
         #. Get the information using bash
-        #. Compare nic g8os results to that of the bash results, should be the same
+        #. Compare nic zos results to that of the bash results, should be the same
         """
         self.lg('{} STARTED'.format(self._testID))
 
         self.lg('get nic info using linux bash command (ip a)')
         expected_nic_info = self.getNicInfo(self.client)
 
-        self.lg('get nic info using g8os client')
-        g8os_nic_info = self.client.info.nic()
+        self.lg('get nic info using zos client')
+        zos_nic_info = self.client.info.nic()
 
-        self.lg('compare g8os/container results to bash results')
+        self.lg('compare zos/container results to bash results')
         params_to_check = ['name', 'addrs', 'mtu', 'hardwareaddr']
         for i in range(len(expected_nic_info) - 1):
             for param in params_to_check:
-                self.assertEqual(expected_nic_info[i][param], g8os_nic_info[i][param])
+                self.assertEqual(expected_nic_info[i][param], zos_nic_info[i][param])
 
         self.lg('{} ENDED'.format(self._testID))
 
     @parameterized.expand(['client', 'container'])
     def test008_mkdir_exists_list_chmod_move_remove_directory(self, client_type):
-        """ g8os-015
+        """ zos-015
         *Test case for test filesystem mkdir, exists, list, chmod, move, remove methods*
 
         **Test Scenario:**
@@ -427,7 +461,7 @@ class SystemTests(BaseTest):
     @parameterized.expand(['client', 'container'])
     def test009_open_close_read_write_file(self, client_type):
 
-        """ g8os-019
+        """ zos-019
         *Test case for test filesystem upload, download, upload_file, download_file methods*
 
         **Test Scenario:**
@@ -562,13 +596,13 @@ class SystemTests(BaseTest):
     @parameterized.expand(['client', 'container'])
     def test010_upload_download_file(self, client_type):
 
-        """ g8os-018
+        """ zos-018
         *Test case for test filesystem upload, download, upload_file, download_file methods*
 
         **Test Scenario:**
         #. Create local file (LF1) and write data to it, should succeed
-        #. Upload file (LF1) to g8os/container
-        #. Check file (LF1) exists in g8os/container and check its data
+        #. Upload file (LF1) to zos/container
+        #. Check file (LF1) exists in zos/container and check its data
         #. Upload buffer data to the remote file
         #. Check the remote file content equal to buffer content
         #. Create remote file (RF1) and write data to it, should succeed
@@ -594,10 +628,10 @@ class SystemTests(BaseTest):
         with open(local_file_name, 'w+') as f:
             f.write(test_txt)
 
-        self.lg('Upload file (LF1) to g8os/container')
+        self.lg('Upload file (LF1) to zos/container')
         client.filesystem.upload_file('/{}'.format(remote_file_name), local_file_name)
 
-        self.lg('Check file (LF1) is exists in g8os/container and check its data')
+        self.lg('Check file (LF1) is exists in zos/container and check its data')
         ls = client.bash('ls').get().stdout.splitlines()
         self.assertIn(remote_file_name, ls)
         file_text = client.bash('cat {}'.format(remote_file_name)).get().stdout.strip()
@@ -645,7 +679,7 @@ class SystemTests(BaseTest):
 
     def test011_kill_list_jobs(self):
 
-        """ g8os-032
+        """ zos-032
         *Test case for testing killing and listing jobs*
 
         **Test Scenario:**
@@ -677,7 +711,7 @@ class SystemTests(BaseTest):
 
     def test012_add_delete_list_addr(self):
 
-        """ g8os-038
+        """ zos-038
         *Test case for testing adding, deleteing and listing ip addresses*
 
         **Test Scenario:**
@@ -727,7 +761,7 @@ class SystemTests(BaseTest):
 
     def test013_link_up_down_list_rename(self):
 
-        """ g8os-039
+        """ zos-039
         *Test case for testing adding, deleteing and listing ip addresses*
 
         **Test Scenario:**
@@ -766,7 +800,7 @@ class SystemTests(BaseTest):
 
     def test014_add_delete_interface_bridge(self):
 
-        """ g8os-040
+        """ zos-040
         *Test case for testing adding, deleteing bridges and their interfaces*
 
         **Test Scenario:**
@@ -818,7 +852,7 @@ class SystemTests(BaseTest):
 
     def test015_add_delete_list_route(self):
 
-        """ g8os-041
+        """ zos-041
         *Test case for testing adding, deleteing and listing routes*
 
         **Test Scenario:**
@@ -863,7 +897,7 @@ class SystemTests(BaseTest):
 
     def test016_open_drop_list_nft(self):
 
-        """ g8os-042
+        """ zos-042
         *Test case for testing opening, droping ports and listing rules*
 
         **Test Scenario:**
@@ -908,7 +942,7 @@ class SystemTests(BaseTest):
 
     def test017_add_list_remove_tasks_cgroups(self):
 
-        """ g8os-046
+        """ zos-046
         *Test case for adding, listing and removing tasks for cgroups*
 
         **Test Scenario:**
@@ -953,7 +987,7 @@ class SystemTests(BaseTest):
     @unittest.skip('https://github.com/zero-os/0-core/issues/702')
     def test018_add_list_remove_cgroup_subsystem(self):
 
-        """ g8os-047
+        """ zos-047
         *Test case for adding, listing and removing subsystem*
 
         **Test Scenario:**
@@ -1005,28 +1039,27 @@ class SystemTests(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test019_dmi_bios_info(self):
-        """ g8os-048
+        """ zos-048
         *Test case for checking on the dmi BIOS information*
 
         **Test Scenario:**
-        #. Get the dmi bios information using g8os client
+        #. Get the dmi bios information using zos client
         #. Get the information using bash
-        #. Compare dmi g8os results to that of the bash results, should be the same
+        #. Compare dmi zos results to that of the bash results, should be the same
         """
         self.lg('get dmi_bios info using linux bash command (dmidecode -t bios)')
-        dmi_bois_info = self.getDmibiosInfo(self.client)
+        dmi_bios_info = self.get_dmi_bios_info(self.client)
 
-        self.lg('get dmi_bios info using g8os client')
+        self.lg('get dmi_bios info using zos client')
         bios_info = self.client.info.dmi('bios')['BIOS Information']['properties']
 
-        for k in dmi_bois_info.keys():
-            bios_info_value = bios_info[k]['value']
-            self.assertEqual(dmi_bois_info[k],bios_info_value)
+        for k in dmi_bios_info:
+            self.assertEqual(dmi_bios_info[k],bios_info[k]['value'])
             
 
     @parameterized.expand(['client', 'container'])
     def test020_mkdir_chown_remove_directory(self, client_type):
-        """ g8os-049
+        """ zos-049
         *Test case for testing filesystem mkdir and chown methods*
 
         **Test Scenario:**
@@ -1073,7 +1106,7 @@ class SystemTests(BaseTest):
         self.assertEqual(group_owner_1, 'root')
 
         self.lg('Change directory (D1) user owner and group owner to the new user (U1) using filesystem chown method')
-        client.filesystem.chown('{}'.format(dir_name), '{}'.format(new_user), '{}'.format(new_user))
+        client.filesystem.chown(dir_name, new_user, new_user)
 
         self.lg('Get user owner and group owner using bash')
         user_owner_2 = client.bash('stat -c %U {}'.format(dir_name)).get().stdout.splitlines()[0]
@@ -1091,3 +1124,35 @@ class SystemTests(BaseTest):
         self.lg('Remove user (U1), should succeed')
         state = client.bash('deluser {}'.format(new_user)).get().state
         self.assertEqual(state, 'SUCCESS')
+
+    @parameterized.expand(['tcp', 'udp'])
+    def test021_port_info(self, protocol):
+        """ zos-051
+        *Test case for checking on port information*
+
+        **Test Scenario:**
+        #. Get port information using zos client
+        #. Get port information using bash
+        #. Compare port zos results to that of the bash results, should be the same
+        """
+        self.lg('Get port information using zos client')
+        port_info_1 = self.client.info.port()
+
+        self.lg('Get port information using bash (netstat)')
+        port_info_2 = self.get_port_info(self.client, protocol)
+
+        if protocol == 'tcp':
+            start = 0
+        else:
+            for i,n in enumerate(port_info_1):
+                if n['network'] == 'udp':
+                    start = i 
+                    break
+
+        self.lg('Compare port zos results to that of the bash results, should be the same')
+        # check ip, port and pid are the same
+        for idx in range(0 ,len(port_info_2['ip'])):
+            self.assertEqual(port_info_1[idx + start]['ip'], port_info_2['ip'][idx])
+            self.assertEqual(port_info_1[idx + start]['port'], int(port_info_2['port'][idx]))
+            self.assertEqual(port_info_1[idx + start]['pid'], int(port_info_2['pid'][idx]))
+        
