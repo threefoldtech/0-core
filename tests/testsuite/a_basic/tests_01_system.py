@@ -1125,10 +1125,10 @@ class SystemTests(BaseTest):
         state = client.bash('deluser {}'.format(new_user)).get().state
         self.assertEqual(state, 'SUCCESS')
 
-
-    def test021_tcp_port_info(self):
+    @parameterized.expand(['tcp', 'udp'])
+    def test021_port_info(self, protocol):
         """ zos-051
-        *Test case for checking on tcp port information*
+        *Test case for checking on port information*
 
         **Test Scenario:**
         #. Get port information using zos client
@@ -1139,37 +1139,20 @@ class SystemTests(BaseTest):
         port_info_1 = self.client.info.port()
 
         self.lg('Get port information using bash (netstat)')
-        port_info_2 = self.get_port_info(self.client, 'tcp')
+        port_info_2 = self.get_port_info(self.client, protocol)
+
+        if protocol == 'tcp':
+            start = 0
+        else:
+            for i,n in enumerate(port_info_1):
+                if n['network'] == 'udp':
+                    start = i 
+                    break
 
         self.lg('Compare port zos results to that of the bash results, should be the same')
         # check ip, port and pid are the same
         for idx in range(0 ,len(port_info_2['ip'])):
-            self.assertEqual(port_info_1[idx]['ip'], port_info_2['ip'][idx])
-            self.assertEqual(port_info_1[idx]['port'], int(port_info_2['port'][idx]))
-            self.assertEqual(port_info_1[idx]['pid'], int(port_info_2['pid'][idx]))
-        
-
-    def test022_udp_port_info(self):
-        """ zos-052
-        *Test case for checking on udp port information*
-
-        **Test Scenario:**
-        #. Get port information using zos client
-        #. Get port information using bash
-        #. Compare port zos results to that of the bash results, should be the same
-        """
-        self.lg('Get port information using zos client')
-        port_info_1 = self.client.info.port()
-
-        self.lg('Get port information using bash (netstat)')
-        port_info_2 = self.get_port_info(self.client, 'udp')
-
-        for i,n in enumerate(port_info_1):
-            if n['network']=='udp':
-                start = i 
-                break
-
-        for idx in range(0 ,len(port_info_2['ip'])):
             self.assertEqual(port_info_1[idx + start]['ip'], port_info_2['ip'][idx])
             self.assertEqual(port_info_1[idx + start]['port'], int(port_info_2['port'][idx]))
             self.assertEqual(port_info_1[idx + start]['pid'], int(port_info_2['pid'][idx]))
+        
