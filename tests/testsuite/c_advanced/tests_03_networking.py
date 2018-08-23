@@ -9,7 +9,7 @@ import unittest
 class AdvancedNetworking(BaseTest):
     def setUp(self):
         super(AdvancedNetworking, self).setUp()
-        self.check_g8os_connection(AdvancedNetworking)
+        self.check_zos_connection(AdvancedNetworking)
         containers = self.client.container.find('ovs')
         ovs_exist = [key for key, value in containers.items()]
         if not ovs_exist:
@@ -24,7 +24,7 @@ class AdvancedNetworking(BaseTest):
 
 
     def test001_vxlans_connections(self):
-        """ g8os-029
+        """ zos-029
         *Test case for testing vxlans connections*
 
         **Test Scenario:**
@@ -93,7 +93,7 @@ class AdvancedNetworking(BaseTest):
 
     @unittest.skip('line 123 has a problem related to packet machines locations.. please execute it manually')
     def test002_vlans_connections(self):
-        """ g8os-030
+        """ zos-030
         *Test case for testing vlans connections*
 
         **Test Scenario:**
@@ -180,7 +180,7 @@ class AdvancedNetworking(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test003_vxlan_vlan_connections(self):
-        """ g8os-031
+        """ zos-031
         *Test case for testing vxlans-vlans connections*
 
         **Test Scenario:**
@@ -229,7 +229,7 @@ class AdvancedNetworking(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test004_create_multiple_vlans_vxlan(self):
-        """ g8os-033
+        """ zos-033
         *Test case for creating multiple vlans and vxlans*
 
         **Test Scenario:**

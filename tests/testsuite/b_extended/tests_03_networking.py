@@ -8,14 +8,14 @@ class ExtendedNetworking(BaseTest):
 
     def setUp(self):
         super(ExtendedNetworking, self).setUp()
-        self.check_g8os_connection(ExtendedNetworking)
+        self.check_zos_connection(ExtendedNetworking)
 
     def rand_mac_address(self):
         mac_addr = ["{:02X}".format(randint(0, 255)) for x in range(6)]
         return ':'.join(mac_addr)
 
     def test001_zerotier(self):
-        """ g8os-014
+        """ zos-014
         *Test case for testing zerotier functionally*
 
         **Test Scenario:**
@@ -66,7 +66,7 @@ class ExtendedNetworking(BaseTest):
 
     def test002_create_bridges_with_specs_hwaddr(self):
 
-        """ g8os-023
+        """ zos-023
         *Test case for testing creating, listing, deleting bridges*
 
         **Test Scenario:**
@@ -108,7 +108,7 @@ class ExtendedNetworking(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test003_create_bridges_with_specs_network(self):
-        """ g8os-024
+        """ zos-024
         *Test case for testing creating, listing, deleting bridges*
 
         **Test Scenario:**
@@ -176,7 +176,7 @@ class ExtendedNetworking(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test004_attach_bridge_to_container(self):
-        """ g8os-027
+        """ zos-027
         *Test case for testing creating, listing, deleting bridges*
 
         **Test Scenario:**
@@ -249,7 +249,7 @@ class ExtendedNetworking(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test005_create_bridges_with_specs_nat(self):
-        """ g8os-028
+        """ zos-028
         *Test case for testing creating, listing, deleting bridges*
 
         **Test Scenario:**

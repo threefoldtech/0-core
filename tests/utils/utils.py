@@ -28,7 +28,7 @@ class BaseTest(unittest.TestCase):
     def setUp(self):
         self._testID = self._testMethodName
         self._startTime = time.time()
-        self._logger = logging.LoggerAdapter(logging.getLogger('g8os_testsuite'),
+        self._logger = logging.LoggerAdapter(logging.getLogger('zos_testsuite'),
                                              {'testid': self.shortDescription() or self._testID})
 
 
@@ -38,12 +38,12 @@ class BaseTest(unittest.TestCase):
     def lg(self, msg):
         self._logger.info(msg)
 
-    def check_g8os_connection(self, classname):
+    def check_zos_connection(self, classname):
         try:
             self.client.ping()
         except Exception as e:
-            self.lg("can't reach g8os remote machine")
-            print("Can't reach g8os remote machine")
+            self.lg("can't reach zos remote machine")
+            print("Can't reach zos remote machine")
             self.skipTest(classname)
 
     def rand_str(self):
@@ -122,9 +122,9 @@ class BaseTest(unittest.TestCase):
             self.lg('can\'t connect to zerotier, {}:{}'.format(r.status_code, r.content))
             return False
 
-    def get_g8os_zt_ip(self, networkId):
+    def get_zos_zt_ip(self, networkId):
         """
-        method to get the zerotier ip address of the g8os client
+        method to get the zerotier ip address of the zos client
         """
         nws = self.client.zerotier.list()
         for nw in nws:
@@ -136,7 +136,7 @@ class BaseTest(unittest.TestCase):
 
     def get_contanier_zt_ip(self, client, networkId):
         """
-        method to get zerotier ip address of the g8os container
+        method to get zerotier ip address of the zos container
         Note: to use this method, make sure that zt is defined first in the nic
         list during creating your container, so it could be attached to etho interface
         """

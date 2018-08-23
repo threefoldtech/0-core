@@ -7,10 +7,10 @@ class BasicNetworking(BaseTest):
 
     def setUp(self):
         super(BasicNetworking, self).setUp()
-        self.check_g8os_connection(BasicNetworking)
+        self.check_zos_connection(BasicNetworking)
 
     def test001_join_leave_list_zerotier(self):
-        """ g8os-012
+        """ zos-012
         *Test case for testing joining, listing, leaving zerotier networks*
 
         **Test Scenario:**
@@ -55,7 +55,7 @@ class BasicNetworking(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test002_create_delete_list_bridges(self):
-        """ g8os-013
+        """ zos-013
         *Test case for testing creating, listing, deleting bridges*
 
         **Test Scenario:**
@@ -94,7 +94,7 @@ class BasicNetworking(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test003_add_remove_list_nics_for_bridge(self):
-        """ g8os-045
+        """ zos-045
         *Test case for adding, removing and listing nics for a bridges*
 
         **Test Scenario:**
