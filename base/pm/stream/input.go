@@ -6,7 +6,6 @@ import (
 	"io"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 
 	logging "github.com/op/go-logging"
@@ -22,16 +21,18 @@ var (
 	pmMsgPattern  = regexp.MustCompile("^(\\d+)(:{2,3})(.*)$")
 	headerPattern = regexp.MustCompile(`^(\d+)(:{2,3})`)
 
+	multiLineTerm = []byte("\n:::\n")
+
 	errNotHeader = fmt.Errorf("not header")
 )
 
 type consumerImpl struct {
 	level   uint16
 	handler MessageHandler
+	source  io.Reader
 
-	multi *Message
-
-	source io.Reader
+	multi      *bytes.Buffer
+	multiLevel uint16
 }
 
 type header struct {
@@ -62,42 +63,6 @@ func Consume(wg *sync.WaitGroup, source io.ReadCloser, level uint16, handler Mes
 	}()
 }
 
-func (c *consumerImpl) isDigit(b byte) bool {
-	return b >= '0' && b <= '9'
-}
-
-func (c *consumerImpl) parseHead(head []byte) (*header, error) {
-	//parse the header without regex
-	//valid pattern is
-	// `dd?:::?`
-	if len(head) < 3 {
-		return nil, errNotHeader //noway this is a header
-	}
-
-	skip := bytes.Index(head, []byte("::"))
-
-	if skip > 2 || skip <= 0 {
-		return nil, errNotHeader
-	}
-
-	level, _ := strconv.ParseUint(string(head[0:skip]), 10, 16)
-	h := header{
-		level: uint16(level),
-	}
-
-	if bytes.HasPrefix(head[skip:], []byte(":::")) {
-		//multi line
-		h.multiline = true
-		h.length = skip + 3
-	} else if bytes.HasPrefix(head[skip:], []byte("::")) {
-		h.length = skip + 2
-	} else {
-		return nil, errNotHeader
-	}
-
-	return &h, nil
-}
-
 func (c *consumerImpl) getHeaderFromMatch(m [][]byte) *header {
 	level, _ := strconv.ParseUint(string(m[1]), 10, 16)
 	h := header{
@@ -110,15 +75,6 @@ func (c *consumerImpl) getHeaderFromMatch(m [][]byte) *header {
 	return &h
 }
 
-// func (c *consumerImpl) readLine(out io.Writer) error {
-// 	line, err := c.buffer.ReadBytes('\n')
-// 	if err != nil && err != io.EOF {
-// 		return err
-// 	}
-// 	_, err = out.Write(line)
-// 	return err
-// }
-
 //newLineOrEOF will return index of the next \n or EOF (end of file or string)
 func (c *consumerImpl) newLineOrEOF(b []byte) int {
 	i := 0
@@ -130,13 +86,29 @@ func (c *consumerImpl) newLineOrEOF(b []byte) int {
 
 //process process the buffer and return th
 func (c *consumerImpl) process(buffer []byte) int {
+	if c.multi != nil {
+		//we are in a middle of a multi line message
+		if end := bytes.Index(buffer, multiLineTerm); end != -1 {
+			//we found the termination string
+			c.multi.Write(buffer[:end])
+			c.handler(&Message{
+				Meta:    NewMeta(c.multiLevel),
+				Message: c.multi.String(),
+			})
+			buffer = buffer[end+len(multiLineTerm):]
+		} else {
+			c.multi.Write(buffer)
+			return 0
+		}
+	}
+
 	start := 0
 	for i := 0; i < len(buffer); i++ {
-		//fmt.Printf("trying: %s\n", string(buffer[i:]))
+		//fmt.Printf("trying: '%s'\n", string(buffer[i:]))
 		m := headerPattern.FindSubmatch(buffer[i:])
 		if m == nil {
 			//no header was found at this position
-			i += c.newLineOrEOF(buffer[i+1:]) + 1
+			i += c.newLineOrEOF(buffer[i:])
 			continue
 		}
 
@@ -151,24 +123,48 @@ func (c *consumerImpl) process(buffer []byte) int {
 		h := c.getHeaderFromMatch(m)
 		if !h.multiline {
 			//find next new line or end of line
-			j := i + h.length               //start of text after the header
-			j += c.newLineOrEOF(buffer[j:]) //seek to new line or end of text
+			start = i + h.length                       //start of text after the header
+			i = start + c.newLineOrEOF(buffer[start:]) //seek to new line or end of text
 
+			var msg string
+			if i == len(buffer) {
+				msg = string(buffer[start:i])
+			} else {
+				msg = string(buffer[start : i+1]) //include the new line
+			}
 			c.handler(&Message{
 				Meta:    NewMeta(h.level),
-				Message: string(buffer[i+h.length : j]),
+				Message: msg,
 			})
-			i = j + 1
-			start = i
+
+			start = i + 1
+
 			//TODO: what if the same line output is split !!
+
 			//I think it's better if the single line message must end with new line, in that case we
 			//need to seek only to new line termination, if not found we save the current state and
 			//wait for the next feedback
 			continue
 		}
 
-		//TODO:
-		//if we are here we must find the \n::: termination string
+		//multiline message
+		//read in multi until eof or \n::: termination
+		j := i + h.length
+		if end := bytes.Index(buffer[j:], multiLineTerm); end != -1 {
+			//we found the termination string
+			c.handler(&Message{
+				Meta:    NewMeta(h.level),
+				Message: string(buffer[j : j+end]),
+			})
+			i = j + end + len(multiLineTerm) // 4 is the width of the termination string
+			start = i
+		} else {
+			c.multiLevel = h.level
+			c.multi = bytes.NewBuffer(nil)
+			c.multi.Write(buffer[j:])
+			start = len(buffer)
+			break
+		}
 	}
 
 	if start < len(buffer) {
@@ -186,8 +182,8 @@ func (c *consumerImpl) consume() error {
 	offset := 0
 	for {
 		size, err := c.source.Read(buffer[offset:]) //fill what left of the buffer
-		if err == io.EOF {
-			return nil
+		if err != nil && err != io.EOF {
+			return err
 		}
 
 		all := offset + size
@@ -199,49 +195,9 @@ func (c *consumerImpl) consume() error {
 			copy(buffer, buffer[all-reminder:all])
 			offset = reminder
 		}
-	}
-}
 
-func (c *consumerImpl) processLine(line string) {
-	line = strings.TrimRight(line, "\n")
-
-	if c.multi != nil {
-		if line == ":::" {
-			//last, flush mult
-			c.handler(c.multi)
-			c.multi = nil
-			return
-		}
-
-		c.multi.Message += "\n" + line
-		return
-	}
-
-	matches := pmMsgPattern.FindStringSubmatch(line)
-
-	if matches == nil {
-		//use default level.
-		c.handler(&Message{
-			Meta:    NewMeta(c.level),
-			Message: line,
-		})
-	} else {
-		l, _ := strconv.ParseUint(matches[1], 10, 16)
-		level := uint16(l)
-		message := matches[3]
-
-		if matches[2] == ":::" {
-			c.multi = &Message{
-				Meta:    NewMeta(level),
-				Message: message,
-			}
-		} else {
-			//single line message
-			c.handler(&Message{
-				Meta:    NewMeta(level),
-				Message: message,
-			})
+		if err == io.EOF {
+			return nil
 		}
 	}
-
 }

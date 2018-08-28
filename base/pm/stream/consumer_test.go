@@ -2,6 +2,7 @@ package stream
 
 import (
 	"io"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -45,7 +46,7 @@ func TestConsumer_newLineOrEOF(t *testing.T) {
 		t.Fail()
 	}
 
-	b := []byte("hello\nworld")
+	b := []byte("hello\ngood\nworld")
 	var r []string
 	for i := 0; i < len(b); i++ {
 		n := c.newLineOrEOF(b[i:])
@@ -53,7 +54,7 @@ func TestConsumer_newLineOrEOF(t *testing.T) {
 		i += n
 	}
 
-	if ok := assert.Equal(t, []string{"hello", "world"}, r); !ok {
+	if ok := assert.Equal(t, []string{"hello", "good", "world"}, r); !ok {
 		t.Fail()
 	}
 }
@@ -155,6 +156,87 @@ that spans multiple lines`))
 		t.Error()
 	}
 
+	if ok := assert.Equal(t, "this is a single line message\n", messages[1].Message); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, uint16(2), messages[1].Meta.Level()); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, "followed by some more text\nthat spans multiple lines", messages[2].Message); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, uint16(1), messages[2].Meta.Level()); !ok {
+		t.Error()
+	}
+
+	messages = nil
+
+	c.process([]byte(`2::this is a single line message
+3::followed by some more messages
+4::that has some message`))
+
+	if ok := assert.Len(t, messages, 3); !ok {
+		t.Fatal()
+	}
+
+	if ok := assert.Equal(t, "this is a single line message\n", messages[0].Message); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, uint16(2), messages[0].Meta.Level()); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, "followed by some more messages\n", messages[1].Message); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, uint16(3), messages[1].Meta.Level()); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, "that has some message", messages[2].Message); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, uint16(4), messages[2].Meta.Level()); !ok {
+		t.Error()
+	}
+}
+
+func TestConsumer_processSingleLineMessageMultiBlocks(t *testing.T) {
+	var messages []*Message
+	h := func(m *Message) {
+		messages = append(messages, m)
+	}
+
+	c := consumerImpl{
+		level:   1,
+		handler: h,
+	}
+
+	c.process([]byte(`hello world
+the folowing line is a single line message
+2::this is a single line message`))
+
+	c.process([]byte(`followed by some more text
+that spans multiple lines`))
+
+	if ok := assert.Len(t, messages, 3); !ok {
+		t.Fatal()
+	}
+
+	if ok := assert.Equal(t, "hello world\nthe folowing line is a single line message\n", messages[0].Message); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, uint16(1), messages[0].Meta.Level()); !ok {
+		t.Error()
+	}
+
 	if ok := assert.Equal(t, "this is a single line message", messages[1].Message); !ok {
 		t.Error()
 	}
@@ -172,225 +254,294 @@ that spans multiple lines`))
 	}
 }
 
-// func TestConsumer_OneLine(t *testing.T) {
-// 	var message *Message
-// 	h := func(m *Message) {
-// 		message = m
-// 	}
+func TestConsumer_processMultiLineMessage(t *testing.T) {
+	var messages []*Message
+	h := func(m *Message) {
+		messages = append(messages, m)
+	}
 
-// 	var wg sync.WaitGroup
-// 	wg.Add(1)
-// 	Consume(&wg, &testReader{
-// 		chunks: []string{"hello world\n"},
-// 	}, 1, h)
+	c := consumerImpl{
+		level:   1,
+		handler: h,
+	}
 
-// 	wg.Wait()
+	c.process([]byte(`3:::multi line message
+with full termination
+in one block
+:::
+`))
 
-// 	if ok := assert.NotNil(t, message); !ok {
-// 		t.Fatal()
-// 	}
+	if ok := assert.Len(t, messages, 1); !ok {
+		t.Fatal()
+	}
 
-// 	if ok := assert.Equal(t, "hello world", message.Message); !ok {
-// 		t.Fatal()
-// 	}
+	if ok := assert.Equal(t, "multi line message\nwith full termination\nin one block", messages[0].Message); !ok {
+		t.Error()
+	}
 
-// 	if ok := assert.Equal(t, uint16(1), message.Meta.Level()); !ok {
-// 		t.Fatal()
-// 	}
-// }
+	if ok := assert.Equal(t, uint16(3), messages[0].Meta.Level()); !ok {
+		t.Error()
+	}
 
-// func TestConsumer_TwoLines(t *testing.T) {
-// 	var messages []*Message
-// 	h := func(m *Message) {
-// 		messages = append(messages, m)
-// 	}
+	messages = nil
+	c.process([]byte(`a multi line block is coming
+3:::multi line message
+with full termination
+in one block
+:::
+which is surrounded by normal text`))
 
-// 	var wg sync.WaitGroup
-// 	wg.Add(1)
-// 	Consume(&wg, &testReader{
-// 		chunks: []string{
-// 			"hello world\n",
-// 			"10::bye bye world\n",
-// 		},
-// 	}, 1, h)
+	if ok := assert.Len(t, messages, 3); !ok {
+		t.Fatal()
+	}
 
-// 	wg.Wait()
+	if ok := assert.Equal(t, "a multi line block is coming\n", messages[0].Message); !ok {
+		t.Error()
+	}
 
-// 	if ok := assert.Len(t, messages, 2); !ok {
-// 		t.Fatal()
-// 	}
+	if ok := assert.Equal(t, uint16(1), messages[0].Meta.Level()); !ok {
+		t.Error()
+	}
 
-// 	if ok := assert.Equal(t, "hello world", messages[0].Message); !ok {
-// 		t.Error()
-// 	}
+	if ok := assert.Equal(t, "multi line message\nwith full termination\nin one block", messages[1].Message); !ok {
+		t.Error()
+	}
 
-// 	if ok := assert.Equal(t, uint16(1), messages[0].Meta.Level()); !ok {
-// 		t.Error()
-// 	}
+	if ok := assert.Equal(t, uint16(3), messages[1].Meta.Level()); !ok {
+		t.Error()
+	}
 
-// 	if ok := assert.Equal(t, "bye bye world", messages[1].Message); !ok {
-// 		t.Error()
-// 	}
+	if ok := assert.Equal(t, "which is surrounded by normal text", messages[2].Message); !ok {
+		t.Error()
+	}
 
-// 	if ok := assert.Equal(t, uint16(10), messages[1].Meta.Level()); !ok {
-// 		t.Error()
-// 	}
-// }
+	if ok := assert.Equal(t, uint16(1), messages[2].Meta.Level()); !ok {
+		t.Error()
+	}
+}
 
-// func TestConsumer_MultiLine(t *testing.T) {
-// 	var messages []*Message
-// 	h := func(m *Message) {
-// 		messages = append(messages, m)
-// 	}
+func TestConsumer_processMultiLineMessageMultiBlock(t *testing.T) {
+	var messages []*Message
+	h := func(m *Message) {
+		messages = append(messages, m)
+	}
 
-// 	var wg sync.WaitGroup
-// 	wg.Add(1)
-// 	Consume(&wg, &testReader{
-// 		chunks: []string{
-// 			"30:::hello\nworld\n",
-// 			":::\n",
-// 		},
-// 	}, 1, h)
+	c := consumerImpl{
+		level:   1,
+		handler: h,
+	}
 
-// 	wg.Wait()
+	c.process([]byte(`a multi line block is coming
+30:::multi line message
+with full termination`))
+	c.process([]byte(`
+in two blocks
+:::
+which is surrounded by normal text`))
 
-// 	if ok := assert.Len(t, messages, 1); !ok {
-// 		t.Fatal()
-// 	}
+	if ok := assert.Len(t, messages, 3); !ok {
+		t.Fatal()
+	}
 
-// 	if ok := assert.Equal(t, "hello\nworld", messages[0].Message); !ok {
-// 		t.Error()
-// 	}
+	if ok := assert.Equal(t, "a multi line block is coming\n", messages[0].Message); !ok {
+		t.Error()
+	}
 
-// 	if ok := assert.Equal(t, uint16(30), messages[0].Meta.Level()); !ok {
-// 		t.Error()
-// 	}
-// }
+	if ok := assert.Equal(t, uint16(1), messages[0].Meta.Level()); !ok {
+		t.Error()
+	}
 
-// func TestConsumer_Complex(t *testing.T) {
-// 	var messages []*Message
-// 	h := func(m *Message) {
-// 		messages = append(messages, m)
-// 	}
+	if ok := assert.Equal(t, "multi line message\nwith full termination\nin two blocks", messages[1].Message); !ok {
+		t.Error()
+	}
 
-// 	chunk1 := `Hello world
-// 20::this is a single line message
-// 30:::but this is a multi line
-// that spans`
+	if ok := assert.Equal(t, uint16(30), messages[1].Meta.Level()); !ok {
+		t.Error()
+	}
 
-// 	chunk2 := ` two blocks of data
-// :::
-// `
-// 	var wg sync.WaitGroup
-// 	wg.Add(1)
-// 	Consume(&wg, &testReader{
-// 		chunks: []string{
-// 			chunk1,
-// 			chunk2,
-// 		},
-// 	}, 2, h)
+	if ok := assert.Equal(t, "which is surrounded by normal text", messages[2].Message); !ok {
+		t.Error()
+	}
 
-// 	wg.Wait()
+	if ok := assert.Equal(t, uint16(1), messages[2].Meta.Level()); !ok {
+		t.Error()
+	}
+}
 
-// 	if ok := assert.Len(t, messages, 3); !ok {
-// 		t.Fatal()
-// 	}
+func TestConsumer_OneLine(t *testing.T) {
+	var message *Message
+	h := func(m *Message) {
+		message = m
+	}
 
-// 	if ok := assert.Equal(t, "Hello world", messages[0].Message); !ok {
-// 		t.Error()
-// 	}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	Consume(&wg, &testReader{
+		chunks: []string{"hello world\n"},
+	}, 1, h)
 
-// 	if ok := assert.Equal(t, uint16(2), messages[0].Meta.Level()); !ok {
-// 		t.Error()
-// 	}
+	wg.Wait()
 
-// 	if ok := assert.Equal(t, "this is a single line message", messages[1].Message); !ok {
-// 		t.Error()
-// 	}
+	if ok := assert.NotNil(t, message); !ok {
+		t.Fatal()
+	}
 
-// 	if ok := assert.Equal(t, uint16(20), messages[1].Meta.Level()); !ok {
-// 		t.Error()
-// 	}
+	if ok := assert.Equal(t, "hello world\n", message.Message); !ok {
+		t.Fatal()
+	}
 
-// 	if ok := assert.Equal(t, "but this is a multi line\nthat spans two blocks of data", messages[2].Message); !ok {
-// 		t.Error()
-// 	}
+	if ok := assert.Equal(t, uint16(1), message.Meta.Level()); !ok {
+		t.Fatal()
+	}
+}
 
-// 	if ok := assert.Equal(t, uint16(30), messages[2].Meta.Level()); !ok {
-// 		t.Error()
-// 	}
-// }
+func TestConsumer_TwoLines(t *testing.T) {
+	var messages []*Message
+	h := func(m *Message) {
+		messages = append(messages, m)
+	}
 
-// func TestConsumerNoNewLine(t *testing.T) {
-// 	var messages []*Message
-// 	h := func(m *Message) {
-// 		messages = append(messages, m)
-// 	}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	Consume(&wg, &testReader{
+		chunks: []string{
+			"hello world\n",
+			"10::bye bye world\n",
+		},
+	}, 1, h)
 
-// 	var wg sync.WaitGroup
-// 	wg.Add(1)
-// 	Consume(&wg, &testReader{
-// 		chunks: []string{
-// 			"hello world",
-// 		},
-// 	}, 1, h)
+	wg.Wait()
 
-// 	wg.Wait()
+	if ok := assert.Len(t, messages, 2); !ok {
+		t.Fatal()
+	}
 
-// 	if ok := assert.Len(t, messages, 1); !ok {
-// 		t.Fatal()
-// 	}
+	if ok := assert.Equal(t, "hello world\n", messages[0].Message); !ok {
+		t.Error()
+	}
 
-// 	if ok := assert.Equal(t, "hello world", messages[0].Message); !ok {
-// 		t.Fatal()
-// 	}
+	if ok := assert.Equal(t, uint16(1), messages[0].Meta.Level()); !ok {
+		t.Error()
+	}
 
-// 	if ok := assert.Equal(t, uint16(1), messages[0].Meta.Level()); !ok {
-// 		t.Fatal()
-// 	}
-// }
+	if ok := assert.Equal(t, "bye bye world\n", messages[1].Message); !ok {
+		t.Error()
+	}
 
-// func TestConsumer_ParseHeader(t *testing.T) {
-// 	var c consumerImpl
-// 	head, err := c.parseHead([]byte("1::"))
+	if ok := assert.Equal(t, uint16(10), messages[1].Meta.Level()); !ok {
+		t.Error()
+	}
+}
 
-// 	if ok := assert.NoError(t, err); !ok {
-// 		t.Fatal()
-// 	}
+func TestConsumer_MultiLine(t *testing.T) {
+	var messages []*Message
+	h := func(m *Message) {
+		messages = append(messages, m)
+	}
 
-// 	if ok := assert.Equal(t, &header{level: 1, length: 3}, head); !ok {
-// 		t.Error()
-// 	}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	Consume(&wg, &testReader{
+		chunks: []string{
+			"30:::hello\nworld",
+			"\n:::\n",
+		},
+	}, 1, h)
 
-// 	head, err = c.parseHead([]byte("12::abc"))
+	wg.Wait()
 
-// 	if ok := assert.NoError(t, err); !ok {
-// 		t.Fatal()
-// 	}
+	if ok := assert.Len(t, messages, 1); !ok {
+		t.Fatal()
+	}
 
-// 	if ok := assert.Equal(t, &header{level: 12, length: 4}, head); !ok {
-// 		t.Error()
-// 	}
+	if ok := assert.Equal(t, "hello\nworld", messages[0].Message); !ok {
+		t.Error()
+	}
 
-// 	head, err = c.parseHead([]byte("12:::abc"))
+	if ok := assert.Equal(t, uint16(30), messages[0].Meta.Level()); !ok {
+		t.Error()
+	}
+}
 
-// 	if ok := assert.NoError(t, err); !ok {
-// 		t.Fatal()
-// 	}
+func TestConsumer_Complex(t *testing.T) {
+	var messages []*Message
+	h := func(m *Message) {
+		messages = append(messages, m)
+	}
 
-// 	if ok := assert.Equal(t, &header{level: 12, length: 5, multiline: true}, head); !ok {
-// 		t.Error()
-// 	}
+	chunk1 := `Hello world
+20::this is a single line message
+30:::but this is a multi line
+that spans`
 
-// 	head, err = c.parseHead([]byte("1:"))
+	chunk2 := ` two blocks of data
+:::
+`
+	var wg sync.WaitGroup
+	wg.Add(1)
+	Consume(&wg, &testReader{
+		chunks: []string{
+			chunk1,
+			chunk2,
+		},
+	}, 2, h)
 
-// 	if ok := assert.Error(t, err); !ok {
-// 		t.Fatal()
-// 	}
+	wg.Wait()
 
-// 	head, err = c.parseHead([]byte(""))
+	if ok := assert.Len(t, messages, 3); !ok {
+		t.Fatal()
+	}
 
-// 	if ok := assert.Error(t, err); !ok {
-// 		t.Fatal()
-// 	}
-// }
+	if ok := assert.Equal(t, "Hello world\n", messages[0].Message); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, uint16(2), messages[0].Meta.Level()); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, "this is a single line message\n", messages[1].Message); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, uint16(20), messages[1].Meta.Level()); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, "but this is a multi line\nthat spans two blocks of data", messages[2].Message); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, uint16(30), messages[2].Meta.Level()); !ok {
+		t.Error()
+	}
+}
+
+func TestConsumerNoNewLine(t *testing.T) {
+	var messages []*Message
+	h := func(m *Message) {
+		messages = append(messages, m)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	Consume(&wg, &testReader{
+		chunks: []string{
+			"hello world",
+		},
+	}, 1, h)
+
+	wg.Wait()
+
+	if ok := assert.Len(t, messages, 1); !ok {
+		t.Fatal()
+	}
+
+	if ok := assert.Equal(t, "hello world", messages[0].Message); !ok {
+		t.Fatal()
+	}
+
+	if ok := assert.Equal(t, uint16(1), messages[0].Meta.Level()); !ok {
+		t.Fatal()
+	}
+}
