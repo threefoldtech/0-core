@@ -223,7 +223,7 @@ class Response:
         # we can terminate quickly by checking if the process is not running and it has no queued output.
         # if not self.running and r.llen(queue) == 0:
         #     return
-
+        count = 0
         while True:
             data = r.blpop(queue, 10)
             if data is None:
@@ -236,15 +236,15 @@ class Response:
             line = message['message']
             meta = message['meta']
             callback(meta >> 16, line, meta & 0xff)
-
+            count += 1
             if meta & 0x6 != 0:
                 break
+        return count
 
     @staticmethod
     def __default(level, line, meta):
         w = sys.stdout if level == 1 else sys.stderr
         w.write(line)
-        w.write('\n')
 
     def get(self, timeout=None):
         """

@@ -118,9 +118,6 @@ type StreamHook struct {
 }
 
 func (h *StreamHook) append(buf *bytes.Buffer, msg *stream.Message) {
-	if buf.Len() > 0 {
-		buf.WriteByte('\n')
-	}
 	buf.WriteString(msg.Message)
 }
 

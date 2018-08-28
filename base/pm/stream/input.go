@@ -85,7 +85,7 @@ func (c *consumerImpl) newLineOrEOF(b []byte) int {
 }
 
 //process process the buffer and return th
-func (c *consumerImpl) process(buffer []byte) int {
+func (c *consumerImpl) process(buffer []byte) {
 	if c.multi != nil {
 		//we are in a middle of a multi line message
 		if end := bytes.Index(buffer, multiLineTerm); end != -1 {
@@ -98,13 +98,12 @@ func (c *consumerImpl) process(buffer []byte) int {
 			buffer = buffer[end+len(multiLineTerm):]
 		} else {
 			c.multi.Write(buffer)
-			return 0
+			return
 		}
 	}
 
 	start := 0
 	for i := 0; i < len(buffer); i++ {
-		//fmt.Printf("trying: '%s'\n", string(buffer[i:]))
 		m := headerPattern.FindSubmatch(buffer[i:])
 		if m == nil {
 			//no header was found at this position
@@ -173,28 +172,18 @@ func (c *consumerImpl) process(buffer []byte) int {
 			Message: string(buffer[start:]),
 		})
 	}
-
-	return 0
 }
 
 func (c *consumerImpl) consume() error {
 	buffer := make([]byte, ioBufferSize)
-	offset := 0
+
 	for {
-		size, err := c.source.Read(buffer[offset:]) //fill what left of the buffer
+		size, err := c.source.Read(buffer) //fill what left of the buffer
 		if err != nil && err != io.EOF {
 			return err
 		}
 
-		all := offset + size
-		reminder := c.process(buffer[:all])
-		if reminder != 0 {
-			//if some data remains at the end of the buffer that
-			//wasn't able to be processed. we need to move it at
-			//the head of the buffer
-			copy(buffer, buffer[all-reminder:all])
-			offset = reminder
-		}
+		c.process(buffer[:size])
 
 		if err == io.EOF {
 			return nil
