@@ -35,7 +35,7 @@ func TestSystemProcess_Run(t *testing.T) {
 		t.Fatal()
 	}
 
-	if ok := assert.Equal(t, "hello world", messages[0].Message); !ok {
+	if ok := assert.Equal(t, "hello world\n", messages[0].Message); !ok {
 		t.Error()
 	}
 }
@@ -68,7 +68,7 @@ func TestSystemProcess_RunStderr(t *testing.T) {
 		t.Fatal()
 	}
 
-	if ok := assert.Equal(t, "hello world", messages[0].Message); !ok {
+	if ok := assert.Equal(t, "hello world\n", messages[0].Message); !ok {
 		t.Error()
 	}
 
