@@ -332,7 +332,8 @@ func TestConsumer_processMultiLineMessageMultiBlock(t *testing.T) {
 	}
 
 	c.process([]byte(`a multi line block is coming
-30:::multi line message
+30:::
+multi line message
 with full termination`))
 	c.process([]byte(`
 in two blocks
@@ -351,7 +352,7 @@ which is surrounded by normal text`))
 		t.Error()
 	}
 
-	if ok := assert.Equal(t, "multi line message\nwith full termination\nin two blocks", messages[1].Message); !ok {
+	if ok := assert.Equal(t, "\nmulti line message\nwith full termination\nin two blocks", messages[1].Message); !ok {
 		t.Error()
 	}
 
@@ -366,6 +367,7 @@ which is surrounded by normal text`))
 	if ok := assert.Equal(t, uint16(1), messages[2].Meta.Level()); !ok {
 		t.Error()
 	}
+
 }
 
 func TestConsumer_OneLine(t *testing.T) {
