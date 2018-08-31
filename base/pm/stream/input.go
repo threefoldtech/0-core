@@ -95,6 +95,7 @@ func (c *consumerImpl) process(buffer []byte) {
 				Meta:    NewMeta(c.multiLevel),
 				Message: c.multi.String(),
 			})
+			c.multi = nil
 			buffer = buffer[end+len(multiLineTerm):]
 		} else {
 			c.multi.Write(buffer)
