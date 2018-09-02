@@ -130,4 +130,14 @@ func TestResolveURL(t *testing.T) {
 	if ok := assert.Equal(t, "http://localhost:80/", url); !ok {
 		t.Error()
 	}
+
+	url, err = ResolveURL("zdb://127.0.0.1:80/")
+
+	if ok := assert.NoError(t, err); !ok {
+		t.Fatal()
+	}
+
+	if ok := assert.Equal(t, "zdb://1.2.3.4:8080/", url); !ok {
+		t.Error()
+	}
 }
