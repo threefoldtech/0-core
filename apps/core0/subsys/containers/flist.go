@@ -91,12 +91,9 @@ func (m *containerManager) flistCreate(cmd *pm.Command) (interface{}, error) {
 	srcPath := containerPath(cont, args.Src)
 
 	// create flist
-	storage, err := socat.ResolveURL(args.Storage)
-	if err != nil {
-		return nil, fmt.Errorf("failed to process storage url: %s", err)
-	}
+	storage := socat.Resolve(args.Storage)
 
-	_, err = zflist("--archive", archivePath, "-args.Storageargs.Storage-create", srcPath, "--backend", storage)
+	_, err := zflist("--archive", archivePath, "--create", srcPath, "--backend", storage)
 	if err != nil {
 		return nil, err
 	}
