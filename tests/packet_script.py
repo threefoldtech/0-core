@@ -11,7 +11,7 @@ import requests
 
 def create_new_device(manager, hostname, branch='master'):
     project = manager.list_projects()[0]
-    ipxe_script_url = 'http://unsecure.bootstrap.gig.tech/ipxe/{}/0/development'.format(branch)
+    ipxe_script_url = 'https://bootstrap.grid.tf/ipxe/{}/0/development'.format(branch)
     available_facility = None
     facilities = [x.code for x in manager.list_facilities()]
     for facility in facilities:
