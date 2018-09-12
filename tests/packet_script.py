@@ -59,13 +59,13 @@ def delete_device(manager):
 
 def check_status(found, branch):
     session = requests.Session()
-    url = 'https://build.gig.tech/build/status'
+    url = 'https://build.grid.tf/build/status'
     t1 = time.time()
     while True:
         try:
             if found:
                 t2 = time.time()
-                if t1+10 > t2:
+                if t1 + 10 > t2:
                     return 'No_build_triggered'
             res_st = session.get(url)
             t = res_st.json()['zero-os/0-core/{}'.format(branch)]['started']
@@ -121,7 +121,7 @@ if __name__ == '__main__':
             print('waiting for zos build to pass ..')
             check_status(False, branch)
             time.sleep(2)
-            url2 = 'https://build.gig.tech/build/history'
+            url2 = 'https://build.grid.tf/build/history'
             session = requests.Session()
             res_hs = session.get(url2)
             if res_hs.json()[0]['started'] == t:
