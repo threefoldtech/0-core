@@ -5,7 +5,6 @@ if [ "$TRAVIS_EVENT_TYPE" == "cron" ] || [ "$TRAVIS_EVENT_TYPE" == "api" ]
    if [ "$point" == "before" ]
     then
       echo "Before running tests"
-      apt-get install python3-yaml
       pip3 install -r tests/requirements.txt
       pip3 install client/py-client/.
       pip3 install git+https://github.com/gigforks/packet-python.git

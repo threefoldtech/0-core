@@ -14,11 +14,11 @@ setup (
     version='1.1.0-alpha-4',
     description='Zero-OS 0-core client',
     long_description=long_description,
-    url='https://github.com/zero-os/0-core',
+    url='https://github.com/threefoldtech/0-core',
     author='Muhamad Azmy',
     author_email='muhamada@greenitglobe.com',
     license='Apache 2.0',
     namespaces=['zeroos'],
     packages=find_packages(),
-    install_requires=['redis>=2.10.5'],
+    install_requires=['redis>=2.10.5', 'pyaml'],
 )

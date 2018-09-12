@@ -21,7 +21,7 @@ class BaseTest(unittest.TestCase):
         self.root_url = 'https://hub.grid.tf/tf-bootable/ubuntu:16.04.flist'
         self.smallsize_img = 'https://hub.gig.tech/gig-official-apps/0-disk-master.flist'
         self.ovs_flist = 'https://hub.grid.tf/tf-official-apps/ovs.flist'
-        self.storage = 'ardb://hub.grid.tf:16379'
+        self.storage = 'zdb://hub.grid.tf:9900'
         self.client.timeout = 80
         super(BaseTest, self).__init__(*args, **kwargs)
 
