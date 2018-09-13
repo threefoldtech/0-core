@@ -24,7 +24,7 @@ class SystemTests(BaseTest):
         self.client.container.terminate(self.cid)
 
     def getNicInfo(self, client):
-        r = client.bash('ip -br a').get().stdout
+        r = client.bash("ip -br a | awk '{print $1}'").get().stdout
         nics = [x.split()[0] for x in r.splitlines() if x.strip() != '']
         nicInfo = []
         for nic in nics:
@@ -105,7 +105,7 @@ class SystemTests(BaseTest):
     def get_dmi_bios_info(self, client):
 
         lines = client.bash('dmidecode -t bios').get().stdout.splitlines()
-        dmi_info = {'Vendor':'vendor', 'Version':'version','Release Date':'release date','Address':'address', 
+        dmi_info = {'Vendor':'vendor', 'Version':'version','Release Date':'release date','Address':'address',
                     'Runtime Size':'runtime size', 'ROM Size':'rom size','BIOS Revision':'bios revision' }
 
         for line in lines:
@@ -114,11 +114,11 @@ class SystemTests(BaseTest):
                 if key == line[:line.find(':')]:
                     item = (line[line.index(':') + 2 :])
                     dmi_info[key] = item
-        
+
         return dmi_info
 
     def get_port_info(self, client, protocol):
-        
+
         if protocol == 'tcp':
             lines_1 = client.bash('netstat -tlpn | tail -n+3 | awk "{print \$4}"').get().stdout.splitlines() #ip:port
             lines_2 = client.bash('netstat -tlpn | tail -n+3 | awk "{print \$7}"').get().stdout.splitlines() #pid
@@ -133,19 +133,25 @@ class SystemTests(BaseTest):
         ip = []
         port = []
         pid = []
-        # Separate ip, port from ip:port line 
+        # Separate ip, port from ip:port line
         for line in lines_1:
-            line = line.replace('\t', '')
-            ip.append(line[: line.rfind(':')])
-            port.append(line[line.rfind(':') + 1 :])
+            if line == '' or line == '\n':
+                continue
+            else:
+                line = line.replace('\t', '')
+                ip.append(line[: line.rfind(':')])
+                port.append(line[line.rfind(':') + 1 :])
 
         # Get pid 
         for line in lines_2:
-            line = line.replace('\t', '')
-            if line[: line.rfind('/')] == '':
-                pid.append('0')
+            if line == '' or line == '\n':
+                continue
             else:
-                pid.append(line[: line.rfind('/')])
+                line = line.replace('\t', '')
+                if line[: line.rfind('/')] == '':
+                    pid.append('0')
+                else:
+                    pid.append(line[: line.rfind('/')])
 
         port_info = {'ip' : ip, 'port': port, 'pid': pid}
         return port_info
@@ -177,7 +183,7 @@ class SystemTests(BaseTest):
         self.lg('Check that the folder is created')
         rs1 = self.client.bash('ls | grep {}'.format(folder))
         rs_ob = rs1.get()
-        self.assertEqual(rs_ob.stdout, '{}\n'.format(folder))
+        self.assertEqual(rs_ob.stdout.replace('\n', ''), '{}'.format(folder))
         self.assertEqual(rs_ob.state, 'SUCCESS')
 
         self.lg('Check that you can get same responce for (C1)')
@@ -559,7 +565,7 @@ class SystemTests(BaseTest):
 
                 self.lg('Check file (F1) content, should success')
                 file_text = client.bash('cat {}'.format(file_name)).get().stdout
-                self.assertEqual(file_text, '{}{}\n'.format(new_txt.decode('utf-8'), txt[l:]))
+                self.assertEqual(file_text.replace('\n', ''), '{}{}'.format(new_txt.decode('utf-8'), txt[l:]).replace('\n', ''))
                 file_text = client.filesystem.read(f).decode('utf-8')
                 self.assertEqual(file_text, '{}\n'.format(txt[l:]))
                 with self.assertRaises(RuntimeError):
@@ -1055,7 +1061,7 @@ class SystemTests(BaseTest):
 
         for k in dmi_bios_info:
             self.assertEqual(dmi_bios_info[k],bios_info[k]['value'])
-            
+
 
     @parameterized.expand(['client', 'container'])
     def test020_mkdir_chown_remove_directory(self, client_type):
@@ -1146,7 +1152,7 @@ class SystemTests(BaseTest):
         else:
             for i,n in enumerate(port_info_1):
                 if n['network'] == 'udp':
-                    start = i 
+                    start = i
                     break
 
         self.lg('Compare port zos results to that of the bash results, should be the same')
@@ -1155,4 +1161,3 @@ class SystemTests(BaseTest):
             self.assertEqual(port_info_1[idx + start]['ip'], port_info_2['ip'][idx])
             self.assertEqual(port_info_1[idx + start]['port'], int(port_info_2['port'][idx]))
             self.assertEqual(port_info_1[idx + start]['pid'], int(port_info_2['pid'][idx]))
-        

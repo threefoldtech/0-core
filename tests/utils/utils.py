@@ -18,10 +18,10 @@ class BaseTest(unittest.TestCase):
         self.client = client.Client(self.target_ip)
         self.session = requests.Session()
         self.session.headers['Authorization'] = 'Bearer {}'.format(self.zt_access_token)
-        self.root_url = 'https://hub.gig.tech/gig-official-apps/ubuntu1604.flist'
-        self.smallsize_img = 'https://hub.gig.tech/gig-official-apps/0-disk-master.flist'
-        self.ovs_flist = 'https://hub.gig.tech/gig-official-apps/ovs.flist'
-        self.storage = 'ardb://hub.gig.tech:16379'
+        self.root_url = 'https://hub.grid.tf/tf-bootable/ubuntu:16.04.flist'
+        self.smallsize_img = 'https://hub.grid.tf/tf-official-apps/minio.flist'
+        self.ovs_flist = 'https://hub.grid.tf/tf-official-apps/ovs.flist'
+        self.storage = 'zdb://hub.grid.tf:9900'
         self.client.timeout = 80
         super(BaseTest, self).__init__(*args, **kwargs)
 
