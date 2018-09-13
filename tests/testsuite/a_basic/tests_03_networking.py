@@ -9,7 +9,6 @@ class BasicNetworking(BaseTest):
         super(BasicNetworking, self).setUp()
         self.check_zos_connection(BasicNetworking)
 
-    @unittest.skip('https://github.com/threefoldtech/0-core/issues/41')
     def test001_join_leave_list_zerotier(self):
         """ zos-012
         *Test case for testing joining, listing, leaving zerotier networks*
