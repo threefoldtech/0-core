@@ -24,7 +24,7 @@ class SystemTests(BaseTest):
         self.client.container.terminate(self.cid)
 
     def getNicInfo(self, client):
-        r = client.bash('ip -br a').get().stdout
+        r = client.bash("ip -br a | awk '{print $1}'").get().stdout
         nics = [x.split()[0] for x in r.splitlines() if x.strip() != '']
         nicInfo = []
         for nic in nics:
@@ -177,7 +177,7 @@ class SystemTests(BaseTest):
         self.lg('Check that the folder is created')
         rs1 = self.client.bash('ls | grep {}'.format(folder))
         rs_ob = rs1.get()
-        self.assertEqual(rs_ob.stdout, '{}'.format(folder))
+        self.assertEqual(rs_ob.stdout.replace('\n', ''), '{}'.format(folder))
         self.assertEqual(rs_ob.state, 'SUCCESS')
 
         self.lg('Check that you can get same responce for (C1)')
@@ -559,7 +559,7 @@ class SystemTests(BaseTest):
 
                 self.lg('Check file (F1) content, should success')
                 file_text = client.bash('cat {}'.format(file_name)).get().stdout
-                self.assertEqual(file_text, '{}{}'.format(new_txt.decode('utf-8'), txt[l:]))
+                self.assertEqual(file_text.replace('\n', ''), '{}{}'.format(new_txt.decode('utf-8'), txt[l:]).replace('\n', ''))
                 file_text = client.filesystem.read(f).decode('utf-8')
                 self.assertEqual(file_text, '{}\n'.format(txt[l:]))
                 with self.assertRaises(RuntimeError):

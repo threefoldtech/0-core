@@ -19,7 +19,7 @@ class BaseTest(unittest.TestCase):
         self.session = requests.Session()
         self.session.headers['Authorization'] = 'Bearer {}'.format(self.zt_access_token)
         self.root_url = 'https://hub.grid.tf/tf-bootable/ubuntu:16.04.flist'
-        self.smallsize_img = 'https://hub.gig.tech/gig-official-apps/0-disk-master.flist'
+        self.smallsize_img = 'https://hub.grid.tf/tf-official-apps/minio.flist'
         self.ovs_flist = 'https://hub.grid.tf/tf-official-apps/ovs.flist'
         self.storage = 'zdb://hub.grid.tf:9900'
         self.client.timeout = 80

@@ -199,7 +199,7 @@ class ExtendedMachines(BaseTest):
         ccl2 = self.client.container.client(cid2)
         nic_type = self.client.container.list()[str(cid2)]['container']['arguments']['nics'][0]['type']
         self.assertEqual(nic_type, 'default')
-        self.assertEqual(ccl2.filesystem.list("/bin")[0]['name'], 'nbdserver')
+        self.assertEqual(ccl2.filesystem.list("/bin")[0]['name'], 'minio')
 
         self.lg('{} ENDED'.format(self._testID))
 
