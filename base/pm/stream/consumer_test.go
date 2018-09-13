@@ -547,3 +547,56 @@ func TestConsumerNoNewLine(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func TestConsumerJsonOutput(t *testing.T) {
+	s := `{
+	"address": "c4f432413e",
+	"clock": 1536831437282,
+	"config": {
+	"physical": null,
+	"settings": {
+	"allowTcpFallbackRelay": true,
+	"portMappingEnabled": true,
+	"primaryPort": 9993,
+	"softwareUpdate": "disable",
+	"softwareUpdateChannel": "release"
+	}
+	},
+	"online": true,
+	"planetWorldId": 149604618,
+	"planetWorldTimestamp": 1532555817048,
+	"publicIdentity": "c4f432413e:0:b3566436739189bb7b8198d37b2bc51894cf81622b4bb04a091db4dfa2c00f1c9fb21c09c13f0e20c4ce2888879c7a878b615d585399dc0ba72976636398f776",
+	"tcpFallbackActive": false,
+	"version": "1.2.10",
+	"versionBuild": 0,
+	"versionMajor": 1,
+	"versionMinor": 2,
+	"versionRev": 10
+}
+`
+
+	var message *Message
+	h := func(m *Message) {
+		message = m
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	Consume(&wg, &testReader{
+		chunks: []string{"20:::\n", s, ":::\n"},
+	}, 1, h)
+
+	wg.Wait()
+
+	if ok := assert.NotNil(t, message); !ok {
+		t.Fatal()
+	}
+
+	// if ok := assert.Equal(t, "hello world\n", message.Message); !ok {
+	// 	t.Fatal()
+	// }
+
+	if ok := assert.Equal(t, uint16(20), message.Meta.Level()); !ok {
+		t.Fatal()
+	}
+}

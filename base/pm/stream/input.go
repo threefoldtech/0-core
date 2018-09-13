@@ -6,6 +6,7 @@ import (
 	"io"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 
 	logging "github.com/op/go-logging"
@@ -21,7 +22,8 @@ var (
 	pmMsgPattern  = regexp.MustCompile("^(\\d+)(:{2,3})(.*)$")
 	headerPattern = regexp.MustCompile(`^(\d+)(:{2,3})`)
 
-	multiLineTerm = []byte("\n:::\n")
+	multiLineTerm = "\n:::\n"
+	// multiLineHead = ":::\n"
 
 	errNotHeader = fmt.Errorf("not header")
 )
@@ -77,10 +79,16 @@ func (c *consumerImpl) getHeaderFromMatch(m [][]byte) *header {
 
 //newLineOrEOF will return index of the next \n or EOF (end of file or string)
 func (c *consumerImpl) newLineOrEOF(b []byte) int {
-	i := 0
-	for ; i < len(b) && b[i] != '\n'; i++ {
+	var i int
+	var x rune
+	for i, x = range string(b) {
+		if x == '\n' {
+			break
+		}
 	}
-
+	if i+1 == len(b) {
+		i += 1
+	}
 	return i
 }
 
@@ -88,7 +96,14 @@ func (c *consumerImpl) newLineOrEOF(b []byte) int {
 func (c *consumerImpl) process(buffer []byte) {
 	if c.multi != nil {
 		//we are in a middle of a multi line message
-		if end := bytes.Index(buffer, multiLineTerm); end != -1 {
+		if c.multi.Len() > 0 && c.multi.Bytes()[c.multi.Len()-1] == '\n' && bytes.HasPrefix(buffer, []byte(":::\n")) {
+			c.handler(&Message{
+				Meta:    NewMeta(c.multiLevel),
+				Message: c.multi.String(),
+			})
+			c.multi = nil
+			buffer = buffer[4:]
+		} else if end := strings.Index(string(buffer), multiLineTerm); end != -1 {
 			//we found the termination string
 			c.multi.Write(buffer[:end])
 			c.handler(&Message{
@@ -147,10 +162,11 @@ func (c *consumerImpl) process(buffer []byte) {
 			continue
 		}
 
+		log.Debugf("starting multiline")
 		//multiline message
-		//read in multi until eof or \n::: termination
+		//read in multi until eof or \n:::\n termination
 		j := i + h.length
-		if end := bytes.Index(buffer[j:], multiLineTerm); end != -1 {
+		if end := strings.Index(string(buffer[j:]), multiLineTerm); end != -1 {
 			//we found the termination string
 			c.handler(&Message{
 				Meta:    NewMeta(h.level),
@@ -183,7 +199,6 @@ func (c *consumerImpl) consume() error {
 		if err != nil && err != io.EOF {
 			return err
 		}
-
 		c.process(buffer[:size])
 
 		if err == io.EOF {
