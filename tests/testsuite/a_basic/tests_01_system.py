@@ -135,17 +135,23 @@ class SystemTests(BaseTest):
         pid = []
         # Separate ip, port from ip:port line
         for line in lines_1:
-            line = line.replace('\t', '')
-            ip.append(line[: line.rfind(':')])
-            port.append(line[line.rfind(':') + 1 :])
-
-        # Get pid
-        for line in lines_2:
-            line = line.replace('\t', '')
-            if line[: line.rfind('/')] == '':
-                pid.append('0')
+            if line == '' or line == '\n':
+                continue
             else:
-                pid.append(line[: line.rfind('/')])
+                line = line.replace('\t', '')
+                ip.append(line[: line.rfind(':')])
+                port.append(line[line.rfind(':') + 1 :])
+
+        # Get pid 
+        for line in lines_2:
+            if line == '' or line == '\n':
+                continue
+            else:
+                line = line.replace('\t', '')
+                if line[: line.rfind('/')] == '':
+                    pid.append('0')
+                else:
+                    pid.append(line[: line.rfind('/')])
 
         port_info = {'ip' : ip, 'port': port, 'pid': pid}
         return port_info
