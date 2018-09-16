@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
 	"github.com/threefoldtech/0-core/base/pm"
 	"gopkg.in/yaml.v2"
 )
@@ -90,7 +91,9 @@ func (m *containerManager) flistCreate(cmd *pm.Command) (interface{}, error) {
 	srcPath := containerPath(cont, args.Src)
 
 	// create flist
-	_, err := zflist("--archive", archivePath, "--create", srcPath, "--backend", args.Storage)
+	storage := socat.Resolve(args.Storage)
+
+	_, err := zflist("--archive", archivePath, "--create", srcPath, "--backend", storage)
 	if err != nil {
 		return nil, err
 	}
