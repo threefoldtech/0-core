@@ -112,6 +112,7 @@ type ContainerCreateArguments struct {
 	Tags        pm.Tags           `json:"tags"`         //for searching containers
 	Env         map[string]string `json:"env"`          //environment variables.
 	CGroups     []CGroup          `json:"cgroups"`      //container creation cgroups
+	Config      map[string]string `json:"config"`       //overrides vm config (from flist)
 }
 
 type ContainerDispatchArguments struct {

@@ -28,7 +28,20 @@ func (c *container) name() string {
 	return fmt.Sprintf("%d", c.id)
 }
 
-func (c *container) mountFList(src string, target string, hooks ...pm.RunnerHook) error {
+func (c *container) flistConfigOverride(target string, cfg map[string]string) error {
+	for name, content := range cfg {
+		p := path.Join(target, utils.SafeNormalize(name))
+		if err := os.MkdirAll(path.Dir(p), 0700); err != nil {
+			return fmt.Errorf("failed to create director: %s", path.Dir(p))
+		}
+		if err := ioutil.WriteFile(p, []byte(content), 0600); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *container) mountFList(src string, target string, cfg map[string]string, hooks ...pm.RunnerHook) error {
 	//check
 	namespace := fmt.Sprintf("containers/%s", c.name())
 	storage := c.Args.Storage
@@ -37,7 +50,24 @@ func (c *container) mountFList(src string, target string, hooks ...pm.RunnerHook
 		c.Args.Storage = storage
 	}
 
-	return filesystem.MountFList(namespace, storage, src, target, hooks...)
+	err := filesystem.MountFList(namespace, storage, src, target, hooks...)
+	if err != nil {
+		return err
+	}
+	err = c.flistConfigOverride(target, cfg)
+	if err == nil {
+		return err
+	}
+
+	return nil
+	//load entry config
+	// cfgstr, err := ioutil.ReadFile(path.Join(target, "boot", "boot.yaml"))
+	// if err != nil {
+	// 	return config, fmt.Errorf("failed to open boot/boot.yaml: %s", err)
+	// }
+
+	// err = yaml.Unmarshal(cfgstr, &config)
+	// config.Root = target
 }
 
 func (c *container) root() string {
@@ -126,8 +156,8 @@ func (c *container) sandbox() error {
 			c.cleanSandbox()
 		},
 	}
-
-	if err := c.mountFList(c.Args.Root, root, onSBExit); err != nil {
+	cfg := map[string]string{}
+	if err := c.mountFList(c.Args.Root, root, cfg, onSBExit); err != nil {
 		return fmt.Errorf("mount-root-flist(%s)", err)
 	}
 
@@ -163,7 +193,7 @@ func (c *container) sandbox() error {
 				return err
 			}
 			//assume a flist
-			if err := c.mountFList(src, target); err != nil {
+			if err := c.mountFList(src, target, cfg); err != nil {
 				return fmt.Errorf("mount-bind-flist(%s)", err)
 			}
 		}
