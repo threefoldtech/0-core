@@ -55,19 +55,11 @@ func (c *container) mountFList(src string, target string, cfg map[string]string,
 		return err
 	}
 	err = c.flistConfigOverride(target, cfg)
-	if err == nil {
+	if err != nil {
 		return err
 	}
 
 	return nil
-	//load entry config
-	// cfgstr, err := ioutil.ReadFile(path.Join(target, "boot", "boot.yaml"))
-	// if err != nil {
-	// 	return config, fmt.Errorf("failed to open boot/boot.yaml: %s", err)
-	// }
-
-	// err = yaml.Unmarshal(cfgstr, &config)
-	// config.Root = target
 }
 
 func (c *container) root() string {
@@ -156,7 +148,7 @@ func (c *container) sandbox() error {
 			c.cleanSandbox()
 		},
 	}
-	cfg := map[string]string{}
+	cfg := c.Args.Config
 	if err := c.mountFList(c.Args.Root, root, cfg, onSBExit); err != nil {
 		return fmt.Errorf("mount-root-flist(%s)", err)
 	}
