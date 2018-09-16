@@ -481,7 +481,7 @@ class DisksTests(BaseTest):
         self.lg('Try to write file inside that directory exceeding L1, should fail')
         rs = self.client.bash('cd {}; fallocate -l 200M {}'.format(sv1_path, self.rand_str()))
         self.assertEqual(rs.get().state, 'ERROR')
-        self.assertEqual(rs.get().stderr.strip(), 'fallocate: fallocate failed: Disk quota exceeded')
+        self.assertIn('Disk quota exceeded', rs.get().stderr.strip())
 
         self.lg('Destroy this btrfs filesystem')
         self.destroy_btrfs()
@@ -521,7 +521,7 @@ class DisksTests(BaseTest):
         self.lg('Add device (D1) to the (Bfs1) mount point, should succeed')
         self.client.btrfs.device_add(self.mount_point, d1)
         rs = self.client.bash('btrfs filesystem show | grep -o "loop0"')
-        self.assertEqual(rs.get().stdout.strip(), 'loop0')
+        self.assertIn('loop0', rs.get().stdout.strip())
         self.assertEqual(rs.get().state, 'SUCCESS')
 
         self.lg('Add (D1) again to the (Bfs1) mount point, should fail')
