@@ -521,7 +521,7 @@ class DisksTests(BaseTest):
         self.lg('Add device (D1) to the (Bfs1) mount point, should succeed')
         self.client.btrfs.device_add(self.mount_point, d1)
         rs = self.client.bash('btrfs filesystem show | grep -o "loop0"')
-        self.assertEqual(rs.get().stdout.strip(), 'loop0')
+        self.assertIn('loop0', rs.get().stdout.strip())
         self.assertEqual(rs.get().state, 'SUCCESS')
 
         self.lg('Add (D1) again to the (Bfs1) mount point, should fail')
