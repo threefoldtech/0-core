@@ -148,8 +148,7 @@ func (c *container) sandbox() error {
 			c.cleanSandbox()
 		},
 	}
-	cfg := c.Args.Config
-	if err := c.mountFList(c.Args.Root, root, cfg, onSBExit); err != nil {
+	if err := c.mountFList(c.Args.Root, root, c.Args.Config, onSBExit); err != nil {
 		return fmt.Errorf("mount-root-flist(%s)", err)
 	}
 
@@ -185,7 +184,7 @@ func (c *container) sandbox() error {
 				return err
 			}
 			//assume a flist
-			if err := c.mountFList(src, target, cfg); err != nil {
+			if err := c.mountFList(src, target, nil); err != nil {
 				return fmt.Errorf("mount-bind-flist(%s)", err)
 			}
 		}
