@@ -142,7 +142,7 @@ class SystemTests(BaseTest):
                 ip.append(line[: line.rfind(':')])
                 port.append(line[line.rfind(':') + 1 :])
 
-        # Get pid 
+        # Get pid
         for line in lines_2:
             if line == '' or line == '\n':
                 continue
@@ -364,6 +364,7 @@ class SystemTests(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
+    @unittest.skip('https://github.com/threefoldtech/0-core/issues/45 .. line 33 in this file')
     def test007_nic_info(self):
 
         """ zos-007

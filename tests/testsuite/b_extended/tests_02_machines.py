@@ -138,6 +138,7 @@ class ExtendedMachines(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
+    @unittest.skip('https://github.com/threefoldtech/0-core/issues/46')
     def test_003_containers_backup_restore(self):
         """ zos-037
 

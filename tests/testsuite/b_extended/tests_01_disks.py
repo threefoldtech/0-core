@@ -481,7 +481,7 @@ class DisksTests(BaseTest):
         self.lg('Try to write file inside that directory exceeding L1, should fail')
         rs = self.client.bash('cd {}; fallocate -l 200M {}'.format(sv1_path, self.rand_str()))
         self.assertEqual(rs.get().state, 'ERROR')
-        self.assertEqual(rs.get().stderr.strip(), 'fallocate: fallocate failed: Disk quota exceeded')
+        self.assertIn('Disk quota exceeded', rs.get().stderr.strip())
 
         self.lg('Destroy this btrfs filesystem')
         self.destroy_btrfs()
