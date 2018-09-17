@@ -44,3 +44,23 @@ func TestParseSource(t *testing.T) {
 		})
 	}
 }
+
+func TestCompareSource(t *testing.T) {
+	onlyPort := source{
+		ip:   "",
+		port: 80,
+	}
+	interfacePort := source{
+		ip:   "zt*",
+		port: 80,
+	}
+	rules := map[source]rule{
+		onlyPort: rule{},
+	}
+
+	_, exists := rules[onlyPort]
+	require.True(t, exists)
+
+	_, exists = rules[interfacePort]
+	require.False(t, exists)
+}

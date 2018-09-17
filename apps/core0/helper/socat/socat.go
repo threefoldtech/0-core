@@ -19,7 +19,7 @@ var (
 	log  = logging.MustGetLogger("socat")
 	lock sync.Mutex
 
-	rules = map[int]rule{}
+	rules = map[source]rule{}
 )
 
 type source struct {
@@ -95,7 +95,7 @@ func SetPortForward(namespace string, ip string, host string, dest int) error {
 
 	//NOTE: this will only check if the port is used for port forwarding
 	//if a port on the host is using this port it will get masked out
-	if _, exists := rules[src.port]; exists {
+	if _, exists := rules[src]; exists {
 		return fmt.Errorf("port already in use")
 	}
 
@@ -123,7 +123,7 @@ func SetPortForward(namespace string, ip string, host string, dest int) error {
 		return err
 	}
 
-	rules[src.port] = r
+	rules[src] = r
 	return nil
 }
 
@@ -140,7 +140,7 @@ func RemovePortForward(namespace string, host string, dest int) error {
 		return err
 	}
 
-	rule, ok := rules[src.port]
+	rule, ok := rules[src]
 	if !ok {
 		return fmt.Errorf("no port forwrard from host port: %d", src.port)
 	}
@@ -166,7 +166,7 @@ func RemovePortForward(namespace string, host string, dest int) error {
 		return err
 	}
 
-	delete(rules, src.port)
+	delete(rules, src)
 	return nil
 }
 
@@ -176,7 +176,7 @@ func RemoveAll(namespace string) error {
 	defer lock.Unlock()
 
 	var todelete []nft.Rule
-	var hostPorts []int
+	var hostPorts []source
 
 	for host, r := range rules {
 		if !strings.HasPrefix(r.ns, fmt.Sprintf("socat-%s", namespace)) {

@@ -57,8 +57,19 @@ func Resolve(address string) string {
 		return address
 	}
 
+	var (
+		ok      = false
+		ruleSrc source
+		dst     rule
+	)
 	lock.Lock()
-	dst, ok := rules[src.port]
+	for ruleSrc, dst = range rules {
+		if ruleSrc.port == src.port {
+			ok = true
+			break
+		}
+	}
+	// dst, ok := rules[src]
 	lock.Unlock()
 
 	if !ok {
