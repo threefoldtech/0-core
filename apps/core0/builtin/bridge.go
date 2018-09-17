@@ -11,10 +11,10 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/vishvananda/netlink"
 	"github.com/threefoldtech/0-core/base/nft"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/utils"
+	"github.com/vishvananda/netlink"
 )
 
 type bridgeMgr struct {
@@ -441,7 +441,7 @@ func (b *bridgeMgr) setNAT(addr *netlink.Addr) error {
 			Chains: nft.Chains{
 				"post": nft.Chain{
 					Rules: []nft.Rule{
-						{Body: fmt.Sprintf("ip daddr %s masquerade", addr.IPNet.String())},
+						//{Body: fmt.Sprintf("ip daddr %s masquerade", addr.IPNet.String())},
 						{Body: fmt.Sprintf("ip saddr %s masquerade", addr.IPNet.String())},
 					},
 				},
@@ -545,16 +545,16 @@ func (b *bridgeMgr) nft(br string) error {
 	name := fmt.Sprintf("\"%v\"", br)
 
 	n := nft.Nft{
-		"nat": nft.Table{
-			Family: nft.FamilyIP,
-			Chains: nft.Chains{
-				"pre": nft.Chain{
-					Rules: []nft.Rule{
-						{Body: fmt.Sprintf("iif %s meta mark set 1", name)},
-					},
-				},
-			},
-		},
+		// "nat": nft.Table{
+		// 	Family: nft.FamilyIP,
+		// 	Chains: nft.Chains{
+		// 		"pre": nft.Chain{
+		// 			Rules: []nft.Rule{
+		// 				{Body: fmt.Sprintf("iif %s meta mark set 1", name)},
+		// 			},
+		// 		},
+		// 	},
+		// },
 		"filter": nft.Table{
 			Family: nft.FamilyINET,
 			Chains: nft.Chains{
@@ -563,12 +563,13 @@ func (b *bridgeMgr) nft(br string) error {
 						{Body: fmt.Sprintf("iif %s udp dport {53,67,68} accept", name)},
 					},
 				},
-				"forward": nft.Chain{
-					Rules: []nft.Rule{
-						{Body: fmt.Sprintf("iif %s oif %s meta mark set 2", name, name)},
-						{Body: fmt.Sprintf("oif %s meta mark 1 drop", name)},
-					},
-				},
+				// "forward": nft.Chain{
+				// 	Rules: []nft.Rule{
+				// 		{Body: fmt.Sprintf("iif %s meta mark set 1", name)},
+				// 		{Body: fmt.Sprintf("iif %s oif %s meta mark set 2", name, name)},
+				// 		{Body: fmt.Sprintf("oif %s meta mark 1 drop", name)},
+				// 	},
+				// },
 			},
 		},
 	}
