@@ -35,6 +35,36 @@ func getInterfaceMatch(ip string) (name string, address net.IP, err error) {
 	return
 }
 
+//getRoutingInterface returns the first interface that has the given ip reachable through
+//its network
+//as <name>, <address>, error
+//error return if no match is found
+func getRoutingInterface(ip string) (name string, network *net.IPNet, err error) {
+	_ip := net.ParseIP(ip)
+	nics, err := net.Interfaces()
+	if err != nil {
+		return
+	}
+	for _, nic := range nics {
+		var addrs []net.Addr
+		addrs, err = nic.Addrs()
+		if err != nil {
+			return
+		}
+
+		for _, addr := range addrs {
+			if addr, ok := addr.(*net.IPNet); ok {
+				if addr.Contains(_ip) {
+					return nic.Name, addr, nil
+				}
+			}
+		}
+	}
+
+	err = fmt.Errorf("no match found")
+	return
+}
+
 //Resolve resolves an address of the form <ip>:<port> to a direct address to the endpoint
 //IF
 // - the ip address is a local address of this machine
