@@ -39,7 +39,7 @@ func (s source) String() string {
 
 	}
 	//assume interface name
-	return fmt.Sprintf("iifname %s tcp dport %d", s.ip, s.port)
+	return fmt.Sprintf("iifname \"%s\" tcp dport %d", s.ip, s.port)
 }
 
 func getSource(src string) (source, error) {
