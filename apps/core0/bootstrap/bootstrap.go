@@ -307,6 +307,10 @@ func (b *Bootstrap) First() {
 		}
 	}
 
+	if err := MonitorIPChangesUpdateSocat(); err != nil {
+		log.Critical("failed to start dnat ip monitoring")
+	}
+
 	//register core extensions
 	b.registerExtensions(settings.Settings.Extension)
 

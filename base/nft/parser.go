@@ -21,6 +21,10 @@ func Get() (Nft, error) {
 }
 
 func Parse(config string) (Nft, error) {
+	//HACK: remove the set definition from the nft ruleset to avoid fixing this messy parser
+	//TODO: nft can export ruleset as json, we can use that instead, but it seems not to be enabled
+	//on our build
+	config = setCleanup(config)
 
 	level := NFT
 
@@ -97,7 +101,13 @@ var (
 	chainRegex     = regexp.MustCompile("chain ([a-z]+)")
 	chainPropRegex = regexp.MustCompile("type ([a-z]+) hook ([a-z]+) priority ([0-9]+); policy ([a-z]+);")
 	ruleRegex      = regexp.MustCompile("\\s*(.+) # handle ([0-9]+)")
+
+	setCleanupRegex = regexp.MustCompile(`(?smU:set [^\s]+ {.+^\s+}$)`)
 )
+
+func setCleanup(cfg string) string {
+	return setCleanupRegex.ReplaceAllString(cfg, "")
+}
 
 func parseTable(line []byte) ([]byte, *Table) {
 	match := tableRegex.FindSubmatch(line)

@@ -3,7 +3,6 @@ package nft
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 
 	logging "github.com/op/go-logging"
 	"github.com/threefoldtech/0-core/base/pm"
@@ -31,7 +30,7 @@ func Apply(nft Nft) error {
 	}
 	defer func() {
 		f.Close()
-		os.RemoveAll(f.Name())
+		//os.RemoveAll(f.Name())
 	}()
 
 	if _, err := f.Write(data); err != nil {
