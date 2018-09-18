@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/op/go-logging"
 	"github.com/threefoldtech/0-core/apps/core0/assets"
@@ -50,6 +51,20 @@ func init() {
 	signal.Notify(make(chan os.Signal), signals...)
 }
 
+func updateHostnameOnScreen(hostSection *screen.TextSection) {
+	for {
+		time.Sleep(time.Second * 5)
+
+		hostname, err := os.Hostname()
+		if err != nil {
+			log.Critical(err.Error())
+		} else {
+			hostSection.Text = fmt.Sprintf("Hostname: %s", hostname)
+		}
+	}
+
+}
+
 //Splash setup splash screen
 func Splash() {
 	if err := screen.New(2); err != nil {
@@ -74,7 +89,18 @@ func Splash() {
 			options.Options.Kernel.String("debug", "organization", "zerotier", "quiet", "development", "support"), //flags we care about
 		),
 	})
+
 	screen.Push(&screen.TextSection{})
+
+	hostnameSection := &screen.TextSection{
+		Attributes: screen.Attributes{screen.Bold},
+		Text:       "",
+	}
+	screen.Push(hostnameSection)
+	screen.Push(&screen.TextSection{})
+
+	go updateHostnameOnScreen(hostnameSection)
+
 	screen.Push(&screen.TextSection{
 		Text: "[Alt+F1: Kernel logs view] [Alt+F2: This screen]",
 	})
