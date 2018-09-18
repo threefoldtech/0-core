@@ -20,7 +20,7 @@ func getCurrentIPs() ([]string, error) {
 	var all []string
 	for _, link := range links {
 		name := link.Attrs().Name
-		if name == "lo" || !utils.InString([]string{"device", "tun", "tap"}, link.Type()) {
+		if name == "lo" || !utils.InString([]string{"device", "tun", "tap", "openvswitch"}, link.Type()) {
 			continue
 		}
 		if strings.HasPrefix(name, "tun") || strings.HasPrefix(name, "tap") {
