@@ -86,6 +86,9 @@ func MonitorIPChangesUpdateSocat() error {
 	_, err := pm.Run(&pm.Command{
 		ID:      "socat.notify",
 		Command: pm.CommandSystem,
+		Flags: pm.JobFlags{
+			Protected: true,
+		},
 		Arguments: pm.MustArguments(
 			pm.SystemCommandArguments{
 				Name: "ip",
