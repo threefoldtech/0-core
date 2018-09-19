@@ -71,7 +71,7 @@ func getRoutingInterface(ip string) (name string, network *net.IPNet, err error)
 // - port has a forwarding rule
 //ELSE
 // - return address unchanged
-func Resolve(address string) string {
+func (s *socatApi) Resolve(address string) string {
 	src, err := getSource(address)
 	if err != nil {
 		return address
@@ -87,9 +87,9 @@ func Resolve(address string) string {
 		return address
 	}
 
-	lock.Lock()
-	dst, ok := rules[src.port]
-	lock.Unlock()
+	s.rm.Lock()
+	dst, ok := s.rules[src.port]
+	s.rm.Unlock()
 
 	if !ok {
 		return address
@@ -128,7 +128,7 @@ func Resolve(address string) string {
 //ResolveURL rewrites a url to a direct address to the end point. Return original url
 //if no forwarding rule configured that matches the given address
 //note, the url host part must be an ip, can't use host names
-func ResolveURL(raw string) (string, error) {
+func (s *socatApi) ResolveURL(raw string) (string, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return raw, err
@@ -142,7 +142,7 @@ func ResolveURL(raw string) (string, error) {
 		host = fmt.Sprintf("%s:%d", host, port)
 	}
 
-	u.Host = Resolve(host)
+	u.Host = s.Resolve(host)
 
 	return u.String(), nil
 }

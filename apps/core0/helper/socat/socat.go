@@ -5,10 +5,13 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/threefoldtech/0-core/base/nft"
+	"github.com/threefoldtech/0-core/base/pm"
 
 	"github.com/op/go-logging"
+	"github.com/patrickmn/go-cache"
 )
 
 const (
@@ -16,11 +19,22 @@ const (
 )
 
 var (
-	log  = logging.MustGetLogger("socat")
-	lock sync.Mutex
-
-	rules = map[int]rule{}
+	log   = logging.MustGetLogger("socat")
+	socat socatApi
 )
+
+type socatApi struct {
+	rm    sync.Mutex
+	rules map[int]rule
+
+	sm      sync.Mutex
+	reseved *cache.Cache
+}
+
+func init() {
+	socat.rules = make(map[int]rule)
+	socat.reseved = cache.New(2*time.Minute, 1*time.Minute)
+}
 
 type source struct {
 	ip   string
@@ -84,9 +98,9 @@ func (r rule) Rule() string {
 //SetPortForward create a single port forward from host(port), to ip(addr) and dest(port) in this namespace
 //The namespace is used to group port forward rules so they all can get terminated
 //with one call later.
-func SetPortForward(namespace string, ip string, host string, dest int) error {
-	lock.Lock()
-	defer lock.Unlock()
+func (s *socatApi) SetPortForward(namespace string, ip string, host string, dest int) error {
+	s.rm.Lock()
+	defer s.rm.Unlock()
 
 	src, err := getSource(host)
 	if err != nil {
@@ -95,7 +109,7 @@ func SetPortForward(namespace string, ip string, host string, dest int) error {
 
 	//NOTE: this will only check if the port is used for port forwarding
 	//if a port on the host is using this port it will get masked out
-	if _, exists := rules[src.port]; exists {
+	if _, exists := s.rules[src.port]; exists {
 		return fmt.Errorf("port already in use")
 	}
 
@@ -124,7 +138,12 @@ func SetPortForward(namespace string, ip string, host string, dest int) error {
 		return err
 	}
 
-	rules[src.port] = r
+	s.rules[src.port] = r
+
+	s.sm.Lock()
+	defer s.sm.Unlock()
+	s.reseved.Delete(fmt.Sprint(src.port))
+
 	return nil
 }
 
@@ -133,15 +152,15 @@ func forwardID(namespace string, host int, dest int) string {
 }
 
 //RemovePortForward removes a single port forward
-func RemovePortForward(namespace string, host string, dest int) error {
-	lock.Lock()
-	defer lock.Unlock()
+func (s *socatApi) RemovePortForward(namespace string, host string, dest int) error {
+	s.rm.Lock()
+	defer s.rm.Unlock()
 	src, err := getSource(host)
 	if err != nil {
 		return err
 	}
 
-	rule, ok := rules[src.port]
+	rule, ok := s.rules[src.port]
 	if !ok {
 		return fmt.Errorf("no port forwrard from host port: %d", src.port)
 	}
@@ -167,19 +186,19 @@ func RemovePortForward(namespace string, host string, dest int) error {
 		return err
 	}
 
-	delete(rules, src.port)
+	delete(s.rules, src.port)
 	return nil
 }
 
 //RemoveAll remove all port forwrards that were created in this namespace.
-func RemoveAll(namespace string) error {
-	lock.Lock()
-	defer lock.Unlock()
+func (s *socatApi) RemoveAll(namespace string) error {
+	s.rm.Lock()
+	defer s.rm.Unlock()
 
 	var todelete []nft.Rule
 	var hostPorts []int
 
-	for host, r := range rules {
+	for host, r := range s.rules {
 		if !strings.HasPrefix(r.ns, fmt.Sprintf("socat-%s", namespace)) {
 			continue
 		}
@@ -212,8 +231,77 @@ func RemoveAll(namespace string) error {
 	}
 
 	for _, host := range hostPorts {
-		delete(rules, host)
+		delete(s.rules, host)
 	}
 
 	return nil
+}
+
+//Reserve reseves the first n number of ports, and return the reserved ports
+//reseved ports are reserved only for around 2 min, after that a new reserve
+//call can return the same ports.
+func (s *socatApi) Reserve(n int) ([]int, error) {
+	//get all listening tcp ports
+	type portInfo struct {
+		Network string `json:"network"`
+		Port    int    `json:"port"`
+	}
+	var ports []portInfo
+
+	/*
+		list ports from local services, we of course can't grantee
+		that a service will start listening after listing the ports
+		but zos doesn't start any more services (it shouldn't) after
+		the initial bootstrap, so we almost safe by using this returned
+		list
+	*/
+	if err := pm.Internal("info.port", nil, &ports); err != nil {
+		return nil, err
+	}
+
+	used := make(map[int]struct{})
+
+	for _, port := range ports {
+		if port.Network == "tcp" {
+			used[port.Port] = struct{}{}
+		}
+	}
+
+	s.rm.Lock()
+	defer s.rm.Unlock()
+
+	for port := range s.rules {
+		used[port] = struct{}{}
+	}
+
+	s.sm.Lock()
+	defer s.sm.Unlock()
+
+	//used is now filled with all assigned system ports (except reserved)
+	//we can safely find the first port that is not used, and not in reseved and add it to
+	//the result list
+	var result []int
+	p := 1024
+	for i := 0; i < n; i++ {
+		for ; p <= 65536; p++ { //i know last valid port is at 65535, but check code below
+			if _, ok := used[p]; ok {
+				continue
+			}
+
+			if _, ok := s.reseved.Get(fmt.Sprint(p)); ok {
+				continue
+			}
+
+			break
+		}
+
+		if p == 65536 {
+			return result, fmt.Errorf("pool is exhausted")
+		}
+
+		s.reseved.Set(fmt.Sprint(p), nil, cache.DefaultExpiration)
+		result = append(result, p)
+	}
+
+	return result, nil
 }
