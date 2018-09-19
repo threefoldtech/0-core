@@ -34,7 +34,7 @@ func TestJob(t *testing.T) {
 		t.Error()
 	}
 
-	if ok := assert.Equal(t, stdin+"\n", result.Streams.Stdout()); !ok {
+	if ok := assert.Equal(t, stdin, result.Streams.Stdout()); !ok {
 		t.Error()
 	}
 }
