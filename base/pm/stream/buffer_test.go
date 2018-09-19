@@ -55,7 +55,7 @@ func TestBufferString(t *testing.T) {
 
 	expected := ""
 	for i := 10; i < 20; i++ {
-		expected += fmt.Sprintf("line %d\n", i)
+		expected += fmt.Sprintf("line %d", i)
 	}
 
 	expected = strings.TrimSpace(expected)
