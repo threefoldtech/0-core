@@ -12,7 +12,7 @@ matrix:
         - sudo ln -s /usr/bin/python3.5 /usr/bin/python
         - sudo ln -s /usr/bin/python3.5 /usr/bin/python3
       install:
-        - sudo bash tests/install_jumpscale.sh
+        - sudo bash tests/install_zt_js.sh
       script:
         - sudo python3 tests/env_setup_run.py --zos_ip $ZOS_ip --zerotierid $ZT_NET_ID --branch $BRANCH --zt_token $ZT_TOKEN
 

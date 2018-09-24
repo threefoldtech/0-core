@@ -55,11 +55,6 @@ class Utils(object):
 def main(options):
     utils = Utils(options)
 
-    # make sure zerotier is installed
-    if not os.path.exists('/usr/sbin/zerotier-one'):
-        os.system('curl -s https://install.zerotier.com/ | sudo bash')
-    os.system('zerotier-cli join {}'.format(options.zerotier_id))
-
     # get zeroos host client
     zos_client = j.clients.zos.get('zos-kds-farm', data={'host': '{}'.format(options.zos_ip)})
     vm_zos_name = 'vm-zeroos'
