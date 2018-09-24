@@ -1,11 +1,4 @@
 #!/bin/bash
-
-apt-get install -y python3.5 python3.5-dev
-rm -f /usr/bin/python
-rm -f /usr/bin/python3
-ln -s /usr/bin/python3.5 /usr/bin/python
-ln -s /usr/bin/python3.5 /usr/bin/python3
-
 set -e
 
 sudo ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa
