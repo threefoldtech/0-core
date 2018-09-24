@@ -20,3 +20,4 @@ mkdir -p /opt/code/config_test
 git init /opt/code/config_test
 touch /opt/code/config_test/.jsconfig
 js_config init --silent --path /opt/code/config_test/ --key ~/.ssh/id_rsa
+sleep 10
