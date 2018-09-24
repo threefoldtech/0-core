@@ -4,9 +4,7 @@ matrix:
       python: 3.5
       if: type IN (api, cron)
       install:
-        - export JUMPSCALEBRANCH="development"
-        - sudo curl https://raw.githubusercontent.com/threefoldtech/jumpscale_core/$JUMPSCALEBRANCH/install.sh?$RANDOM > /tmp/install_jumpscale.sh
-        - sudo bash /tmp/install_jumpscale.sh
+        - sudo bash tests/install_jumpscale.sh
       script:
         - python3 tests/env_setup_run.py --zos_ip $ZOS_ip --zerotierid $ZT_NET_ID --branch $BRANCH --zt_token $ZT_TOKEN
 
