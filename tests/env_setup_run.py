@@ -6,6 +6,7 @@ from subprocess import Popen, PIPE
 import random
 import uuid
 import time
+import shlex
 
 
 class Utils(object):
@@ -26,6 +27,17 @@ class Utils(object):
                 break
         raise RuntimeError("Failed to execute command.\n\ncommand:\n{}\n\n{}".format(cmd, err.decode('utf-8')))
 
+    def stream_run_cmd(self, cmd):
+        sub = Popen(shlex.split(cmd), stdout=PIPE)
+        while True:
+            out = sub.stdout.readline()
+            if out == '' and sub.poll() is not None:
+                break
+            if out:
+                print(out.strip())
+        rc = sub.poll()
+        return rc
+
     def send_script_to_remote_machine(self, script, ip, port):
         templ = 'scp -o StrictHostKeyChecking=no -r -o UserKnownHostsFile=/dev/null -P {} {} root@{}:'
         cmd = templ.format(port, script, ip)
@@ -34,7 +46,7 @@ class Utils(object):
     def run_cmd_on_remote_machine(self, cmd, ip, port):
         templ = 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p {} root@{} {}'
         cmd = templ.format(port, ip, cmd)
-        return self.run_cmd(cmd)
+        return self.stream_run_cmd(cmd)
 
     def create_disk(self, zos_client):
         zdb_name = str(uuid.uuid4())[0:8]
@@ -69,7 +81,7 @@ cd tests
 pip3 install -r requirements.txt
 sed -i -e"s/^target_ip=.*/target_ip={}/" config.ini
 sed -i -e"s/^zt_access_token=.*/zt_access_token={}/" config.ini
-nosetests -v -s testsuite/a_basic/tests_01_system.py --tc-file config.ini
+nosetests -v -s testsuite --tc-file config.ini
     """.format(options.branch, vm_zos_ip, options.zt_token)
 
     try:
@@ -83,6 +95,7 @@ nosetests -v -s testsuite/a_basic/tests_01_system.py --tc-file config.ini
         zos_client.client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_ubuntu_ip, 'mac': vm_ubuntu_mac})
 
         # create a zeroos vm
+        print('Creating zero-os vm')
         vm_zos = zos_client.primitives.create_virtual_machine(name=vm_zos_name, type_='zero-os:{}'.format(options.branch))
         vm_zos.nics.add(name='nic1', type_='bridge', networkid=bridge, hwaddr=vm_zos_mac)
         vm_zos.vcpus = 4
@@ -100,6 +113,7 @@ nosetests -v -s testsuite/a_basic/tests_01_system.py --tc-file config.ini
         pub_key.replace('\n', '')
 
         # create an ubuntu vm to run testcases from
+        print('Creating ubuntu vm to fire the testsuite from')
         ubuntu_port = random.randint(2222, 3333)
         vm_ubuntu = zos_client.primitives.create_virtual_machine(name=vm_ubuntu_name, type_='ubuntu:lts')
         vm_ubuntu.nics.add(name='nic2', type_='default')
@@ -117,6 +131,7 @@ nosetests -v -s testsuite/a_basic/tests_01_system.py --tc-file config.ini
             f.write(script)
         utils.send_script_to_remote_machine(script_path, options.zos_ip, ubuntu_port)
 
+        print('* Running the testcases')
         cmd = 'bash runtests.sh'
         utils.run_cmd_on_remote_machine(cmd, options.zos_ip, ubuntu_port)
 
