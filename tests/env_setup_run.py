@@ -31,9 +31,7 @@ class Utils(object):
         sub = Popen(shlex.split(cmd), stdout=PIPE)
         while True:
             out = sub.stdout.readline()
-            print('sub.poll:')
-            print(sub.poll())
-            if out == '' and sub.poll() is not None:
+            if out == b'' and sub.poll() is not None:
                 break
             if out:
                 print(out.strip())
@@ -83,7 +81,7 @@ cd tests
 pip3 install -r requirements.txt
 sed -i -e"s/^target_ip=.*/target_ip={}/" config.ini
 sed -i -e"s/^zt_access_token=.*/zt_access_token={}/" config.ini
-nosetests -v -s testsuite/a_basic/tests_01_system.py --tc-file config.ini
+nosetests -v -s testsuite --tc-file config.ini
     """.format(options.branch, vm_zos_ip, options.zt_token)
 
     try:
