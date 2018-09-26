@@ -31,8 +31,8 @@ class Utils(object):
         sub = Popen(shlex.split(cmd), stdout=PIPE)
         while True:
             out = sub.stdout.readline()
+            print('sub.poll:' + sub.poll())
             if out == '' and sub.poll() is not None:
-                print('sub.poll:' + sub.poll())
                 break
             if out:
                 print(out.strip())
