@@ -6,8 +6,9 @@ import os
 
 def main(options):
     if not options.teardown:
+        utils = Utils(options)
         cmd = "nosetests -v -s testsuite --tc-file config.ini"
-        Utils.run_cmd_on_remote_machine(cmd, options.zos_ip, int(os.environ['ubuntu_port']))
+        utils.run_cmd_on_remote_machine(cmd, options.zos_ip, int(os.environ['ubuntu_port']))
     else:
         zos_client = j.clients.zos.get('zos-kds-farm', data={'host': '{}'.format(options.zos_ip)})
         vms = zos_client.client.kvm.list()

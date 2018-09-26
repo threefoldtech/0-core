@@ -19,7 +19,7 @@ matrix:
       script:
         - sudo python3 -u tests/run_tests.py --zos_ip $ZOS_ip
       after_script:
-        - sudo python3 -u tests/run_tests.py --teardown
+        - sudo python3 -u tests/run_tests.py --zos_ip $ZOS_ip --teardown
 
 
     - language: go
