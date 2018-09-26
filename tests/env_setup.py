@@ -1,4 +1,4 @@
-#python script for 0-core testcases on kds farm
+#python script for 0-core testcases
 from jumpscale import j
 import os
 from argparse import ArgumentParser
@@ -69,10 +69,11 @@ def main(options):
 
     # get zeroos host client
     zos_client = j.clients.zos.get('zos-kds-farm', data={'host': '{}'.format(options.zos_ip)})
-    vm_zos_name = 'vm-zeroos'
-    vm_ubuntu_name = 'vm-ubuntu2'
+    vm_zos_name = os.environ['vm_zos_name']
+    vm_ubuntu_name = os.environ['vm_ubuntu_name']
     vm_zos_ip = '10.100.20.{}'.format(random.randint(3, 125))
     vm_ubuntu_ip = '10.100.20.{}'.format(random.randint(126, 253))
+
     script = """
 apt-get install git python3-pip -y
 git clone https://github.com/threefoldtech/0-core.git
@@ -81,77 +82,57 @@ cd tests
 pip3 install -r requirements.txt
 sed -i -e"s/^target_ip=.*/target_ip={}/" config.ini
 sed -i -e"s/^zt_access_token=.*/zt_access_token={}/" config.ini
-nosetests -v -s testsuite --tc-file config.ini
     """.format(options.branch, vm_zos_ip, options.zt_token)
 
-    try:
-        # create a bridge and assign specific ips for the vms
-        bridge = str(uuid.uuid4())[0:8]
-        vm_zos_mac = utils.random_mac()
-        vm_ubuntu_mac = utils.random_mac()
-        zos_client.client.bridge.create(bridge, network='dnsmasq', nat=True, settings={'cidr': '10.100.20.1/24',
-                                        'start': '10.100.20.2', 'end': '10.100.20.254'})
-        zos_client.client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_zos_ip, 'mac': vm_zos_mac})
-        zos_client.client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_ubuntu_ip, 'mac': vm_ubuntu_mac})
+    # create a bridge and assign specific ips for the vms
+    bridge = os.environ['bridge']
+    vm_zos_mac = utils.random_mac()
+    vm_ubuntu_mac = utils.random_mac()
+    zos_client.client.bridge.create(bridge, network='dnsmasq', nat=True, settings={'cidr': '10.100.20.1/24',
+                                    'start': '10.100.20.2', 'end': '10.100.20.254'})
+    zos_client.client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_zos_ip, 'mac': vm_zos_mac})
+    zos_client.client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_ubuntu_ip, 'mac': vm_ubuntu_mac})
 
-        # create a zeroos vm
-        print('Creating zero-os vm')
-        vm_zos = zos_client.primitives.create_virtual_machine(name=vm_zos_name, type_='zero-os:{}'.format(options.branch))
-        vm_zos.nics.add(name='nic1', type_='bridge', networkid=bridge, hwaddr=vm_zos_mac)
-        vm_zos.vcpus = 4
-        vm_zos.memory = 8192
-        disk = utils.create_disk(zos_client)
-        vm_zos.disks.add(disk)
-        vm_zos.deploy()
+    # create a zeroos vm
+    print('* Creating zero-os vm')
+    vm_zos = zos_client.primitives.create_virtual_machine(name=vm_zos_name, type_='zero-os:{}'.format(options.branch))
+    vm_zos.nics.add(name='nic1', type_='bridge', networkid=bridge, hwaddr=vm_zos_mac)
+    vm_zos.vcpus = 4
+    vm_zos.memory = 8192
+    disk = utils.create_disk(zos_client)
+    vm_zos.disks.add(disk)
+    vm_zos.deploy()
 
-        # create sshkey and provide the public key
-        keypath = '/root/.ssh/id_rsa.pub'
-        if not os.path.isfile(keypath):
-            os.system("echo  | ssh-keygen -P ''")
-        with open(keypath, "r") as key:
-            pub_key = key.read()
-        pub_key.replace('\n', '')
+    # create sshkey and provide the public key
+    keypath = '/root/.ssh/id_rsa.pub'
+    if not os.path.isfile(keypath):
+        os.system("echo  | ssh-keygen -P ''")
+    with open(keypath, "r") as key:
+        pub_key = key.read()
+    pub_key.replace('\n', '')
 
-        # create an ubuntu vm to run testcases from
-        print('Creating ubuntu vm to fire the testsuite from')
-        ubuntu_port = random.randint(2222, 3333)
-        vm_ubuntu = zos_client.primitives.create_virtual_machine(name=vm_ubuntu_name, type_='ubuntu:lts')
-        vm_ubuntu.nics.add(name='nic2', type_='default')
-        vm_ubuntu.nics.add(name='nic3', type_='bridge', networkid=bridge, hwaddr=vm_ubuntu_mac)
-        vm_ubuntu.configs.add('sshkey', '/root/.ssh/authorized_keys', pub_key)
-        vm_ubuntu.ports.add('port2', ubuntu_port, 22)
-        vm_ubuntu.vcpus = 4
-        vm_ubuntu.memory = 8192
-        vm_ubuntu.deploy()
+    # create an ubuntu vm to run testcases from
+    print('* Creating ubuntu vm to fire the testsuite from')
+    ubuntu_port = int(os.environ['ubuntu_port'])
+    vm_ubuntu = zos_client.primitives.create_virtual_machine(name=vm_ubuntu_name, type_='ubuntu:lts')
+    vm_ubuntu.nics.add(name='nic2', type_='default')
+    vm_ubuntu.nics.add(name='nic3', type_='bridge', networkid=bridge, hwaddr=vm_ubuntu_mac)
+    vm_ubuntu.configs.add('sshkey', '/root/.ssh/authorized_keys', pub_key)
+    vm_ubuntu.ports.add('port2', ubuntu_port, 22)
+    vm_ubuntu.vcpus = 4
+    vm_ubuntu.memory = 8192
+    vm_ubuntu.deploy()
 
-        # access the ubuntu vm and start ur testsuite
-        time.sleep(10)
-        script_path = '/tmp/runtests.sh'
-        with open(script_path, "w") as f:
-            f.write(script)
-        utils.send_script_to_remote_machine(script_path, options.zos_ip, ubuntu_port)
+    # access the ubuntu vm and start ur testsuite
+    time.sleep(10)
+    script_path = '/tmp/setup_env.sh'
+    with open(script_path, "w") as f:
+        f.write(script)
+    utils.send_script_to_remote_machine(script_path, options.zos_ip, ubuntu_port)
 
-        print('* Running the testcases')
-        cmd = 'bash runtests.sh'
-        utils.run_cmd_on_remote_machine(cmd, options.zos_ip, ubuntu_port)
-
-    except:
-        raise
-
-    finally:
-        # tear down
-        # delete the vms and bridge
-        vms = zos_client.client.kvm.list()
-        vm_uuid = [vm['uuid'] for vm in vms if vm['name'] == vm_ubuntu_name]
-        if vm_uuid:
-            zos_client.client.kvm.destroy(vm_uuid[0])
-        vm_uuid = [vm['uuid'] for vm in vms if vm['name'] == vm_zos_name]
-        if vm_uuid:
-            zos_client.client.kvm.destroy(vm_uuid[0])
-        if bridge in zos_client.client.bridge.list():
-            zos_client.client.bridge.delete(bridge)
-        # leave the zt-network
-        os.system('zerotier-cli leave {}'.format(options.zerotier_id))
+    print('* Setup the environment')
+    cmd = 'bash setup_env.sh'
+    utils.run_cmd_on_remote_machine(cmd, options.zos_ip, ubuntu_port)
 
 
 if __name__ == "__main__":
