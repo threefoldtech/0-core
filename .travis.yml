@@ -6,7 +6,7 @@ matrix:
       python: 3.5
       if: type IN (api, cron)
       before_install:
-        - source tests/before_script.sh
+        - source tests/before_install.sh
       install:
         - sudo bash tests/install_zt_js.sh
       before_script:
