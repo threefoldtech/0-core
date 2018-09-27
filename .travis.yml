@@ -17,9 +17,9 @@ matrix:
       before_script:
         - sudo python3 -u tests/env_setup.py --zos_ip $ZOS_ip --zerotierid $ZT_NET_ID --branch $BRANCH --zt_token $ZT_TOKEN
       script:
-        - sudo python3 -u tests/run_tests.py --zos_ip $ZOS_ip
+        - ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p $ubuntu_port root@$ZOS_ip "cd 0-core/tests; nosetests -v -s testsuite --tc-file config.ini"
       after_script:
-        - sudo python3 -u tests/run_tests.py --zos_ip $ZOS_ip --teardown
+        - sudo python3 -u tests/teardown.py --zos_ip $ZOS_ip
 
 
     - language: go
