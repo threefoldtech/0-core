@@ -58,7 +58,7 @@ func (o *Bootstrap) populateMinimumDev() error {
 		{"zero", CharDevice, 0666, 1, 5},
 	}
 
-    previousUmask := syscall.Umask(0000)
+	previousUmask := syscall.Umask(0000)
 
 	for _, dev := range devices {
 		if err := dev.mk("/dev"); err != nil {
@@ -91,7 +91,7 @@ func (o *Bootstrap) populateMinimumDev() error {
 		return fmt.Errorf("failed to mount shm: %s", err)
 	}
 
-    syscall.Umask(previousUmask)
+	syscall.Umask(previousUmask)
 
 	return nil
 }
