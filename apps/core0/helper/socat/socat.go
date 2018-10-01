@@ -16,15 +16,22 @@ const (
 )
 
 var (
-	log  = logging.MustGetLogger("socat")
+	log              = logging.MustGetLogger("socat")
+	defaultProtocols = []string{"tcp"}
+	validProtocols   = map[string]struct{}{
+		"tcp": struct{}{},
+		"udp": struct{}{},
+	}
+
 	lock sync.Mutex
 
 	rules = map[int]rule{}
 )
 
 type source struct {
-	ip   string
-	port int
+	ip        string
+	port      int
+	protocols []string
 }
 
 func (s source) String() string {
@@ -42,11 +49,42 @@ func (s source) String() string {
 	return fmt.Sprintf("iifname \"%s\" tcp dport %d", s.ip, s.port)
 }
 
+/*
+getSource parse source port
+
+source = port
+source = address:port
+source = source|protocol
+protocol = tcp
+protocol = udp
+protocol = protocol(+protocol)?
+address = ip
+address = ip/mask
+address = nic
+address = nic*
+*/
 func getSource(src string) (source, error) {
-	parts := strings.SplitN(src, ":", 2)
-	var r = source{
-		ip: addressAll,
+	parts := strings.SplitN(src, "|", 2)
+	if len(parts) > 2 {
+		return source{}, fmt.Errorf("invalid syntax")
 	}
+	var r = source{
+		ip:        addressAll,
+		protocols: defaultProtocols,
+	}
+
+	src = parts[0]
+	if len(parts) == 2 {
+		r.protocols = strings.Split(parts[1], "+")
+	}
+
+	for _, p := range r.protocols {
+		if _, ok := validProtocols[p]; !ok {
+			return source{}, fmt.Errorf("invalid protocol '%s'", p)
+		}
+	}
+
+	parts = strings.SplitN(src, ":", 2)
 
 	if _, err := fmt.Sscanf(parts[len(parts)-1], "%d", &r.port); err != nil {
 		return r, err
