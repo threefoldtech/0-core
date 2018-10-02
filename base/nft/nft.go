@@ -46,15 +46,21 @@ func (n Nft) MarshalText() ([]byte, error) {
 type Chains map[string]Chain
 
 type Table struct {
-	Family Family
-	Chains Chains
+	Family   Family
+	Chains   Chains
+	IPv4Sets []string
 }
 
 func (t *Table) marshal(name string, buf *bytes.Buffer) error {
 	if t.Family == Family("") {
 		return fmt.Errorf("family is required")
 	}
+
 	buf.WriteString(fmt.Sprintf("table %s %s {\n", t.Family, name))
+	for _, ipv4set := range t.IPv4Sets {
+		buf.WriteString(fmt.Sprintf("set %s { type ipv4_addr; }\n", ipv4set))
+	}
+
 	for name, chain := range t.Chains {
 		if name == "" {
 			return fmt.Errorf("empty chain name")

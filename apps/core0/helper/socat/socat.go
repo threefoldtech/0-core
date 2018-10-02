@@ -113,11 +113,10 @@ type rule struct {
 	source source
 	port   int
 	ip     string
-	nic    string
 }
 
 func (r rule) Rule() string {
-	return fmt.Sprintf("iif != \"%s\" %s dnat to %s:%d", r.nic, r.source, r.ip, r.port)
+	return fmt.Sprintf("ip daddr @host %s dnat to %s:%d", r.source, r.ip, r.port)
 }
 
 //SetPortForward create a single port forward from host(port), to ip(addr) and dest(port) in this namespace
@@ -126,11 +125,6 @@ func (r rule) Rule() string {
 func SetPortForward(namespace string, ip string, host string, dest int) error {
 	lock.Lock()
 	defer lock.Unlock()
-
-	nic, _, err := getRoutingInterface(ip)
-	if err != nil {
-		return fmt.Errorf("ip is not routable: %s", err)
-	}
 
 	src, err := getSource(host)
 	if err != nil {
@@ -148,12 +142,12 @@ func SetPortForward(namespace string, ip string, host string, dest int) error {
 		source: src,
 		port:   dest,
 		ip:     ip,
-		nic:    nic,
 	}
 
 	set := nft.Nft{
 		"nat": nft.Table{
-			Family: nft.FamilyIP,
+			Family:   nft.FamilyIP,
+			IPv4Sets: []string{"host"},
 			Chains: nft.Chains{
 				"pre": nft.Chain{
 					Rules: []nft.Rule{
