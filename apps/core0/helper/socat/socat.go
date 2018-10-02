@@ -34,19 +34,28 @@ type source struct {
 	protocols []string
 }
 
-func (s source) String() string {
+func (s source) match(proto string) string {
 	if addr := net.ParseIP(s.ip); addr != nil {
 		if s.ip == "0.0.0.0" {
-			return fmt.Sprintf("tcp dport %d", s.port)
+			return fmt.Sprintf("%s dport %d", proto, s.port)
 		}
-		return fmt.Sprintf("ip saddr %s tcp dport %d", s.ip, s.port)
+		return fmt.Sprintf("ip saddr %s %s dport %d", s.ip, proto, s.port)
 	} else if _, _, err := net.ParseCIDR(s.ip); err == nil {
 		//NETWORK
-		return fmt.Sprintf("ip saddr %s tcp dport %d", s.ip, s.port)
+		return fmt.Sprintf("ip saddr %s %s dport %d", s.ip, proto, s.port)
 
 	}
 	//assume interface name
-	return fmt.Sprintf("iifname \"%s\" tcp dport %d", s.ip, s.port)
+	return fmt.Sprintf("iifname \"%s\" %s dport %d", s.ip, proto, s.port)
+}
+
+func (s source) Matches() []string {
+	var matches []string
+	for _, proto := range s.protocols {
+		matches = append(matches, s.match(proto))
+	}
+
+	return matches
 }
 
 /*
@@ -115,8 +124,17 @@ type rule struct {
 	ip     string
 }
 
-func (r rule) Rule() string {
-	return fmt.Sprintf("ip daddr @host %s dnat to %s:%d", r.source, r.ip, r.port)
+func (r rule) rule(match string) string {
+	return fmt.Sprintf("ip daddr @host %s dnat to %s:%d", match, r.ip, r.port)
+}
+
+func (r rule) Rules() []string {
+	var rules []string
+	for _, match := range r.source.Matches() {
+		rules = append(rules, r.rule(match))
+	}
+
+	return rules
 }
 
 //SetPortForward create a single port forward from host(port), to ip(addr) and dest(port) in this namespace
@@ -137,11 +155,16 @@ func SetPortForward(namespace string, ip string, host string, dest int) error {
 		return fmt.Errorf("port already in use")
 	}
 
-	r := rule{
+	rule := rule{
 		ns:     forwardID(namespace, src.port, dest),
 		source: src,
 		port:   dest,
 		ip:     ip,
+	}
+
+	var rs []nft.Rule
+	for _, r := range rule.Rules() {
+		rs = append(rs, nft.Rule{Body: r})
 	}
 
 	set := nft.Nft{
@@ -150,9 +173,7 @@ func SetPortForward(namespace string, ip string, host string, dest int) error {
 			IPv4Sets: []string{"host"},
 			Chains: nft.Chains{
 				"pre": nft.Chain{
-					Rules: []nft.Rule{
-						{Body: r.Rule()},
-					},
+					Rules: rs,
 				},
 			},
 		},
@@ -162,7 +183,7 @@ func SetPortForward(namespace string, ip string, host string, dest int) error {
 		return err
 	}
 
-	rules[src.port] = r
+	rules[src.port] = rule
 	return nil
 }
 
@@ -188,14 +209,17 @@ func RemovePortForward(namespace string, host string, dest int) error {
 		return fmt.Errorf("permission denied")
 	}
 
+	var rs []nft.Rule
+	for _, r := range rule.Rules() {
+		rs = append(rs, nft.Rule{Body: r})
+	}
+
 	set := nft.Nft{
 		"nat": nft.Table{
 			Family: nft.FamilyIP,
 			Chains: nft.Chains{
 				"pre": nft.Chain{
-					Rules: []nft.Rule{
-						{Body: rule.Rule()},
-					},
+					Rules: rs,
 				},
 			},
 		},
@@ -214,7 +238,7 @@ func RemoveAll(namespace string) error {
 	lock.Lock()
 	defer lock.Unlock()
 
-	var todelete []nft.Rule
+	var toDelete []nft.Rule
 	var hostPorts []int
 
 	for host, r := range rules {
@@ -222,14 +246,14 @@ func RemoveAll(namespace string) error {
 			continue
 		}
 
-		todelete = append(todelete, nft.Rule{
-			Body: r.Rule(),
-		})
+		for _, rs := range r.Rules() {
+			toDelete = append(toDelete, nft.Rule{Body: rs})
+		}
 
 		hostPorts = append(hostPorts, host)
 	}
 
-	if len(todelete) == 0 {
+	if len(toDelete) == 0 {
 		return nil
 	}
 
@@ -238,7 +262,7 @@ func RemoveAll(namespace string) error {
 			Family: nft.FamilyIP,
 			Chains: nft.Chains{
 				"pre": nft.Chain{
-					Rules: todelete,
+					Rules: toDelete,
 				},
 			},
 		},

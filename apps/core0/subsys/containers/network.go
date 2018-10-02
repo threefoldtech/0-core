@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
-	"github.com/vishvananda/netlink"
 	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
 	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/vishvananda/netlink"
 )
 
 const (
@@ -487,10 +487,6 @@ func (c *container) postDefaultNetwork(name string, idx int, net *Nic) error {
 		return err
 	}
 
-	if err := c.setPortForwards(); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -506,6 +502,10 @@ func (c *container) preDefaultNetwork(i int, net *Nic) error {
 	}
 
 	if err := c.preBridge(i, DefaultBridgeName, defnet, nil); err != nil {
+		return err
+	}
+
+	if err := c.setPortForwards(); err != nil {
 		return err
 	}
 

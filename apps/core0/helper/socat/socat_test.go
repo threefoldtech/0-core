@@ -52,3 +52,38 @@ func TestParseSource(t *testing.T) {
 		})
 	}
 }
+
+func TestRule(t *testing.T) {
+	source, err := getSource("80|tcp+udp")
+	if ok := assert.NoError(t, err); !ok {
+		t.Fatal()
+	}
+
+	r := rule{
+		source: source,
+		port:   8080,
+		ip:     "1.2.3.4",
+	}
+
+	rules := r.Rules()
+
+	if ok := assert.Len(t, rules, 2); !ok {
+		t.Fatal()
+	}
+
+	if ok := assert.Equal(
+		t,
+		"ip daddr @host tcp dport 80 dnat to 1.2.3.4:8080",
+		rules[0],
+	); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(
+		t,
+		"ip daddr @host udp dport 80 dnat to 1.2.3.4:8080",
+		rules[1],
+	); !ok {
+		t.Error()
+	}
+}
