@@ -1,6 +1,7 @@
 package pm
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -528,4 +529,28 @@ func System(bin string, args ...string) (*JobResult, error) {
 	job.Streams[1] = output.Stderr.String()
 
 	return job, nil
+}
+
+//Internal run builtin command by name
+func Internal(cmd string, args M, out interface{}) error {
+	runner, err := Run(&Command{
+		ID:        uuid.New(),
+		Command:   cmd,
+		Arguments: MustArguments(args),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	job := runner.Wait()
+	if job.State != StateSuccess {
+		return Error(job.Code, fmt.Errorf("(%s): %v", job.State, job.Streams))
+	}
+
+	if job.Level != stream.LevelResultJSON {
+		return fmt.Errorf("invalid return format expecting json, got %d", job.Level)
+	}
+
+	return json.Unmarshal([]byte(job.Data), out)
 }

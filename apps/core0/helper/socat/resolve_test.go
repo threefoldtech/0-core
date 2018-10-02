@@ -21,7 +21,7 @@ func TestResolveInvalidSyntax(t *testing.T) {
 
 func TestResolveAny(t *testing.T) {
 	src, _ := getSource("8080")
-	rules = map[int]rule{
+	socat.rules = map[int]rule{
 		src.port: rule{
 			source: src,
 			port:   80,
@@ -36,7 +36,7 @@ func TestResolveAny(t *testing.T) {
 
 func TestResolveNetwork(t *testing.T) {
 	src, _ := getSource("127.0.0.0/8:8080")
-	rules = map[int]rule{
+	socat.rules = map[int]rule{
 		src.port: rule{
 			source: src,
 			port:   80,
@@ -55,7 +55,7 @@ func TestResolveNetwork(t *testing.T) {
 
 func TestResolveInf(t *testing.T) {
 	src, _ := getSource("lo:8080")
-	rules = map[int]rule{
+	socat.rules = map[int]rule{
 		src.port: rule{
 			source: src,
 			port:   80,
@@ -74,7 +74,7 @@ func TestResolveInf(t *testing.T) {
 
 func TestResolveInfParital(t *testing.T) {
 	src, _ := getSource("l*:8080")
-	rules = map[int]rule{
+	socat.rules = map[int]rule{
 		src.port: rule{
 			source: src,
 			port:   80,
@@ -93,7 +93,7 @@ func TestResolveInfParital(t *testing.T) {
 
 func TestResolveURL(t *testing.T) {
 	src, _ := getSource(":80")
-	rules = map[int]rule{
+	socat.rules = map[int]rule{
 		src.port: rule{
 			source: src,
 			port:   8080,

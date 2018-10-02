@@ -58,6 +58,8 @@ func (o *Bootstrap) populateMinimumDev() error {
 		{"zero", CharDevice, 0666, 1, 5},
 	}
 
+	previousUmask := syscall.Umask(0000)
+
 	for _, dev := range devices {
 		if err := dev.mk("/dev"); err != nil {
 			return fmt.Errorf("failed to create device %v: %s", dev, err)
@@ -88,6 +90,8 @@ func (o *Bootstrap) populateMinimumDev() error {
 		"size=65536k"); err != nil {
 		return fmt.Errorf("failed to mount shm: %s", err)
 	}
+
+	syscall.Umask(previousUmask)
 
 	return nil
 }
