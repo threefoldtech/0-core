@@ -19,7 +19,9 @@ const (
 )
 
 var (
-	log              = logging.MustGetLogger("socat")
+	log   = logging.MustGetLogger("socat")
+	socat socatApi
+
 	defaultProtocols = []string{"tcp"}
 	validProtocols   = map[string]struct{}{
 		"tcp": struct{}{},
@@ -195,7 +197,7 @@ func (s *socatApi) SetPortForward(namespace string, ip string, host string, dest
 		return err
 	}
 
-	s.rules[src.port] = r
+	s.rules[src.port] = rule
 
 	s.sm.Lock()
 	defer s.sm.Unlock()
