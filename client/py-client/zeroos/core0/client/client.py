@@ -385,9 +385,9 @@ class JobManager:
 
     def kill(self, id, signal=signal.SIGTERM):
         """
-        Kill a job with given id
-
-        :WARNING: beware of what u kill, if u killed redis for example core0 or coreX won't be reachable
+        Sends a signal to a job. Not all jobs can handle signals (only one associated with processes)
+        A signal, doesn't mean the job will die, it depends on the process implementation and how it
+        handles the signal.
 
         :param id: job id to kill
         """
@@ -397,6 +397,21 @@ class JobManager:
         }
         self._kill_chk.check(args)
         return self._client.json('job.kill', args)
+    
+    def unschedule(self, id):
+        """
+        If you started a job with `recurring_period` set, unschedule will prevent it from restarting 
+        once it dies. It does not kill the running job, just mark it to not restart again once it exits.
+
+        Usually u will follow a call to unschedule to a call to kill to stop the process completely.
+
+        :param id: job id
+        """
+        args = {
+            'id': id,
+        }
+        self._job_chk.check(args)
+        return self._client.json('job.unschedule', args)
 
 
 class ProcessManager:
@@ -735,7 +750,8 @@ class BaseClient:
         """
         return self._ip
 
-    def raw(self, command, arguments, queue=None, max_time=None, stream=False, tags=None, id=None):
+    def raw(self, command, arguments, queue=None, max_time=None, stream=False,
+            tags=None, id=None, recurring_period=None):
         """
         Implements the low level command call, this needs to build the command structure
         and push it on the correct queue.
@@ -792,7 +808,7 @@ class BaseClient:
         """
         return self.json('core.ping', {})
 
-    def system(self, command, dir='', stdin='', env=None, queue=None, max_time=None, stream=False, tags=None, id=None):
+    def system(self, command, dir='', stdin='', env=None, queue=None, max_time=None, stream=False, tags=None, id=None, recurring_period=None):
         """
         Execute a command
 
@@ -817,11 +833,11 @@ class BaseClient:
 
         self._system_chk.check(args)
         response = self.raw(command='core.system', arguments=args,
-                            queue=queue, max_time=max_time, stream=stream, tags=tags, id=id)
+                            queue=queue, max_time=max_time, stream=stream, tags=tags, id=id, recurring_period=recurring_period)
 
         return response
 
-    def bash(self, script, stdin='', queue=None, max_time=None, stream=False, tags=None, id=None):
+    def bash(self, script, stdin='', queue=None, max_time=None, stream=False, tags=None, id=None, recurring_period=None):
         """
         Execute a bash script, or run a process inside a bash shell.
 
@@ -836,7 +852,7 @@ class BaseClient:
         }
         self._bash_chk.check(args)
         response = self.raw(command='bash', arguments=args,
-                            queue=queue, max_time=max_time, stream=stream, tags=tags, id=id)
+                            queue=queue, max_time=max_time, stream=stream, tags=tags, id=id, recurring_period=recurring_period)
 
         return response
 
@@ -928,7 +944,7 @@ class ContainerClient(BaseClient):
         """
         return self._zerotier
 
-    def raw(self, command, arguments, queue=None, max_time=None, stream=False, tags=None, id=None):
+    def raw(self, command, arguments, queue=None, max_time=None, stream=False, tags=None, id=None, recurring_period=None):
         """
         Implements the low level command call, this needs to build the command structure
         and push it on the correct queue.
@@ -954,6 +970,7 @@ class ContainerClient(BaseClient):
                 'stream': stream,
                 'tags': tags,
                 'id': id,
+                'recurring_period': recurring_period,
             },
         }
 
@@ -3169,6 +3186,7 @@ class Client(BaseClient):
         'max_time': typchk.Or(int, typchk.IsNone()),
         'stream': bool,
         'tags': typchk.Or([str], typchk.IsNone()),
+        'recurring_period': typchk.Or(typchk.IsNone(), int)
     })
 
     def __init__(self, host, port=6379, password="", db=0, ssl=True, timeout=None, testConnectionAttempts=3):
@@ -3317,7 +3335,8 @@ class Client(BaseClient):
         """
         return self._cgroup
 
-    def raw(self, command, arguments, queue=None, max_time=None, stream=False, tags=None, id=None):
+    def raw(self, command, arguments, queue=None, max_time=None,
+            stream=False, tags=None, id=None, recurring_period=None):
         """
         Implements the low level command call, this needs to build the command structure
         and push it on the correct queue.
@@ -3344,6 +3363,7 @@ class Client(BaseClient):
             'max_time': max_time,
             'stream': stream,
             'tags': tags,
+            'recurring_period': recurring_period
         }
 
         self._raw_chk.check(payload)

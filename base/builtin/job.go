@@ -9,18 +9,20 @@ import (
 )
 
 const (
-	cmdJobList    = "job.list"
-	cmdJobKill    = "job.kill"
-	cmdJobKillAll = "job.killall"
+	cmdJobList       = "job.list"
+	cmdJobKill       = "job.kill"
+	cmdJobKillAll    = "job.killall"
+	cmdJobUnschedule = "job.unschedule"
 )
 
 func init() {
 	pm.RegisterBuiltIn(cmdJobList, jobList)
 	pm.RegisterBuiltIn(cmdJobKill, jobKill)
 	pm.RegisterBuiltIn(cmdJobKillAll, jobKillAll)
+	pm.RegisterBuiltIn(cmdJobUnschedule, jobUnschedule)
 }
 
-type jobListArguments struct {
+type jobArguments struct {
 	ID string `json:"id"`
 }
 
@@ -33,7 +35,7 @@ type processData struct {
 
 func jobList(cmd *pm.Command) (interface{}, error) {
 	//load data
-	var data jobListArguments
+	var data jobArguments
 	err := json.Unmarshal(*cmd.Arguments, &data)
 	if err != nil {
 		return nil, err
@@ -83,7 +85,7 @@ func jobList(cmd *pm.Command) (interface{}, error) {
 }
 
 type jobKillArguments struct {
-	ID     string         `json:"id"`
+	jobArguments
 	Signal syscall.Signal `json:"signal"`
 }
 
@@ -111,6 +113,25 @@ func jobKill(cmd *pm.Command) (interface{}, error) {
 
 	return true, nil
 
+}
+
+func jobUnschedule(cmd *pm.Command) (interface{}, error) {
+	//load data
+	data := jobArguments{}
+	err := json.Unmarshal(*cmd.Arguments, &data)
+
+	if err != nil {
+		return nil, err
+	}
+
+	job, ok := pm.JobOf(data.ID)
+	if !ok {
+		return false, nil
+	}
+
+	job.Unschedule()
+
+	return true, nil
 }
 
 func jobKillAll(cmd *pm.Command) (interface{}, error) {
