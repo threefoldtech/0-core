@@ -188,14 +188,13 @@ func TestJobMaxRecurring(t *testing.T) {
 
 	go func() {
 		time.Sleep(4 * time.Second)
-		job.Signal(syscall.SIGKILL)
+		job.Unschedule()
 	}()
 
 	job.start(false)
 
-	//it will never reach here.
 	result := job.Wait()
-	if ok := assert.Equal(t, StateKilled, result.State); !ok {
+	if ok := assert.Equal(t, StateSuccess, result.State); !ok {
 		t.Error()
 	}
 

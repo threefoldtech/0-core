@@ -26,14 +26,17 @@ type Job interface {
 	Wait() *JobResult
 	StartTime() int64
 	Subscribe(stream.MessageHandler)
+	Unschedule()
 
 	start(unprivileged bool)
 }
 
 type jobImb struct {
-	command *Command
-	factory ProcessFactory
-	signal  chan syscall.Signal
+	command        *Command
+	factory        ProcessFactory
+	signal         chan syscall.Signal
+	unschedule     chan struct{}
+	unscheduleOnce sync.Once
 
 	process     Process
 	hooks       []RunnerHook
@@ -47,8 +50,7 @@ type jobImb struct {
 
 	registerPID func(GetPID) (int, error)
 	waitPID     func(int) syscall.WaitStatus
-
-	running int32
+	running     int32
 }
 
 /*
@@ -70,11 +72,12 @@ NewRunner creates a new r object that is bind to this PM instance.
 */
 func newJob(command *Command, factory ProcessFactory, hooks ...RunnerHook) Job {
 	job := &jobImb{
-		command: command,
-		factory: factory,
-		signal:  make(chan syscall.Signal, 5), //enough buffer for 5 signals
-		hooks:   hooks,
-		backlog: stream.NewBuffer(GenericStreamBufferSize),
+		command:    command,
+		factory:    factory,
+		signal:     make(chan syscall.Signal, 5), //enough buffer for 5 signals
+		unschedule: make(chan struct{}),
+		hooks:      hooks,
+		backlog:    stream.NewBuffer(GenericStreamBufferSize),
 
 		registerPID: registerPID,
 		waitPID:     waitPID,
@@ -304,6 +307,7 @@ func (r *jobImb) start(unprivileged bool) {
 	defer func() {
 		atomic.StoreInt32(&r.running, 0)
 		close(r.signal)
+		r.Unschedule()
 
 		if result != nil {
 			r.result = result
@@ -332,11 +336,6 @@ loop:
 			continue
 		}
 
-		if result.State == StateKilled {
-			//we never restart a killed job.
-			break
-		}
-
 		restarting := false
 		var restartIn time.Duration
 
@@ -355,18 +354,22 @@ loop:
 		}
 
 		if restarting {
-			log.Debugf("Recurring '%s' in %s", r.command, restartIn)
+			log.Debugf("recurring '%s' in %s", r.command, restartIn)
 			select {
 			case <-time.After(restartIn):
-			case <-r.signal:
-				log.Infof("Command %s Killed during scheduler sleep", r.command)
-				result.State = StateKilled
+			case <-r.unschedule:
 				break loop
 			}
 		} else {
 			break
 		}
 	}
+}
+
+func (r *jobImb) Unschedule() {
+	r.unscheduleOnce.Do(func() {
+		close(r.unschedule)
+	})
 }
 
 func (r *jobImb) Signal(sig syscall.Signal) error {
@@ -378,7 +381,7 @@ func (r *jobImb) Signal(sig syscall.Signal) error {
 	case r.signal <- sig:
 		return nil
 	default:
-		return fmt.Errorf("job not receiving singnals")
+		return fmt.Errorf("job not receiving signals")
 	}
 }
 
