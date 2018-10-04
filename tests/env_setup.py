@@ -95,6 +95,7 @@ sed -i -e"s/^zt_access_token=.*/zt_access_token={}/" config.ini
 
     # create a zeroos vm
     print('* Creating zero-os vm')
+    print('zos_vm ip: ' + vm_zos_ip)
     vm_zos = zos_client.primitives.create_virtual_machine(name=vm_zos_name, type_='zero-os:{}'.format(options.branch))
     vm_zos.nics.add(name='nic1', type_='bridge', networkid=bridge, hwaddr=vm_zos_mac)
     vm_zos.vcpus = 4
@@ -113,6 +114,7 @@ sed -i -e"s/^zt_access_token=.*/zt_access_token={}/" config.ini
 
     # create an ubuntu vm to run testcases from
     print('* Creating ubuntu vm to fire the testsuite from')
+    print('ubuntu_vm ip: ' + vm_ubuntu_ip)
     ubuntu_port = int(os.environ['ubuntu_port'])
     vm_ubuntu = zos_client.primitives.create_virtual_machine(name=vm_ubuntu_name, type_='ubuntu:lts')
     vm_ubuntu.nics.add(name='nic2', type_='default')
