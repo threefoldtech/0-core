@@ -1,0 +1,34 @@
+[startup."ovs.init"]
+name = "bash"
+running_delay = -1
+
+[startup."ovs.init".args]
+script = """
+mkdir -p /usr/var/run/openvswitch
+ovsdb-tool create /usr/var/run/openvswitch/config.db
+"""
+
+[startup.ovsdb]
+name = "core.system"
+after = ["ovs.init"]
+protected = true
+
+[startup.ovsdb.args]
+name = "/usr/sbin/ovsdb-server"
+args = [
+    "--remote=punix:/usr/var/run/openvswitch/db.sock",
+    "--pidfile=/usr/var/run/openvswitch/ovsdb-server.pid",
+    "/usr/var/run/openvswitch/config.db"
+]
+
+[startup.ovs]
+name = "core.system"
+after = ["ovsdb"]
+protected = true
+
+[startup.ovs.args]
+name = "/usr/sbin/ovs-vswitchd"
+args = [
+    "--pidfile=/usr/var/run/openvswitch/ovs-vswitchd.pid",
+    "unix:/usr/var/run/openvswitch/db.sock"
+]
