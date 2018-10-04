@@ -103,7 +103,7 @@ func (sink *Sink) LExpire(key string, duration int64) (int64, error) {
 //Result handler implementation
 func (sink *Sink) Result(cmd *pm.Command, result *pm.JobResult) {
 	if err := sink.Forward(result); err != nil {
-		log.Errorf("failed to forward result: %s", cmd.ID)
+		log.Debugf("failed to forward result: %s", cmd.ID)
 	}
 }
 

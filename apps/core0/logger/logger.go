@@ -45,5 +45,7 @@ func (logger *ConsoleLogger) LogRecord(record *LogRecord) {
 		return
 	}
 
-	log.Debugf("[%d]%s %s", record.Core, record.Command, record.Message)
+	if len(record.Message.Message) > 0 {
+		log.Debugf("[%d]%s %s", record.Core, record.Command, record.Message)
+	}
 }
