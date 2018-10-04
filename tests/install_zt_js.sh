@@ -3,8 +3,6 @@
 # install zerotier and join the network
 curl -s https://install.zerotier.com/ | sudo bash
 zerotier-cli join ${ZT_NET_ID}
-memberid=$(sudo zerotier-cli info | awk '{print $3}')
-curl -s -H "Content-Type: application/json" -H "Authorization: Bearer ${TLRE_ZT_TOKEN}" -X POST -d '{"config": {"authorized": true}}' https://my.zerotier.com/api/network/${ZT_NET_ID}/member/${memberid} > /dev/null
 # fix for travis - zerotier issue
 sudo ifconfig "$(ls /sys/class/net | grep zt)" mtu 1280
 
