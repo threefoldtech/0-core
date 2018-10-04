@@ -20,7 +20,7 @@ const (
 
 var (
 	log   = logging.MustGetLogger("socat")
-	socat socatApi
+	socat socatAPI
 
 	defaultProtocols = []string{"tcp"}
 	validProtocols   = map[string]struct{}{
@@ -29,17 +29,17 @@ var (
 	}
 )
 
-type socatApi struct {
+type socatAPI struct {
 	rm    sync.Mutex
 	rules map[int]rule
 
-	sm      sync.Mutex
-	reseved *cache.Cache
+	sm       sync.Mutex
+	reserved *cache.Cache
 }
 
 func init() {
 	socat.rules = make(map[int]rule)
-	socat.reseved = cache.New(2*time.Minute, 1*time.Minute)
+	socat.reserved = cache.New(2*time.Minute, 1*time.Minute)
 }
 
 type source struct {
@@ -154,7 +154,7 @@ func (r rule) Rules() []string {
 //SetPortForward create a single port forward from host(port), to ip(addr) and dest(port) in this namespace
 //The namespace is used to group port forward rules so they all can get terminated
 //with one call later.
-func (s *socatApi) SetPortForward(namespace string, ip string, host string, dest int) error {
+func (s *socatAPI) SetPortForward(namespace string, ip string, host string, dest int) error {
 	s.rm.Lock()
 	defer s.rm.Unlock()
 
@@ -201,7 +201,7 @@ func (s *socatApi) SetPortForward(namespace string, ip string, host string, dest
 
 	s.sm.Lock()
 	defer s.sm.Unlock()
-	s.reseved.Delete(fmt.Sprint(src.port))
+	s.reserved.Delete(fmt.Sprint(src.port))
 
 	return nil
 }
@@ -211,7 +211,7 @@ func forwardID(namespace string, host int, dest int) string {
 }
 
 //RemovePortForward removes a single port forward
-func (s *socatApi) RemovePortForward(namespace string, host string, dest int) error {
+func (s *socatAPI) RemovePortForward(namespace string, host string, dest int) error {
 	s.rm.Lock()
 	defer s.rm.Unlock()
 	src, err := getSource(host)
@@ -221,7 +221,7 @@ func (s *socatApi) RemovePortForward(namespace string, host string, dest int) er
 
 	rule, ok := s.rules[src.port]
 	if !ok {
-		return fmt.Errorf("no port forwrard from host port: %d", src.port)
+		return fmt.Errorf("no port forward from host port: %d", src.port)
 	}
 
 	if rule.ns != forwardID(namespace, src.port, dest) {
@@ -253,7 +253,7 @@ func (s *socatApi) RemovePortForward(namespace string, host string, dest int) er
 }
 
 //RemoveAll remove all port forwrards that were created in this namespace.
-func (s *socatApi) RemoveAll(namespace string) error {
+func (s *socatAPI) RemoveAll(namespace string) error {
 	s.rm.Lock()
 	defer s.rm.Unlock()
 
@@ -302,7 +302,7 @@ func (s *socatApi) RemoveAll(namespace string) error {
 //Reserve reseves the first n number of ports, and return the reserved ports
 //reseved ports are reserved only for around 2 min, after that a new reserve
 //call can return the same ports.
-func (s *socatApi) Reserve(n int) ([]int, error) {
+func (s *socatAPI) Reserve(n int) ([]int, error) {
 	//get all listening tcp ports
 	type portInfo struct {
 		Network string `json:"network"`
@@ -350,7 +350,7 @@ func (s *socatApi) Reserve(n int) ([]int, error) {
 				continue
 			}
 
-			if _, ok := s.reseved.Get(fmt.Sprint(p)); ok {
+			if _, ok := s.reserved.Get(fmt.Sprint(p)); ok {
 				continue
 			}
 
@@ -361,7 +361,7 @@ func (s *socatApi) Reserve(n int) ([]int, error) {
 			return result, fmt.Errorf("pool is exhausted")
 		}
 
-		s.reseved.Set(fmt.Sprint(p), nil, cache.DefaultExpiration)
+		s.reserved.Set(fmt.Sprint(p), nil, cache.DefaultExpiration)
 		result = append(result, p)
 	}
 

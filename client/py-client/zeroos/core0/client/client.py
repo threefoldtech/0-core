@@ -918,7 +918,7 @@ class ContainerClient(BaseClient):
             'stream': bool,
             'tags': typchk.Or([str], typchk.IsNone()),
             'id': typchk.Or(str, typchk.IsNone()),
-
+            'recurring_period': typchk.Or(typchk.IsNone(), int)
         }
     })
 

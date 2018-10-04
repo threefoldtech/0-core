@@ -226,6 +226,10 @@ func (p *containerProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 		return ps.Pid, nil
 	})
 
+	if logf != nil {
+		logf.Close()
+	}
+
 	if err != nil {
 		return
 	}

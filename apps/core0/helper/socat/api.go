@@ -17,7 +17,7 @@ func init() {
 	pm.RegisterBuiltIn(cmdSocalReseve, socat.reserve)
 }
 
-func (s *socatApi) list(cmd *pm.Command) (interface{}, error) {
+func (s *socatAPI) list(cmd *pm.Command) (interface{}, error) {
 	s.rm.Lock()
 	defer s.rm.Unlock()
 
@@ -37,7 +37,7 @@ func (s *socatApi) list(cmd *pm.Command) (interface{}, error) {
 	return m, nil
 }
 
-func (s *socatApi) reserve(cmd *pm.Command) (interface{}, error) {
+func (s *socatAPI) reserve(cmd *pm.Command) (interface{}, error) {
 	var query struct {
 		Numer int `json:"number"`
 	}
