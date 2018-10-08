@@ -84,7 +84,7 @@ sed -i -e"s/^target_ip=.*/target_ip=%s/" config.ini
 sed -i -e"s/^zt_access_token=.*/zt_access_token=%s/" config.ini
 interface=$(ip a | grep 3: | awk '{print $2}')
 dhclient $interface
-    """. % (options.branch, vm_zos_ip, options.zt_token)
+    """ % (options.branch, vm_zos_ip, options.zt_token)
 
     # create a bridge and assign specific ips for the vms
     bridge = os.environ['bridge']
