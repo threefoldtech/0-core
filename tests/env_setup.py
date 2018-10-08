@@ -77,14 +77,14 @@ def main(options):
     script = """
 apt-get install git python3-pip -y
 git clone https://github.com/threefoldtech/0-core.git
-cd 0-core; git checkout {}; pip3 install client/py-client/.
+cd 0-core; git checkout %s; pip3 install client/py-client/.
 cd tests
 pip3 install -r requirements.txt
-sed -i -e"s/^target_ip=.*/target_ip={}/" config.ini
-sed -i -e"s/^zt_access_token=.*/zt_access_token={}/" config.ini
+sed -i -e"s/^target_ip=.*/target_ip=%s/" config.ini
+sed -i -e"s/^zt_access_token=.*/zt_access_token=%s/" config.ini
 interface=$(ip a | grep 3: | awk '{print $2}')
 dhclient $interface
-    """.format(options.branch, vm_zos_ip, options.zt_token)
+    """. % (options.branch, vm_zos_ip, options.zt_token)
 
     # create a bridge and assign specific ips for the vms
     bridge = os.environ['bridge']
