@@ -82,6 +82,8 @@ cd tests
 pip3 install -r requirements.txt
 sed -i -e"s/^target_ip=.*/target_ip={}/" config.ini
 sed -i -e"s/^zt_access_token=.*/zt_access_token={}/" config.ini
+interface=$(ip a | grep 3: | awk '{print $2}')
+dhclient $interface
     """.format(options.branch, vm_zos_ip, options.zt_token)
 
     # create a bridge and assign specific ips for the vms
@@ -135,6 +137,7 @@ sed -i -e"s/^zt_access_token=.*/zt_access_token={}/" config.ini
     print('* Setup the environment')
     cmd = 'bash setup_env.sh'
     utils.run_cmd_on_remote_machine(cmd, options.zos_ip, ubuntu_port)
+    time.sleep(30)
 
 
 if __name__ == "__main__":
