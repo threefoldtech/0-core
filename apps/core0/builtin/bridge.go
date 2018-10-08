@@ -11,6 +11,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/threefoldtech/0-core/apps/core0/helper/ovs"
 	"github.com/threefoldtech/0-core/base/nft"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/utils"
@@ -151,7 +152,7 @@ func (b *bridgeMgr) conflict(addr *netlink.Addr) error {
 	return nil
 }
 
-func (b *bridgeMgr) bridgeStaticNetworking(bridge *netlink.Bridge, network *BridgeNetwork) (*netlink.Addr, error) {
+func (b *bridgeMgr) bridgeStaticNetworking(bridge netlink.Link, network *BridgeNetwork) (*netlink.Addr, error) {
 	var settings NetworkStaticSettings
 	if err := json.Unmarshal(network.Settings, &settings); err != nil {
 		return nil, err
@@ -175,23 +176,23 @@ func (b *bridgeMgr) bridgeStaticNetworking(bridge *netlink.Bridge, network *Brid
 	}
 
 	//we still dnsmasq also for the default bridge for dns resolving.
-
-	leases := fmt.Sprintf("/var/lib/misc/%s.leases", bridge.Name)
+	name := bridge.Attrs().Name
+	leases := fmt.Sprintf("/var/lib/misc/%s.leases", name)
 	os.RemoveAll(leases)
 
 	args := []string{
 		"--no-hosts",
 		"--keep-in-foreground",
-		fmt.Sprintf("--pid-file=/var/run/dnsmasq/%s.pid", bridge.Name),
+		fmt.Sprintf("--pid-file=/var/run/dnsmasq/%s.pid", name),
 		fmt.Sprintf("--dhcp-leasefile=%s", leases),
 		fmt.Sprintf("--listen-address=%s", addr.IP),
-		fmt.Sprintf("--interface=%s", bridge.Name),
+		fmt.Sprintf("--interface=%s", name),
 		"--bind-interfaces",
 		"--except-interface=lo",
 	}
 
 	cmd := &pm.Command{
-		ID:      b.dnsmasqPName(bridge.Name),
+		ID:      b.dnsmasqPName(name),
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(
 			pm.SystemCommandArguments{
@@ -204,12 +205,12 @@ func (b *bridgeMgr) bridgeStaticNetworking(bridge *netlink.Bridge, network *Brid
 	onExit := &pm.ExitHook{
 		Action: func(state bool) {
 			if !state {
-				log.Errorf("dnsmasq for %s exited with an error", bridge.Name)
+				log.Errorf("dnsmasq for %s exited with an error", name)
 			}
 		},
 	}
 
-	log.Debugf("dnsmasq(%s): %s", bridge.Name, args)
+	log.Debugf("dnsmasq(%s): %s", name, args)
 	_, err = pm.Run(cmd, onExit)
 
 	if err != nil {
@@ -227,7 +228,7 @@ func (b *bridgeMgr) dnsmasqHostsFilePath(n string) string {
 	return fmt.Sprintf("/var/run/dnsmasq/%s", b.dnsmasqPName(n))
 }
 
-func (b *bridgeMgr) bridgeDnsMasqNetworking(bridge *netlink.Bridge, network *BridgeNetwork) (*netlink.Addr, error) {
+func (b *bridgeMgr) bridgeDnsMasqNetworking(bridge netlink.Link, network *BridgeNetwork) (*netlink.Addr, error) {
 	var settings NetworkDnsMasqSettings
 	if err := json.Unmarshal(network.Settings, &settings); err != nil {
 		return nil, err
@@ -252,20 +253,21 @@ func (b *bridgeMgr) bridgeDnsMasqNetworking(bridge *netlink.Bridge, network *Bri
 		return nil, err
 	}
 
-	hostsFile := b.dnsmasqHostsFilePath(bridge.Name)
+	name := bridge.Attrs().Name
+	hostsFile := b.dnsmasqHostsFilePath(name)
 	os.RemoveAll(hostsFile)
 	os.MkdirAll(hostsFile, 0755)
 
-	leases := fmt.Sprintf("/var/lib/misc/%s.leases", bridge.Name)
+	leases := fmt.Sprintf("/var/lib/misc/%s.leases", name)
 	os.RemoveAll(leases)
 
 	args := []string{
 		"--no-hosts",
 		"--keep-in-foreground",
-		fmt.Sprintf("--pid-file=/var/run/dnsmasq/%s.pid", bridge.Name),
+		fmt.Sprintf("--pid-file=/var/run/dnsmasq/%s.pid", name),
 		fmt.Sprintf("--dhcp-leasefile=%s", leases),
 		fmt.Sprintf("--listen-address=%s", addr.IP),
-		fmt.Sprintf("--interface=%s", bridge.Name),
+		fmt.Sprintf("--interface=%s", name),
 		fmt.Sprintf("--dhcp-range=%s,%s,%s", settings.Start, settings.End, net.IP(addr.Mask)),
 		fmt.Sprintf("--dhcp-option=6,%s", addr.IP),
 		fmt.Sprintf("--dhcp-hostsfile=%s", hostsFile),
@@ -274,7 +276,7 @@ func (b *bridgeMgr) bridgeDnsMasqNetworking(bridge *netlink.Bridge, network *Bri
 	}
 
 	cmd := &pm.Command{
-		ID:      b.dnsmasqPName(bridge.Name),
+		ID:      b.dnsmasqPName(name),
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(
 			pm.SystemCommandArguments{
@@ -290,12 +292,12 @@ func (b *bridgeMgr) bridgeDnsMasqNetworking(bridge *netlink.Bridge, network *Bri
 	onExit := &pm.ExitHook{
 		Action: func(state bool) {
 			if !state {
-				log.Errorf("dnsmasq for %s exited with an error", bridge.Name)
+				log.Errorf("dnsmasq for %s exited with an error", name)
 			}
 		},
 	}
 
-	log.Debugf("dnsmasq(%s): %s", bridge.Name, args)
+	log.Debugf("dnsmasq(%s): %s", name, args)
 	_, err = pm.Run(cmd, onExit)
 
 	if err != nil {
@@ -408,7 +410,7 @@ func (b *bridgeMgr) listNic(cmd *pm.Command) (interface{}, error) {
 	return list, nil
 }
 
-func (b *bridgeMgr) bridgeNetworking(bridge *netlink.Bridge, network *BridgeNetwork) error {
+func (b *bridgeMgr) bridgeNetworking(bridge netlink.Link, network *BridgeNetwork) error {
 	var addr *netlink.Addr
 	var err error
 	switch network.Mode {
@@ -490,25 +492,18 @@ func (b *bridgeMgr) create(cmd *pm.Command) (interface{}, error) {
 		return nil, err
 	}
 
-	var hw net.HardwareAddr
+	var opts []ovs.Option
 
 	if args.HwAddress != "" {
-		var err error
-		hw, err = net.ParseMAC(args.HwAddress)
+		hw, err := net.ParseMAC(args.HwAddress)
 		if err != nil {
 			return nil, err
 		}
+
+		opts = append(opts, ovs.HWAddrOption(hw.String()))
 	}
 
-	bridge := &netlink.Bridge{
-		LinkAttrs: netlink.LinkAttrs{
-			Name:         args.Name,
-			HardwareAddr: hw,
-			TxQLen:       1000, //needed other wise bridge won't work
-		},
-	}
-
-	if err := netlink.LinkAdd(bridge); err != nil {
+	if err := ovs.BridgeAdd(args.Name, opts...); err != nil {
 		return nil, err
 	}
 
@@ -516,14 +511,13 @@ func (b *bridgeMgr) create(cmd *pm.Command) (interface{}, error) {
 
 	defer func() {
 		if err != nil {
-			netlink.LinkDel(bridge)
+			ovs.BridgeDel(args.Name)
 		}
 	}()
 
-	if args.HwAddress != "" {
-		if err = netlink.LinkSetHardwareAddr(bridge, hw); err != nil {
-			return nil, err
-		}
+	bridge, err := netlink.LinkByName(args.Name)
+	if err != nil {
+		return nil, err
 	}
 
 	if err = netlink.LinkSetUp(bridge); err != nil {
@@ -610,19 +604,7 @@ func (b *bridgeMgr) unNFT(idx int) error {
 }
 
 func (b *bridgeMgr) list(cmd *pm.Command) (interface{}, error) {
-	links, err := netlink.LinkList()
-	if err != nil {
-		return nil, err
-	}
-
-	bridges := make([]string, 0)
-	for _, link := range links {
-		if link.Type() == "bridge" {
-			bridges = append(bridges, link.Attrs().Name)
-		}
-	}
-
-	return bridges, nil
+	return ovs.BridgeList()
 }
 
 func (b *bridgeMgr) delete(cmd *pm.Command) (interface{}, error) {
@@ -639,7 +621,7 @@ func (b *bridgeMgr) delete(cmd *pm.Command) (interface{}, error) {
 		return nil, err
 	}
 
-	if link.Type() != "bridge" {
+	if link.Type() != "openvswitch" {
 		return nil, fmt.Errorf("bridge not found")
 	}
 
@@ -655,7 +637,7 @@ func (b *bridgeMgr) delete(cmd *pm.Command) (interface{}, error) {
 		return nil, err
 	}
 
-	if err := netlink.LinkDel(link); err != nil {
+	if err := ovs.BridgeDel(args.Name); err != nil {
 		return nil, err
 	}
 

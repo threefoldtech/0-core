@@ -2,7 +2,6 @@ package containers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
+	"github.com/threefoldtech/0-core/apps/core0/helper/ovs"
 	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/vishvananda/netlink"
@@ -274,12 +274,7 @@ func (c *container) postLink(dev string, index int, n *Nic) error {
 	return c.setupLink(name, dev, index, n)
 }
 
-func (c *container) preBridge(index int, bridge string, n *Nic, ovs Container) error {
-	link, err := netlink.LinkByName(bridge)
-	if err != nil {
-		return pm.NotFoundError(fmt.Errorf("bridge '%s' not found: %s", bridge, err))
-	}
-
+func (c *container) preBridge(index int, bridge string, n *Nic) error {
 	var name string
 	if n.Monitor {
 		name = fmt.Sprintf(containerMonitoredLinkNameFmt, c.id, index)
@@ -302,35 +297,8 @@ func (c *container) preBridge(index int, bridge string, n *Nic, ovs Container) e
 		return fmt.Errorf("create veth pair fail: %s", err)
 	}
 
-	//setting the master
-	if ovs == nil {
-		//no ovs
-		if link.Type() != "bridge" {
-			return pm.BadRequestError(fmt.Errorf("'%s' is not a bridge", bridge))
-		}
-		br := link.(*netlink.Bridge)
-		if err := netlink.LinkSetMaster(veth, br); err != nil {
-			return err
-		}
-	} else {
-		//with ovs
-		result, err := c.mgr.Dispatch(ovs.ID(), &pm.Command{
-			Command: "ovs.port-add",
-			Arguments: pm.MustArguments(
-				map[string]interface{}{
-					"bridge": bridge,
-					"port":   name,
-				},
-			),
-		})
-
-		if err != nil {
-			return fmt.Errorf("ovs dispatch error: %s", err)
-		}
-
-		if result.State != pm.StateSuccess {
-			return fmt.Errorf("failed to attach veth to bridge: %s", result.Data)
-		}
+	if err := ovs.PortAdd(name, bridge, 0); err != nil {
+		return err
 	}
 
 	peer, err := netlink.LinkByName(peerName)
@@ -501,7 +469,7 @@ func (c *container) preDefaultNetwork(i int, net *Nic) error {
 		},
 	}
 
-	if err := c.preBridge(i, DefaultBridgeName, defnet, nil); err != nil {
+	if err := c.preBridge(i, DefaultBridgeName, defnet); err != nil {
 		return err
 	}
 
@@ -513,41 +481,24 @@ func (c *container) preDefaultNetwork(i int, net *Nic) error {
 }
 
 func (c *container) preVxlanNetwork(idx int, net *Nic) error {
-	vxlan, err := strconv.ParseInt(net.ID, 10, 64)
+	vxlan, err := strconv.ParseUint(net.ID, 10, 32)
 	if err != nil {
 		return err
 	}
-	//find the container with OVS tag
-	ovs := c.mgr.GetOneWithTags(OVSTag)
-	if ovs == nil {
-		return pm.PreconditionFailedError(fmt.Errorf("ovs is needed for VXLAN network type"))
-	}
+	// //find the container with OVS tag
+	// ovs := c.mgr.GetOneWithTags(OVSTag)
+	// if ovs == nil {
+	// 	return pm.PreconditionFailedError(fmt.Errorf("ovs is needed for VXLAN network type"))
+	// }
 
-	//ensure that a bridge is available with that vlan tag.
-	//we dispatch the ovs.vlan-ensure command to container.
-	result, err := c.mgr.Dispatch(ovs.ID(), &pm.Command{
-		Command: "ovs.vxlan-ensure",
-		Arguments: pm.MustArguments(map[string]interface{}{
-			"master": OVSVXBackend,
-			"vxlan":  vxlan,
-		}),
-	})
-
+	bridge, err := ovs.VXLanEnsure("", OVSVXBackend, uint(vxlan))
 	if err != nil {
 		return err
 	}
 
-	if result.State != pm.StateSuccess {
-		return fmt.Errorf("failed to ensure vxlan bridge: %v", result.Data)
-	}
-
-	var bridge string
-	if err := json.Unmarshal([]byte(result.Data), &bridge); err != nil {
-		return fmt.Errorf("failed to load vxlan-ensure result: %s", err)
-	}
 	log.Debugf("vxlan bridge name: %d", bridge)
 	//we have the vxlan bridge name
-	return c.preBridge(idx, bridge, net, ovs)
+	return c.preBridge(idx, bridge, net)
 }
 
 func (c *container) postVxlanNetwork(name string, idx int, net *Nic) error {
@@ -556,7 +507,7 @@ func (c *container) postVxlanNetwork(name string, idx int, net *Nic) error {
 }
 
 func (c *container) preVlanNetwork(idx int, net *Nic) error {
-	vlanID, err := strconv.ParseInt(net.ID, 10, 16)
+	vlanID, err := strconv.ParseUint(net.ID, 10, 16)
 	if err != nil {
 		return err
 	}
@@ -565,36 +516,15 @@ func (c *container) preVlanNetwork(idx int, net *Nic) error {
 	}
 	//find the container with OVS tag
 
-	ovs := c.mgr.GetOneWithTags(OVSTag)
-	if ovs == nil {
-		return pm.PreconditionFailedError(fmt.Errorf("ovs is needed for VLAN network type"))
-	}
-
-	//ensure that a bridge is available with that vlan tag.
-	//we dispatch the ovs.vlan-ensure command to container.
-	result, err := c.mgr.Dispatch(ovs.ID(), &pm.Command{
-		Command: "ovs.vlan-ensure",
-		Arguments: pm.MustArguments(map[string]interface{}{
-			"master": OVSBackPlane,
-			"vlan":   vlanID,
-		}),
-	})
+	bridge, err := ovs.VLanEnsure("", OVSBackPlane, uint16(vlanID))
 
 	if err != nil {
 		return err
 	}
 
-	if result.State != pm.StateSuccess {
-		return fmt.Errorf("failed to ensure vlan bridge: %v", result.Data)
-	}
-	//brname:
-	var bridge string
-	if err := json.Unmarshal([]byte(result.Data), &bridge); err != nil {
-		return fmt.Errorf("failed to load vlan-ensure result: %s", err)
-	}
 	log.Debugf("vlan bridge name: %d", bridge)
 	//we have the vlan bridge name
-	return c.preBridge(idx, bridge, net, ovs)
+	return c.preBridge(idx, bridge, net)
 }
 
 func (c *container) postVlanNetwork(name string, idx int, net *Nic) error {
@@ -687,7 +617,7 @@ func (c *container) preStartNetwork(idx int, network *Nic) (err error) {
 	case "default":
 		err = c.preDefaultNetwork(idx, network)
 	case "bridge":
-		err = c.preBridge(idx, network.ID, network, nil)
+		err = c.preBridge(idx, network.ID, network)
 	case "macvlan":
 		err = c.preMacVlanNetwork(idx, network)
 	case "passthrough":
@@ -728,7 +658,7 @@ func (c *container) unLink(idx int, n *Nic) error {
 	return nil
 }
 
-func (c *container) unBridge(idx int, n *Nic, ovs Container) error {
+func (c *container) unBridge(idx int, n *Nic) error {
 	var name string
 	if n.Monitor {
 		name = fmt.Sprintf(containerMonitoredLinkNameFmt, c.id, idx)
@@ -736,17 +666,8 @@ func (c *container) unBridge(idx int, n *Nic, ovs Container) error {
 		name = fmt.Sprintf(containerLinkNameFmt, c.id, idx)
 	}
 	n.State = NicStateDestroyed
-	if ovs != nil {
-		_, err := c.mgr.Dispatch(ovs.ID(), &pm.Command{
-			Command: "ovs.port-del",
-			Arguments: pm.MustArguments(map[string]interface{}{
-				"port": name,
-			}),
-		})
-
-		if err != nil {
-			return err
-		}
+	if err := ovs.PortDel(name, ""); err != nil {
+		return err
 	}
 
 	link, err := netlink.LinkByName(name)
@@ -800,10 +721,9 @@ func (c *container) destroyNetwork() {
 		case "vxlan":
 			fallthrough
 		case "vlan":
-			ovs := c.mgr.GetOneWithTags(OVSTag)
-			c.unBridge(idx, network, ovs)
+			c.unBridge(idx, network)
 		case "default":
-			c.unBridge(idx, network, nil)
+			c.unBridge(idx, network)
 			socat.RemoveAll(c.forwardId())
 		}
 	}

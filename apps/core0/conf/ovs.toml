@@ -1,5 +1,6 @@
 [startup."ovs.init"]
 name = "bash"
+after = ["init"]
 running_delay = -1
 
 [startup."ovs.init".args]
@@ -10,7 +11,7 @@ ovsdb-tool create /usr/var/run/openvswitch/config.db
 
 [startup.ovsdb]
 name = "core.system"
-after = ["ovs.init"]
+after = ["init", "ovs.init"]
 protected = true
 
 [startup.ovsdb.args]
@@ -23,7 +24,7 @@ args = [
 
 [startup.ovs]
 name = "core.system"
-after = ["ovsdb"]
+after = ["init", "ovsdb"]
 protected = true
 
 [startup.ovs.args]

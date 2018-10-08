@@ -1,5 +1,9 @@
 package ovs
 
+import (
+	"strings"
+)
+
 //BridgeExists checks if bridge exists
 func BridgeExists(name string) bool {
 	if _, err := vsctl("br-exists", name); err != nil {
@@ -23,4 +27,14 @@ func BridgeAdd(name string, options ...Option) error {
 func BridgeDel(name string) error {
 	_, err := vsctl("del-br", name)
 	return err
+}
+
+//BridgeList list all bridges
+func BridgeList() ([]string, error) {
+	out, err := vsctl("list-br")
+	if err != nil {
+		return nil, err
+	}
+
+	return strings.Fields(out), nil
 }

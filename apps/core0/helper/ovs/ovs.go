@@ -2,7 +2,8 @@ package ovs
 
 import (
 	"fmt"
-	"os/exec"
+
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 const (
@@ -30,6 +31,10 @@ func PeerOption(p string) Option {
 	return KeyValueOption{Key: "option:peer", Value: p}
 }
 
+func HWAddrOption(mac string) Option {
+	return KeyValueOption{Key: "other-config:hwaddr", Value: mac}
+}
+
 func MakeOptions(m map[string]string) []Option {
 	var options []Option
 	for k, v := range m {
@@ -40,16 +45,12 @@ func MakeOptions(m map[string]string) []Option {
 }
 
 func vsctl(args ...string) (string, error) {
-	cmd := exec.Command(Binary, args...)
-	data, err := cmd.Output()
+	job, err := pm.System(Binary, args...)
 	if err != nil {
-		if err, ok := err.(*exec.ExitError); ok {
-			return "", fmt.Errorf("%s: %s", err, string(err.Stderr))
-		}
 		return "", err
 	}
 
-	return string(data), nil
+	return job.Streams.Stdout(), nil
 }
 
 func set(table, record string, option ...Option) error {

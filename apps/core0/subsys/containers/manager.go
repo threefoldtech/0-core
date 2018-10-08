@@ -489,12 +489,7 @@ func (m *containerManager) nicRemove(cmd *pm.Command) (interface{}, error) {
 		return nil, container.unLink(args.Index, nic)
 	}
 
-	var ovs Container
-	if nic.Type == "vlan" || nic.Type == "vxlan" {
-		ovs = m.GetOneWithTags("ovs")
-	}
-
-	return nil, container.unBridge(args.Index, nic, ovs)
+	return nil, container.unBridge(args.Index, nic)
 }
 
 func (m *containerManager) createContainer(args ContainerCreateArguments) (*container, error) {
