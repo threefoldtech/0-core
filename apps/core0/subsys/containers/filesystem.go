@@ -41,6 +41,13 @@ func (c *container) flistConfigOverride(target string, cfg map[string]string) er
 	return nil
 }
 
+//mergeFList layers one (and only one) flist on top of the container root flist
+//usually used for debugging
+func (c *container) mergeFList(src string) error {
+	namespace := fmt.Sprintf("containers/%s", c.name())
+	return filesystem.MergeFList(namespace, c.root(), c.Args.Root, src)
+}
+
 func (c *container) mountFList(src string, target string, cfg map[string]string, hooks ...pm.RunnerHook) error {
 	//check
 	namespace := fmt.Sprintf("containers/%s", c.name())
@@ -148,6 +155,7 @@ func (c *container) sandbox() error {
 			c.cleanSandbox()
 		},
 	}
+
 	if err := c.mountFList(c.Args.Root, root, c.Args.Config, onSBExit); err != nil {
 		return fmt.Errorf("mount-root-flist(%s)", err)
 	}

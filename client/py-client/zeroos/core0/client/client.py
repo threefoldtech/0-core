@@ -1033,6 +1033,11 @@ class ContainerManager:
         )
     })
 
+    _layer_chk = typchk.Checker({
+        'container': int,
+        'flist': str,
+    })
+
     _client_chk = typchk.Checker(
         typchk.Or(int, str)
     )
@@ -1127,6 +1132,22 @@ class ContainerManager:
         response = self._client.raw('corex.create', args, tags=tags)
 
         return JSONResponse(response)
+
+    def layer(self, container, flist):
+        """
+        Layer one (and only one) flist on top of the root flist of the given container
+        The layering is done in runtime, no pause or restart of the container is needed
+
+        The layer can be called multiple times, each call will only replace the last layer
+        with the passed flist 
+        """
+        args = {
+            'container': container,
+            'flist': flist,
+        }
+
+        self._layer_chk.check(args)
+        return self._client.json('corex.flist-layer', args)
 
     def list(self):
         """
