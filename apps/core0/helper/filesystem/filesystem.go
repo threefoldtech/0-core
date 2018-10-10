@@ -251,11 +251,12 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 	return err
 }
 
-// MergeFList layers the given src flist on top of the mounted flist(namespace, target). The fs must be running
+// MergeFList layers the given  flist on top of the mounted flist(namespace, target, base). The fs must be running
 // before your do the merge
 // To prevent abuse, the MergeFList allows layering only ONE flist on top of the running fs. by overriding the
 // fs `layered` file.
-// the namespace, targe, and base are needed to identify the g8ufs process, the flist is the one to layer
+// the namespace, targe, and base are needed to identify the g8ufs process, the flist is the one to layer, where base
+// is the original flist used on the call to MountFlist
 func MergeFList(namespace, target, base, flist string) error {
 	id := path.Join(namespace, target)
 	job, ok := pm.JobOf(id)
