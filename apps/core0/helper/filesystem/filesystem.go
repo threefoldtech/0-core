@@ -7,12 +7,14 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/pm/stream"
@@ -179,9 +181,9 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 
 	cache := settings.Settings.Globals.Get("cache", CacheZeroFSDir)
 	g8ufs := []string{
-		"-reset",
-		"-backend", backend,
-		"-cache", cache,
+		"--reset",
+		"--backend", backend,
+		"--cache", cache,
 	}
 
 	if strings.HasPrefix(src, "restic:") {
@@ -199,21 +201,21 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 		}
 
 		g8ufs = append(g8ufs,
-			"-meta", db,
-			"-storage-url", storage,
+			"--meta", db,
+			"--storage-url", storage,
 		)
 	}
 
 	//local router files
 	if utils.Exists(LocalRouterFile) {
 		g8ufs = append(g8ufs,
-			"-local-router", LocalRouterFile,
+			"--local-router", LocalRouterFile,
 		)
 	}
 
 	g8ufs = append(g8ufs, target)
 	cmd := &pm.Command{
-		ID:      fmt.Sprintf("%s-g8ufs-%s", namespace, target),
+		ID:      path.Join(namespace, target),
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(pm.SystemCommandArguments{
 			Name: "g8ufs",
@@ -247,4 +249,33 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 	//wait for either of the hooks (ready or exit)
 	wg.Wait()
 	return err
+}
+
+// MergeFList layers the given src flist on top of the mounted flist(namespace, target). The fs must be running
+// before your do the merge
+// To prevent abuse, the MergeFList allows layering only ONE flist on top of the running fs. by overriding the
+// fs `layered` file.
+// the namespace, targe, and base are needed to identify the g8ufs process, the flist is the one to layer
+func MergeFList(namespace, target, base, flist string) error {
+	id := path.Join(namespace, target)
+	job, ok := pm.JobOf(id)
+	if !ok {
+		return fmt.Errorf("no filesystem running for the provided namespace and target (%s/%s)", namespace, target)
+	}
+
+	backend := path.Join(CacheBaseDir, namespace, Hash(flist))
+	os.MkdirAll(backend, 0755)
+
+	db, err := getMetaDB(backend, flist)
+	if err != nil {
+		return err
+	}
+
+	//append db to the backend/.layered file
+	baseBackend := path.Join(CacheBaseDir, namespace, Hash(base))
+	if err := ioutil.WriteFile(path.Join(baseBackend, ".layered"), []byte(db), 0644); err != nil {
+		return err
+	}
+
+	return job.Signal(syscall.SIGHUP) //signal fs reload
 }
