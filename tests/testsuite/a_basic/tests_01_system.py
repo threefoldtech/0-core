@@ -537,7 +537,7 @@ class SystemTests(BaseTest):
 
                 self.lg('Check file (F1) is truncated and contains only (T2) text')
                 file_text = client.bash('cat {}'.format(file_name)).get().stdout
-                self.assertEqual(file_text, '{}\n'.format(new_txt.decode('utf-8')), mode)
+                self.assertEqual(file_text, '{}'.format(new_txt.decode('utf-8')), mode)
 
                 self.lg('Try to read the file (F1), should fail')
                 with self.assertRaises(RuntimeError):
@@ -828,8 +828,8 @@ class SystemTests(BaseTest):
         self.assertEqual(self.client.bridge.list()[-1], br)
 
         self.lg('Add interface to B1, should succeed')
-        l = self.client.ip.link.list()
-        inf = [i['name'] for i in l if i['name'].startswith('e') and i['name'].endswith('1')][0]
+        inf = self.rand_str()
+        self.client.bash('ip l a {} type dummy'.format(inf)).get()
         self.client.ip.bridge.addif(br, inf)
         out = self.client.bash('brctl show | grep {} | grep -F -o {}'.format(br, inf))
         self.assertEqual(self.stdout(out), inf)

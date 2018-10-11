@@ -13,7 +13,7 @@ class DisksTests(BaseTest):
         self.label = self.rand_str()
         self.loop_dev_list = self.setup_loop_devices(['bd0', 'bd1'], '500M', deattach=True)
         self.lg('Mount the btrfs filesystem (Bfs1)')
-        self.client.btrfs.create(self.label, self.loop_dev_list)
+        self.client.btrfs.create(self.label, self.loop_dev_list, overwrite=True)
         self.mount_point = '/mnt/{}'.format(self.rand_str())
         self.client.bash('mkdir -p {}'.format(self.mount_point))
         self.client.disk.mount(self.loop_dev_list[0], self.mount_point, [""])
@@ -21,7 +21,7 @@ class DisksTests(BaseTest):
             self.label2 = self.rand_str()
             self.loop_dev_list2 = self.setup_loop_devices(['bd2', 'bd3'], '500M', deattach=False)
             self.lg('Mount the btrfs filesystem (Bfs2)')
-            self.client.btrfs.create(self.label2, self.loop_dev_list2)
+            self.client.btrfs.create(self.label2, self.loop_dev_list2, overwrite=True)
             self.mount_point2 = '/mnt/{}'.format(self.rand_str())
             self.client.bash('mkdir -p {}'.format(self.mount_point2))
             self.client.disk.mount(self.loop_dev_list2[0], self.mount_point2, [""])
@@ -282,11 +282,11 @@ class DisksTests(BaseTest):
         self.lg('Mount disk using zos disk mount.')
         loop_dev_list = self.setup_loop_devices(filename, '500M', deattach=True)
 
-        self.client.btrfs.create(label, loop_dev_list)
+        self.client.btrfs.create(label, loop_dev_list, overwrite=True)
 
         self.lg('Mount disk using zos disk mount')
         self.client.bash('mkdir -p {}'.format(mount_point))
-        self.client.disk.mount(loop_dev_list[0], mount_point,[""])
+        self.client.disk.mount(loop_dev_list[0], mount_point, [""])
 
         self.lg('Get disk info , the mounted disk should be there.')
         disks = self.client.bash(' lsblk -n -io NAME ').get().stdout
@@ -422,12 +422,12 @@ class DisksTests(BaseTest):
                 self.assertEqual(len(disk['children']), 2)
 
         self.lg('Mount partition 1 of disk  using zos disk mount with rw option , should succeed')
-        self.client.btrfs.create(label, ['{}p1'.format(loop_dev_list[0])])
+        self.client.btrfs.create(label, ['{}p1'.format(loop_dev_list[0])], overwrite=True)
         self.client.bash('mkdir -p {}'.format(mount_point_part1))
         self.client.disk.mount('{}p1'.format(loop_dev_list[0]), mount_point_part1, ["rw"])
 
         self.lg('Mount partition 2 of disk  using zos disk mount with rw option , should succeed')
-        self.client.btrfs.create(label, ['{}p5'.format(loop_dev_list[0])])
+        self.client.btrfs.create(label, ['{}p5'.format(loop_dev_list[0])], overwrite=True)
         self.client.bash('mkdir -p {}'.format(mount_point_part2))
         self.client.disk.mount('{}p5'.format(loop_dev_list[0]), mount_point_part2, ["rw"])
 
