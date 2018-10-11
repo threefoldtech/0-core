@@ -582,7 +582,8 @@ class SystemTests(BaseTest):
                 file_text = client.bash('cat {}'.format(file_name)).get().stdout
 
                 self.lg('Check file (F1) text , should succeed')
-                self.assertEqual(file_text, '{}\n{}\n'.format(txt, new_txt.decode('utf-8')))
+                final_text = '{}{}'.format(txt, new_txt.decode('utf-8'))
+                self.assertEqual(file_text.replace('\n', ''), final_text.replace('\n', ''))
 
             if mode == 'x':
                 self.lg('Create file (F2) using open in (x) mode, should succeed')
