@@ -364,7 +364,6 @@ class SystemTests(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
-    @unittest.skip('https://github.com/threefoldtech/0-core/issues/45 .. line 33 in this file')
     def test007_nic_info(self):
 
         """ zos-007
@@ -992,7 +991,6 @@ class SystemTests(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
-    @unittest.skip('https://github.com/zero-os/0-core/issues/702')
     def test018_add_list_remove_cgroup_subsystem(self):
 
         """ zos-047

@@ -204,7 +204,6 @@ class ExtendedMachines(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
-    @unittest.skip('https://github.com/zero-os/0-core/issues/679')
     def test_004_container_passthrough_nic(self):
         """ zos-043
 
@@ -215,8 +214,8 @@ class ExtendedMachines(BaseTest):
         #. Create a bridge (B1).
         #. Check B1 is part of the core0 nics, should succeed.
         #. Create container (C1) and pass B1 as a nic of type passthrough to C1, should fail.
+        #. create container (c1) again without nics, should succeed
         #. Check that B1 hasn't been removed from core0 nics.
-        #. Check that B1 hasn't been added to C1 nics.
         #. Create dunnmy device (D1), should succeed.
         #. Add D1 as a nic of type passthrough to C1.
         #. Check that D1 has been removed from core0 nics.
@@ -234,16 +233,16 @@ class ExtendedMachines(BaseTest):
 
         self.lg('Create container (C1) and pass B1 as a nic of type passthrough to C1, should fail')
         nic = [{"type": "passthrough", "id": bridge_name, "name": bridge_name}]
-        c1 = self.create_container(root_url=self.root_url, storage=self.storage, nics=nic)
-        #creation should fail .. checkon that after the issue is solved
+        with self.assertRaises(RuntimeError):
+            c1 = self.create_container(root_url=self.root_url, storage=self.storage, nics=nic)
+
+        self.lg('create container (c1) again without nics, should succeed')
+        c1 = self.create_container(root_url=self.root_url, storage=self.storage)
+        c1_client = self.client.container.client(c1)
 
         self.lg("Check that B1 hasn't been removed from core0 nics.")
         nic = [n for n in self.client.info.nic() if n['name'] == bridge_name]
         self.assertTrue(nic)
-
-        self.lg("Check that B1 hasn't been added to C1 nics.")
-        nic = [n for n in c1_client.info.nic() if n['name'] == bridge_name]
-        self.assertFalse(nic)
 
         self.lg('Create dunnmy device (D1), should succeed.')
         nic_name = self.rand_str()
@@ -252,15 +251,15 @@ class ExtendedMachines(BaseTest):
         self.assertTrue(nic)
 
         self.lg('Add D1 as a nic of type passthrough to C1.')
-        nic = [{"type": "passthrough", "id": nic_name, "name": nic_name}]
-        c1_client.container.nic_add(c1, nic)
+        nic = {"type": "passthrough", "id": nic_name, "name": nic_name}
+        self.client.container.nic_add(c1, nic)
 
         self.lg('Check that D1 has been removed from core0 nics.')
         nic = [n for n in self.client.info.nic() if n['name'] == nic_name]
         self.assertFalse(nic)
 
         self.lg('Check that D1 has been added to C1 nics.')
-        nic = [n for n in c1_client.info.nic() if n['name'] == bridge_name]
+        nic = [n for n in c1_client.info.nic() if n['name'] == nic_name]
         self.assertTrue(nic)
 
         self.lg('{} ENDED'.format(self._testID))
