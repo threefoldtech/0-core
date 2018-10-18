@@ -397,10 +397,10 @@ class JobManager:
         }
         self._kill_chk.check(args)
         return self._client.json('job.kill', args)
-    
+
     def unschedule(self, id):
         """
-        If you started a job with `recurring_period` set, unschedule will prevent it from restarting 
+        If you started a job with `recurring_period` set, unschedule will prevent it from restarting
         once it dies. It does not kill the running job, just mark it to not restart again once it exits.
 
         Usually u will follow a call to unschedule to a call to kill to stop the process completely.
@@ -1139,7 +1139,7 @@ class ContainerManager:
         The layering is done in runtime, no pause or restart of the container is needed
 
         The layer can be called multiple times, each call will only replace the last layer
-        with the passed flist 
+        with the passed flist
         """
         args = {
             'container': container,
@@ -1492,12 +1492,56 @@ class IPManager:
         def list(self):
             return self._client.json('ip.route.list', {})
 
+    class IPBondManager:
+        def __init__(self, client):
+            self._client = client
+
+        def add(self, bond, interfaces, mtu=1500):
+            """
+            Add a bond
+
+            :param bond: bond name
+            :param interfaces: list of slave links
+            :param mtu: mtu value
+            :return:
+            """
+            args = {
+                'bond': bond,
+                'interfaces': interfaces,
+                'mtu': mtu,
+            }
+            return self._client.json('ip.bond.add', args)
+
+        def delete(self, bond):
+            """
+            Delete a bond
+
+            :param bond: bond name
+            :return:
+            """
+            args = {
+                'bond': bond,
+            }
+            return self._client.json('ip.bond.del', args)
+
+        def list(self):
+            return self._client.json('ip.bond.list', {})
+
     def __init__(self, client):
         self._client = client
         self._bridge = IPManager.IPBridgeManager(client)
         self._link = IPManager.IPLinkManager(client)
         self._addr = IPManager.IPAddrManager(client)
         self._route = IPManager.IPRouteManager(client)
+        self._bond = IPManager.IPBondManager(client)
+
+    @property
+    def bond(self):
+        """
+        Bond manager
+        :return:
+        """
+        return self._bond
 
     @property
     def bridge(self):
@@ -3398,4 +3442,3 @@ class Client(BaseClient):
 
     def response_for(self, id):
         return Response(self, id)
-
