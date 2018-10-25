@@ -71,8 +71,9 @@ def main(options):
     zos_client = j.clients.zos.get('zos-kds-farm', data={'host': '{}'.format(options.zos_ip)})
     vm_zos_name = os.environ['vm_zos_name']
     vm_ubuntu_name = os.environ['vm_ubuntu_name']
-    vm_zos_ip = '10.100.20.{}'.format(random.randint(3, 125))
-    vm_ubuntu_ip = '10.100.20.{}'.format(random.randint(126, 253))
+    rand_num = random.randint(3, 125)
+    vm_zos_ip = '10.100.{}.{}'.format(rand_num, random.randint(3, 125))
+    vm_ubuntu_ip = '10.100.{}.{}'.format(rand_num, random.randint(126, 253))
 
     script = """
 apt-get install git python3-pip -y
@@ -90,8 +91,11 @@ dhclient $interface
     bridge = os.environ['bridge']
     vm_zos_mac = utils.random_mac()
     vm_ubuntu_mac = utils.random_mac()
-    zos_client.client.bridge.create(bridge, network='dnsmasq', nat=True, settings={'cidr': '10.100.20.1/24',
-                                    'start': '10.100.20.2', 'end': '10.100.20.254'})
+    cidr = '10.100.{}.1/24'.format(rand_num)
+    start = '10.100.{}.2'.format(rand_num)
+    end = '10.100.{}.254'.format(rand_num)
+    zos_client.client.bridge.create(bridge, network='dnsmasq', nat=True,
+                                    settings={'cidr': cidr, 'start': start, 'end': end})
     zos_client.client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_zos_ip, 'mac': vm_zos_mac})
     zos_client.client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_ubuntu_ip, 'mac': vm_ubuntu_mac})
 
