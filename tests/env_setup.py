@@ -50,9 +50,9 @@ class Utils(object):
 
     def create_disk(self, zos_client):
         zdb_name = str(uuid.uuid4())[0:8]
-        zdb = zos_client.primitives.create_zerodb(name=zdb_name, path='/mnt/zdbs/sda',
+        mount_path = zos_client.zerodbs.prepare()
+        zdb = zos_client.primitives.create_zerodb(name=zdb_name, path=mount_path[0],
                                                   mode='user', sync=False, admin='mypassword')
-        zdb.namespaces.add(name='mynamespace', size=10, password='namespacepassword', public=True)
         zdb.deploy()
         disk = zos_client.primitives.create_disk('mydisk', zdb, size=50)
         disk.deploy()
