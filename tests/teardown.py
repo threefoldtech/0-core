@@ -14,10 +14,11 @@ def teardown(options):
     for zdb in zdbs:
         zdb_ip = str(zdb.container.default_ip()).split('/')[0]
         if zdb_ip == zdb_cont_ip:
+            zdb_path = zdb.path
             zdb.destroy()
             break
     # remove namespace
-    zos_client.client.bash('rm -rf /mnt/zdbs/sda/data/mydisk').get()
+    zos_client.client.bash('rm -rf {}/data/mydisk'.format(zdb_path)).get()
     # remove vms and bridge
     print('removing vms and bridge')
     vms = zos_client.client.kvm.list()
