@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zero-os/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm/stream"
 )
 
 //RunnerHook is a per process event handler
@@ -118,9 +118,6 @@ type StreamHook struct {
 }
 
 func (h *StreamHook) append(buf *bytes.Buffer, msg *stream.Message) {
-	if buf.Len() > 0 {
-		buf.WriteByte('\n')
-	}
 	buf.WriteString(msg.Message)
 }
 

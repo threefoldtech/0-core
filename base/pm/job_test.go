@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zero-os/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm/stream"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -34,7 +34,7 @@ func TestJob(t *testing.T) {
 		t.Error()
 	}
 
-	if ok := assert.Equal(t, stdin+"\n", result.Streams.Stdout()); !ok {
+	if ok := assert.Equal(t, stdin, result.Streams.Stdout()); !ok {
 		t.Error()
 	}
 }
@@ -188,14 +188,13 @@ func TestJobMaxRecurring(t *testing.T) {
 
 	go func() {
 		time.Sleep(4 * time.Second)
-		job.Signal(syscall.SIGKILL)
+		job.Unschedule()
 	}()
 
 	job.start(false)
 
-	//it will never reach here.
 	result := job.Wait()
-	if ok := assert.Equal(t, StateKilled, result.State); !ok {
+	if ok := assert.Equal(t, StateSuccess, result.State); !ok {
 		t.Error()
 	}
 

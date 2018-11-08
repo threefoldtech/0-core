@@ -1,14 +1,27 @@
 matrix:
-  include: 
+  include:
     - language: python
+      sudo: true
+      dist: trusty
       python: 3.5
+      if: type IN (api, cron)
+      before_install:
+        - sudo apt-get install -y python3.5 python3.5-dev
+        - sudo rm -f /usr/bin/python
+        - sudo rm -f /usr/bin/python3
+        - sudo ln -s /usr/bin/python3.5 /usr/bin/python
+        - sudo ln -s /usr/bin/python3.5 /usr/bin/python3
+        - source tests/before_install.sh
+      install:
+        - sudo bash tests/install_zt_js.sh
       before_script:
-        - bash tests/run_tests.sh before
+        - sudo python3 -u tests/env_setup.py --zos_ip $ZOS_ip --zerotierid $ZT_NET_ID --branch $BRANCH --zt_token $ZT_TOKEN
       script:
-        - bash tests/run_tests.sh run
+        - sudo ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p $ubuntu_port root@$ZOS_ip "cd 0-core/tests; nosetests -v -s testsuite --tc-file config.ini"
       after_script:
-        - bash tests/run_tests.sh after
-    
+        - sudo python3 -u tests/teardown.py --zos_ip $ZOS_ip
+
+
     - language: go
       sudo: true
       dist: trusty

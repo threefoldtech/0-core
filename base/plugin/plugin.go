@@ -14,7 +14,7 @@ func output(o interface{}) {
 	encoder := json.NewEncoder(os.Stdout)
 	os.Stdout.WriteString("20:::")
 	encoder.Encode(o)
-	os.Stdout.WriteString(":::")
+	os.Stdout.WriteString("\n:::\n") //multiline block termination
 }
 
 func exitError(e error) {

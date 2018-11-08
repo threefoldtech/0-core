@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
+	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
+	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/vishvananda/netlink"
-	"github.com/zero-os/0-core/apps/core0/helper/socat"
-	"github.com/zero-os/0-core/base/pm"
 )
 
 const (
@@ -190,7 +190,7 @@ func (c *container) setupLink(src, target string, index int, n *Nic) error {
 	//	return fmt.Errorf("set link name: %s", err)
 	//}
 
-	_, err = pm.System("ip", "netns", "exec", fmt.Sprintf("%v", c.id), "ip", "link", "set", src, "name", target)
+	_, err = pm.System("ip", "-n", fmt.Sprintf("%v", c.id), "link", "set", src, "name", target)
 	if err != nil {
 		return fmt.Errorf("failed to rename device: %s", err)
 	}
@@ -222,17 +222,15 @@ func (c *container) setupLink(src, target string, index int, n *Nic) error {
 		}
 
 		//putting the interface up
-		_, err := pm.System("ip", "netns",
-			"exec",
-			fmt.Sprintf("%v", c.id),
-			"ip", "link", "set", "dev", target, "up")
+		_, err := pm.System("ip", "-n", fmt.Sprintf("%v", c.id),
+			"link", "set", "dev", target, "up")
 
 		if err != nil {
 			return fmt.Errorf("error bringing interface up: %v", err)
 		}
 
 		//setting the ip address
-		_, err = pm.System("ip", "netns", "exec", fmt.Sprintf("%v", c.id), "ip", "address", "add", n.Config.CIDR, "dev", target)
+		_, err = pm.System("ip", "-n", fmt.Sprintf("%v", c.id), "address", "add", n.Config.CIDR, "dev", target)
 		if err != nil {
 			return fmt.Errorf("error settings interface ip: %v", err)
 		}
@@ -465,8 +463,8 @@ func (c *container) setPortForwards() error {
 
 func (c *container) setGateway(dev string, gw string) error {
 	////setting the ip address
-	_, err := pm.System("ip", "netns", "exec", fmt.Sprintf("%v", c.id),
-		"ip", "route", "add", "metric", "1000", "default", "via", gw, "dev", dev)
+	_, err := pm.System("ip", "-n", fmt.Sprintf("%v", c.id),
+		"route", "add", "metric", "1000", "default", "via", gw, "dev", dev)
 
 	if err != nil {
 		return fmt.Errorf("error settings default gateway: %v", err)
@@ -489,10 +487,6 @@ func (c *container) postDefaultNetwork(name string, idx int, net *Nic) error {
 		return err
 	}
 
-	if err := c.setPortForwards(); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -508,6 +502,10 @@ func (c *container) preDefaultNetwork(i int, net *Nic) error {
 	}
 
 	if err := c.preBridge(i, DefaultBridgeName, defnet, nil); err != nil {
+		return err
+	}
+
+	if err := c.setPortForwards(); err != nil {
 		return err
 	}
 
@@ -637,19 +635,19 @@ func (c *container) postStartNetwork(idx int, network *Nic) (err error) {
 
 func (c *container) setupLO() error {
 	if _, err := pm.System("ip", "-n", fmt.Sprint(c.id),
-		"a", "a", "127.0.0.1/8", "dev", "lo",
+		"address", "add", "127.0.0.1/8", "dev", "lo",
 	); err != nil {
 		return err
 	}
 
 	if _, err := pm.System("ip", "-n", fmt.Sprint(c.id),
-		"a", "a", "::1/128", "dev", "lo",
+		"address", "add", "::1/128", "dev", "lo",
 	); err != nil {
 		return err
 	}
 
 	if _, err := pm.System("ip", "-n", fmt.Sprint(c.id),
-		"l", "set", "lo", "up",
+		"link", "set", "lo", "up",
 	); err != nil {
 		return err
 	}
@@ -722,7 +720,7 @@ func (c *container) unLink(idx int, n *Nic) error {
 	}
 
 	name := fmt.Sprintf("eth%d", idx)
-	if _, err := pm.System("ip", "netns", "exec", fmt.Sprint(c.id), "ip", "link", "del", name); err != nil {
+	if _, err := pm.System("ip", "-n", fmt.Sprint(c.id), "link", "del", name); err != nil {
 		return err
 	}
 

@@ -6,14 +6,14 @@ class DisksTests(BaseTest):
 
     def setUp(self):
         super(DisksTests, self).setUp()
-        self.check_g8os_connection(DisksTests)
+        self.check_zos_connection(DisksTests)
 
     def create_btrfs(self, second_btrfs=False):
         self.lg('Create Btrfs file system (Bfs1), should succeed')
         self.label = self.rand_str()
         self.loop_dev_list = self.setup_loop_devices(['bd0', 'bd1'], '500M', deattach=True)
         self.lg('Mount the btrfs filesystem (Bfs1)')
-        self.client.btrfs.create(self.label, self.loop_dev_list)
+        self.client.btrfs.create(self.label, self.loop_dev_list, overwrite=True)
         self.mount_point = '/mnt/{}'.format(self.rand_str())
         self.client.bash('mkdir -p {}'.format(self.mount_point))
         self.client.disk.mount(self.loop_dev_list[0], self.mount_point, [""])
@@ -21,7 +21,7 @@ class DisksTests(BaseTest):
             self.label2 = self.rand_str()
             self.loop_dev_list2 = self.setup_loop_devices(['bd2', 'bd3'], '500M', deattach=False)
             self.lg('Mount the btrfs filesystem (Bfs2)')
-            self.client.btrfs.create(self.label2, self.loop_dev_list2)
+            self.client.btrfs.create(self.label2, self.loop_dev_list2, overwrite=True)
             self.mount_point2 = '/mnt/{}'.format(self.rand_str())
             self.client.bash('mkdir -p {}'.format(self.mount_point2))
             self.client.disk.mount(self.loop_dev_list2[0], self.mount_point2, [""])
@@ -59,7 +59,7 @@ class DisksTests(BaseTest):
         return diskinf
 
     def test001_create_list_delete_btrfs(self):
-        """ g8os-008
+        """ zos-008
         *Test case for creating, listing and monitoring btrfs*
 
         **Test Scenario:**
@@ -110,7 +110,7 @@ class DisksTests(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test002_subvolumes_btrfs(self):
-        """ g8os-016
+        """ zos-016
         *Test case for creating, listing and deleting btrfs subvolumes*
 
         **Test Scenario:**
@@ -168,7 +168,7 @@ class DisksTests(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test003_snapshots_btrfs(self):
-        """ g8os-017
+        """ zos-017
         *Test case for creating, listing and deleting btrfs snapshots*
 
         **Test Scenario:**
@@ -220,7 +220,7 @@ class DisksTests(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test004_disk_get_info(self):
-        """ g8os-020
+        """ zos-020
 
         *Test case for checking on the disks information*
 
@@ -228,8 +228,8 @@ class DisksTests(BaseTest):
 
         #. Get the disks name  using disk list
         #. Get disk info using bash
-        #. Get disk info using g8os disk info
-        #. Compare g8os results to that of the bash results, should be the same
+        #. Get disk info using zos disk info
+        #. Compare zos results to that of the bash results, should be the same
 
         """
         self.lg('{} STARTED'.format(self._testID))
@@ -242,17 +242,17 @@ class DisksTests(BaseTest):
 
         for disk in disks_names:
 
-            self.lg('Get disk {} info  using g8os disk info  '.format(disk))
-            g8os_disk_info = self.client.disk.getinfo(disk)
-            keys = g8os_disk_info.keys()
+            self.lg('Get disk {} info  using zos disk info  '.format(disk))
+            zos_disk_info = self.client.disk.getinfo(disk)
+            keys = zos_disk_info.keys()
 
             self.lg('Get disk {} info  using bash '.format(disk))
             bash_disk_info = self.bash_disk_info(keys, disk)
 
-            self.lg('compare g8os results to disk{} of the bash results, should be the same '.format(disk))
-            for key in g8os_disk_info.keys():
+            self.lg('compare zos results to disk{} of the bash results, should be the same '.format(disk))
+            for key in zos_disk_info.keys():
                 if key in bash_disk_info.keys():
-                    v = g8os_disk_info[key]
+                    v = zos_disk_info[key]
                     if v is None:
                         v = ''
                     if isinstance(v, str):
@@ -262,14 +262,14 @@ class DisksTests(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test005_disk_mount_and_unmount(self):
-        """ g8os-021
+        """ zos-021
 
         *Test case for test mount disk and unmount *
 
         **Test Scenario:**
 
         #. create loop device and put file system on it
-        #. Mount disk using g8os disk mount.
+        #. Mount disk using zos disk mount.
         #. Get disk info , the mounted disk should be there.
         #. Try mount it again , should fail.
         #. unmount the disk, shouldn't be found in the disks list
@@ -279,14 +279,14 @@ class DisksTests(BaseTest):
         filename = [self.rand_str()]
         label = self.rand_str()
         mount_point = '/mnt/{}'.format(self.rand_str())
-        self.lg('Mount disk using g8os disk mount.')
+        self.lg('Mount disk using zos disk mount.')
         loop_dev_list = self.setup_loop_devices(filename, '500M', deattach=True)
 
-        self.client.btrfs.create(label, loop_dev_list)
+        self.client.btrfs.create(label, loop_dev_list, overwrite=True)
 
-        self.lg('Mount disk using g8os disk mount')
+        self.lg('Mount disk using zos disk mount')
         self.client.bash('mkdir -p {}'.format(mount_point))
-        self.client.disk.mount(loop_dev_list[0], mount_point,[""])
+        self.client.disk.mount(loop_dev_list[0], mount_point, [""])
 
         self.lg('Get disk info , the mounted disk should be there.')
         disks = self.client.bash(' lsblk -n -io NAME ').get().stdout
@@ -311,7 +311,7 @@ class DisksTests(BaseTest):
 
     def test006_disk_partitions(self):
 
-        """ g8os-022
+        """ zos-022
 
         *Test case for test creating Partitions in disk *
 
@@ -369,7 +369,7 @@ class DisksTests(BaseTest):
 
     def test007_extended_disk_partitions(self):
 
-        """ g8os-025
+        """ zos-025
 
         *Test case for test creating Partitions in disk *
 
@@ -382,7 +382,7 @@ class DisksTests(BaseTest):
         #. Make extended partition with remain disk space ,should succeed.
         #. Divide extended partition to logical partition ,should succeed .
         #. Check disk  exist in disk list with 2 partition.
-        #. Mount partition 1 and 2 of disk  using g8os disk mount with rw option , should succeed.
+        #. Mount partition 1 and 2 of disk  using zos disk mount with rw option , should succeed.
         #. Get disk info, check the mounted point for partition.
         #. Remove mounted partition ,should fail
         #. Unmount the partition1, should succeed.
@@ -421,13 +421,13 @@ class DisksTests(BaseTest):
             if disk['name'] == device_name:
                 self.assertEqual(len(disk['children']), 2)
 
-        self.lg('Mount partition 1 of disk  using g8os disk mount with rw option , should succeed')
-        self.client.btrfs.create(label, ['{}p1'.format(loop_dev_list[0])])
+        self.lg('Mount partition 1 of disk  using zos disk mount with rw option , should succeed')
+        self.client.btrfs.create(label, ['{}p1'.format(loop_dev_list[0])], overwrite=True)
         self.client.bash('mkdir -p {}'.format(mount_point_part1))
         self.client.disk.mount('{}p1'.format(loop_dev_list[0]), mount_point_part1, ["rw"])
 
-        self.lg('Mount partition 2 of disk  using g8os disk mount with rw option , should succeed')
-        self.client.btrfs.create(label, ['{}p5'.format(loop_dev_list[0])])
+        self.lg('Mount partition 2 of disk  using zos disk mount with rw option , should succeed')
+        self.client.btrfs.create(label, ['{}p5'.format(loop_dev_list[0])], overwrite=True)
         self.client.bash('mkdir -p {}'.format(mount_point_part2))
         self.client.disk.mount('{}p5'.format(loop_dev_list[0]), mount_point_part2, ["rw"])
 
@@ -452,7 +452,7 @@ class DisksTests(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test008_quota_btrfs(self):
-        """ g8os-026
+        """ zos-026
         *Test case for btrfs quota*
 
         **Test Scenario:**
@@ -481,7 +481,7 @@ class DisksTests(BaseTest):
         self.lg('Try to write file inside that directory exceeding L1, should fail')
         rs = self.client.bash('cd {}; fallocate -l 200M {}'.format(sv1_path, self.rand_str()))
         self.assertEqual(rs.get().state, 'ERROR')
-        self.assertEqual(rs.get().stderr.strip(), 'fallocate: fallocate failed: Disk quota exceeded')
+        self.assertIn('Disk quota exceeded', rs.get().stderr.strip())
 
         self.lg('Destroy this btrfs filesystem')
         self.destroy_btrfs()
@@ -489,7 +489,7 @@ class DisksTests(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test009_btrfs_add_remove_devices(self):
-        """ g8os-034
+        """ zos-034
         *Test case for adding and removing devices for btrfs *
 
         **Test Scenario:**
@@ -521,7 +521,7 @@ class DisksTests(BaseTest):
         self.lg('Add device (D1) to the (Bfs1) mount point, should succeed')
         self.client.btrfs.device_add(self.mount_point, d1)
         rs = self.client.bash('btrfs filesystem show | grep -o "loop0"')
-        self.assertEqual(rs.get().stdout.strip(), 'loop0')
+        self.assertIn('loop0', rs.get().stdout.strip())
         self.assertEqual(rs.get().state, 'SUCCESS')
 
         self.lg('Add (D1) again to the (Bfs1) mount point, should fail')

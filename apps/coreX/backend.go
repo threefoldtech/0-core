@@ -2,10 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/pm/stream"
 	"os"
 	"sync"
+
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/pm/stream"
 )
 
 type MessageType string
@@ -45,6 +46,10 @@ func (d *Dispatcher) Result(cmd *pm.Command, result *pm.JobResult) {
 func (d *Dispatcher) Message(cmd *pm.Command, msg *stream.Message) {
 	d.m.Lock()
 	defer d.m.Unlock()
+
+	if len(msg.Message) > 0 {
+		log.Debugf("[%s]%s", cmd.ID, msg.Message)
+	}
 
 	d.enc.Encode(Message{Type: LogMessage, Command: cmd.ID, Payload: msg})
 }

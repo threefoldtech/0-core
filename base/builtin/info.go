@@ -2,14 +2,6 @@ package builtin
 
 import (
 	"fmt"
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/disk"
-	"github.com/shirou/gopsutil/host"
-	"github.com/shirou/gopsutil/mem"
-	"github.com/shirou/gopsutil/net"
-	base "github.com/zero-os/0-core/base"
-	"github.com/zero-os/0-core/base/pm"
-	"gopkg.in/bufio.v1"
 	"io/ioutil"
 	gonet "net"
 	"os"
@@ -17,6 +9,15 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/disk"
+	"github.com/shirou/gopsutil/host"
+	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/net"
+	base "github.com/threefoldtech/0-core/base"
+	"github.com/threefoldtech/0-core/base/pm"
+	"gopkg.in/bufio.v1"
 )
 
 const (
@@ -64,11 +65,11 @@ func getMemInfo(cmd *pm.Command) (interface{}, error) {
 
 type NicInfo struct {
 	net.InterfaceStat
-	Speed uint32 `json:"speed"`
+	Speed int64 `json:"speed"`
 }
 
 func getNicInfo(cmd *pm.Command) (interface{}, error) {
-	var speed uint32
+	var speed int64
 	ifcs, err := net.Interfaces()
 	if err != nil {
 		return nil, err
@@ -84,12 +85,7 @@ func getNicInfo(cmd *pm.Command) (interface{}, error) {
 		if err != nil {
 			speed = 0
 		} else {
-			speedint, err := strconv.Atoi(strings.Trim(string(dat), "\n"))
-			if err != nil {
-				speed = 0
-			} else {
-				speed = uint32(speedint)
-			}
+			speed, _ = strconv.ParseInt(strings.Trim(string(dat), "\n"), 10, 64)
 		}
 		ret[i].Speed = speed
 	}

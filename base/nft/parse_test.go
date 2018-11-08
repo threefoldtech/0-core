@@ -8,6 +8,10 @@ import (
 
 const (
 	sample = `table ip nat {
+	set host {
+		type ipv4_addr;
+		elements = { 10.20.1.1 }
+	}
 	chain pre {
 		type nat hook prerouting priority 0; policy accept;
 		iif "core0" mark set 0x00000001 # handle 3

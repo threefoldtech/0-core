@@ -3,16 +3,27 @@ package builtin
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"path/filepath"
+	"strings"
+	"sync"
 
+	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/vishvananda/netlink"
-	"github.com/zero-os/0-core/base/pm"
 )
 
-type ipmgr struct{}
+const (
+	bondingBaseDir = "/proc/net/bonding/"
+)
+
+type ipmgr struct {
+	bondOnce sync.Once
+}
 
 func init() {
-	mgr := (*ipmgr)(nil)
+	var mgr ipmgr
+
 	pm.RegisterBuiltIn("ip.bridge.add", mgr.brAdd)
 	pm.RegisterBuiltIn("ip.bridge.del", mgr.brDel)
 	pm.RegisterBuiltIn("ip.bridge.addif", mgr.brAddInf)
@@ -31,6 +42,150 @@ func init() {
 	pm.RegisterBuiltIn("ip.route.add", mgr.routeAdd)
 	pm.RegisterBuiltIn("ip.route.del", mgr.routeDel)
 	pm.RegisterBuiltIn("ip.route.list", mgr.routeList)
+
+	pm.RegisterBuiltIn("ip.bond.add", mgr.bondAdd)
+	pm.RegisterBuiltIn("ip.bond.list", mgr.bondList)
+	pm.RegisterBuiltIn("ip.bond.del", mgr.bondDel)
+}
+
+func (m *ipmgr) initBonding() {
+	m.bondOnce.Do(func() {
+		pm.System("modprobe", "bonding")
+		link, err := netlink.LinkByName("bond0")
+		if err != nil {
+			return
+		}
+
+		netlink.LinkDel(link)
+	})
+}
+
+func (_ *ipmgr) parseBond(c string) interface{} {
+	type M map[string]string
+	type L []M
+
+	m := make(M)
+	l := make(L, 0)
+
+	for _, line := range strings.Split(c, "\n") {
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			l = append(l, m)
+			m = make(M)
+			continue
+		}
+
+		kv := strings.SplitN(line, ":", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		m[kv[0]] = kv[1]
+	}
+
+	if len(m) > 0 {
+		l = append(l, m)
+	}
+
+	return l
+}
+
+func (m *ipmgr) bondList(cmd *pm.Command) (interface{}, error) {
+	m.initBonding()
+	files, err := ioutil.ReadDir(bondingBaseDir)
+	if err != nil {
+		return nil, err
+	}
+
+	bonds := make(map[string]interface{})
+
+	for _, info := range files {
+		p := filepath.Join(bondingBaseDir, info.Name())
+		bytes, err := ioutil.ReadFile(p)
+		if err != nil {
+			return nil, pm.InternalError(err)
+		}
+		bonds[info.Name()] = m.parseBond(string(bytes))
+	}
+
+	return bonds, nil
+}
+
+func (m *ipmgr) bondDel(cmd *pm.Command) (interface{}, error) {
+	var args struct {
+		Bond string `json:"bond"`
+	}
+
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+
+	link, err := netlink.LinkByName(args.Bond)
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, netlink.LinkDel(link)
+}
+
+func (m *ipmgr) bondAdd(cmd *pm.Command) (interface{}, error) {
+	m.initBonding()
+
+	var args struct {
+		Bond       string   `json:"bond"`
+		Interfaces []string `json:"interfaces"`
+		MTU        int      `json:"mtu"`
+	}
+
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+
+	mtu := args.MTU
+	if mtu == 0 {
+		mtu = 1500
+	}
+
+	bond := netlink.NewLinkBond(netlink.LinkAttrs{
+		Name:   args.Bond,
+		MTU:    mtu,
+		TxQLen: 1000,
+	})
+
+	bond.Mode = netlink.BOND_MODE_BALANCE_RR
+	bond.MTU = mtu
+
+	enslave := []string{
+		args.Bond,
+	}
+
+	for _, infName := range args.Interfaces {
+		slave, err := netlink.LinkByName(infName)
+		if err != nil {
+			return nil, pm.NotFoundError(fmt.Errorf("interface %s: %s", infName, err))
+		}
+		if err := netlink.LinkSetMTU(slave, mtu); err != nil {
+			return nil, err
+		}
+		if err := netlink.LinkSetUp(slave); err != nil {
+			return nil, err
+		}
+
+		enslave = append(enslave, infName)
+	}
+
+	if err := netlink.LinkAdd(bond); err != nil {
+		return nil, err
+	}
+
+	if err := netlink.LinkSetUp(bond); err != nil {
+		return nil, err
+	}
+
+	if _, err := pm.System("ifenslave", enslave...); err != nil {
+		return nil, err
+	}
+
+	return nil, nil
 }
 
 type LinkArguments struct {

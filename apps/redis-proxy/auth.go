@@ -2,12 +2,31 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	jwt "github.com/dgrijalva/jwt-go"
 )
 
-func AuthMethod(organization string, key string) (func(string) bool, error) {
-	scope := fmt.Sprintf("user:memberof:%s", organization)
+//In checks if s is in l
+func In(s string, l []string) bool {
+	for _, t := range l {
+		if strings.EqualFold(s, t) {
+			return true
+		}
+	}
+
+	return false
+}
+
+//AuthMethod handles authorization of a user
+func AuthMethod(organizations []string, key string) (func(string) bool, error) {
+	var scopes []string
+	for _, organization := range organizations {
+		scopes = append(
+			scopes,
+			fmt.Sprintf("user:memberof:%s", organization),
+		)
+	}
 
 	pub, err := jwt.ParseECPublicKeyFromPEM([]byte(key))
 	if err != nil {
@@ -43,23 +62,25 @@ func AuthMethod(organization string, key string) (func(string) bool, error) {
 			return false
 		}
 
-		if claims["azp"] == organization {
-			return true
+		if azp, ok := claims["azp"].(string); ok {
+			if In(azp, organizations) {
+				return true
+			}
 		}
 
-		var scopes []interface{}
+		var claimedScopes []interface{}
 		if value, ok := claims["scope"]; ok {
-			if scopes, ok = value.([]interface{}); !ok {
+			if claimedScopes, ok = value.([]interface{}); !ok {
 				return false
 			}
 		} else {
 			return false
 		}
 
-		for _, s := range scopes {
-			switch s.(type) {
+		for _, s := range claimedScopes {
+			switch s := s.(type) {
 			case string:
-				if s == scope {
+				if In(s, scopes) {
 					return true
 				}
 			}

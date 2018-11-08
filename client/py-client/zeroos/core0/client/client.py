@@ -9,6 +9,10 @@ import socket
 import logging
 import time
 import sys
+import io
+import yaml
+import re
+import urllib
 from . import typchk
 
 
@@ -219,7 +223,7 @@ class Response:
         # we can terminate quickly by checking if the process is not running and it has no queued output.
         # if not self.running and r.llen(queue) == 0:
         #     return
-
+        count = 0
         while True:
             data = r.blpop(queue, 10)
             if data is None:
@@ -232,15 +236,15 @@ class Response:
             line = message['message']
             meta = message['meta']
             callback(meta >> 16, line, meta & 0xff)
-
+            count += 1
             if meta & 0x6 != 0:
                 break
+        return count
 
     @staticmethod
     def __default(level, line, meta):
         w = sys.stdout if level == 1 else sys.stderr
         w.write(line)
-        w.write('\n')
 
     def get(self, timeout=None):
         """
@@ -381,9 +385,9 @@ class JobManager:
 
     def kill(self, id, signal=signal.SIGTERM):
         """
-        Kill a job with given id
-
-        :WARNING: beware of what u kill, if u killed redis for example core0 or coreX won't be reachable
+        Sends a signal to a job. Not all jobs can handle signals (only one associated with processes)
+        A signal, doesn't mean the job will die, it depends on the process implementation and how it
+        handles the signal.
 
         :param id: job id to kill
         """
@@ -393,6 +397,21 @@ class JobManager:
         }
         self._kill_chk.check(args)
         return self._client.json('job.kill', args)
+
+    def unschedule(self, id):
+        """
+        If you started a job with `recurring_period` set, unschedule will prevent it from restarting
+        once it dies. It does not kill the running job, just mark it to not restart again once it exits.
+
+        Usually u will follow a call to unschedule to a call to kill to stop the process completely.
+
+        :param id: job id
+        """
+        args = {
+            'id': id,
+        }
+        self._job_chk.check(args)
+        return self._client.json('job.unschedule', args)
 
 
 class ProcessManager:
@@ -731,7 +750,8 @@ class BaseClient:
         """
         return self._ip
 
-    def raw(self, command, arguments, queue=None, max_time=None, stream=False, tags=None, id=None):
+    def raw(self, command, arguments, queue=None, max_time=None, stream=False,
+            tags=None, id=None, recurring_period=None):
         """
         Implements the low level command call, this needs to build the command structure
         and push it on the correct queue.
@@ -788,7 +808,7 @@ class BaseClient:
         """
         return self.json('core.ping', {})
 
-    def system(self, command, dir='', stdin='', env=None, queue=None, max_time=None, stream=False, tags=None, id=None):
+    def system(self, command, dir='', stdin='', env=None, queue=None, max_time=None, stream=False, tags=None, id=None, recurring_period=None):
         """
         Execute a command
 
@@ -813,11 +833,11 @@ class BaseClient:
 
         self._system_chk.check(args)
         response = self.raw(command='core.system', arguments=args,
-                            queue=queue, max_time=max_time, stream=stream, tags=tags, id=id)
+                            queue=queue, max_time=max_time, stream=stream, tags=tags, id=id, recurring_period=recurring_period)
 
         return response
 
-    def bash(self, script, stdin='', queue=None, max_time=None, stream=False, tags=None, id=None):
+    def bash(self, script, stdin='', queue=None, max_time=None, stream=False, tags=None, id=None, recurring_period=None):
         """
         Execute a bash script, or run a process inside a bash shell.
 
@@ -832,7 +852,7 @@ class BaseClient:
         }
         self._bash_chk.check(args)
         response = self.raw(command='bash', arguments=args,
-                            queue=queue, max_time=max_time, stream=stream, tags=tags, id=id)
+                            queue=queue, max_time=max_time, stream=stream, tags=tags, id=id, recurring_period=recurring_period)
 
         return response
 
@@ -898,7 +918,7 @@ class ContainerClient(BaseClient):
             'stream': bool,
             'tags': typchk.Or([str], typchk.IsNone()),
             'id': typchk.Or(str, typchk.IsNone()),
-
+            'recurring_period': typchk.Or(typchk.IsNone(), int)
         }
     })
 
@@ -924,7 +944,7 @@ class ContainerClient(BaseClient):
         """
         return self._zerotier
 
-    def raw(self, command, arguments, queue=None, max_time=None, stream=False, tags=None, id=None):
+    def raw(self, command, arguments, queue=None, max_time=None, stream=False, tags=None, id=None, recurring_period=None):
         """
         Implements the low level command call, this needs to build the command structure
         and push it on the correct queue.
@@ -950,6 +970,7 @@ class ContainerClient(BaseClient):
                 'stream': stream,
                 'tags': tags,
                 'id': id,
+                'recurring_period': recurring_period,
             },
         }
 
@@ -1010,6 +1031,11 @@ class ContainerManager:
             typchk.IsNone(),
             [typchk.Length((str,), 2, 2)], # array of (str, str) tuples i.e [(subsyste, name), ...]
         )
+    })
+
+    _layer_chk = typchk.Checker({
+        'container': int,
+        'flist': str,
     })
 
     _client_chk = typchk.Checker(
@@ -1106,6 +1132,22 @@ class ContainerManager:
         response = self._client.raw('corex.create', args, tags=tags)
 
         return JSONResponse(response)
+
+    def layer(self, container, flist):
+        """
+        Layer one (and only one) flist on top of the root flist of the given container
+        The layering is done in runtime, no pause or restart of the container is needed
+
+        The layer can be called multiple times, each call will only replace the last layer
+        with the passed flist
+        """
+        args = {
+            'container': container,
+            'flist': flist,
+        }
+
+        self._layer_chk.check(args)
+        return self._client.json('corex.flist-layer', args)
 
     def list(self):
         """
@@ -1450,12 +1492,56 @@ class IPManager:
         def list(self):
             return self._client.json('ip.route.list', {})
 
+    class IPBondManager:
+        def __init__(self, client):
+            self._client = client
+
+        def add(self, bond, interfaces, mtu=1500):
+            """
+            Add a bond
+
+            :param bond: bond name
+            :param interfaces: list of slave links
+            :param mtu: mtu value
+            :return:
+            """
+            args = {
+                'bond': bond,
+                'interfaces': interfaces,
+                'mtu': mtu,
+            }
+            return self._client.json('ip.bond.add', args)
+
+        def delete(self, bond):
+            """
+            Delete a bond
+
+            :param bond: bond name
+            :return:
+            """
+            args = {
+                'bond': bond,
+            }
+            return self._client.json('ip.bond.del', args)
+
+        def list(self):
+            return self._client.json('ip.bond.list', {})
+
     def __init__(self, client):
         self._client = client
         self._bridge = IPManager.IPBridgeManager(client)
         self._link = IPManager.IPLinkManager(client)
         self._addr = IPManager.IPAddrManager(client)
         self._route = IPManager.IPRouteManager(client)
+        self._bond = IPManager.IPBondManager(client)
+
+    @property
+    def bond(self):
+        """
+        Bond manager
+        :return:
+        """
+        return self._bond
 
     @property
     def bridge(self):
@@ -2145,6 +2231,8 @@ class KvmManager:
         'name': str,
         'media': typchk.Or([_media_dict], typchk.IsNone()),
         'flist': typchk.Or(str, typchk.IsNone()),
+        'cmdline': typchk.Or(str, typchk.IsNone()),
+        'share_cache': bool,
         'cpu': int,
         'memory': int,
         'nics': [{
@@ -2168,7 +2256,8 @@ class KvmManager:
         'config': typchk.Or(
             typchk.IsNone(),
             typchk.Map(str, str),
-        )
+        ),
+        'storage': typchk.Or(str, typchk.IsNone())
     })
 
     _migrate_network_chk = typchk.Checker({
@@ -2222,7 +2311,8 @@ class KvmManager:
         self._client = client
 
     def create(self, name, media=None, flist=None, cpu=2, memory=512,
-               nics=None, port=None, mount=None, tags=None, config=None):
+               nics=None, port=None, mount=None, tags=None, config=None, storage=None,
+               cmdline=None, share_cache=False):
         """
         :param name: Name of the kvm domain
         :param media: (optional) array of media objects to attach to the machine, where the first object is the boot device
@@ -2254,6 +2344,13 @@ class KvmManager:
                        config = {'/root/.ssh/authorized_keys': '<PUBLIC KEYS>'}
 
                        If the machine is not booted from an flist, the config are discarded
+        :param storage: A Url to the ardb storage to use to mount the root flist
+                        if not provided, the default one from core0 configuration will be used. Only applicable
+                        when booting a machine from an flist.
+        :param cmdline: When booting from an flist, add extra kernel cmdline arguments
+        :param share_cache: if set to true, the /var/cache/zerofs directory will be shared to guest machine
+                        as 'zoscache' in rw mode. It's equavilint to adding {'source': '/var/cache/zerofs', 'target': 'zoscahe', readonly: False}
+                        to the `mount` option.
 
         :note: At least one media or an flist must be provided.
         :return: uuid of the virtual machine
@@ -2267,13 +2364,17 @@ class KvmManager:
             'media': media,
             'cpu': cpu,
             'flist': flist,
+            'cmdline': cmdline,
             'memory': memory,
             'nics': nics,
             'port': port,
             'mount': mount,
             'tags': tags,
             'config': config,
+            'storage': storage,
+            'share_cache': share_cache,
         }
+
         self._create_chk.check(args)
 
         if media is None and flist is None:
@@ -2994,6 +3095,153 @@ class CGroupManager:
         return self._client.json('cgroup.cpuset.spec', args)
 
 
+class ZFSManager():
+    PATH = '/var/cache/router.yaml'
+
+    def __init__(self, client):
+        self._client = client
+
+    @property
+    def config(self):
+        """
+        Get/Set configuration of the local routing table in one go
+        This will fully override the zfs routing table on the host.
+
+        :param table:
+           A dict similar to what is returned by `config` it has 3 sections
+            - pools
+            - lookup
+            - cache
+
+            Both lookup, and cache are just ordered list of pool names defined under pools.
+            A pool is a dict of rules, where the key is the hash range rule, and value is the destination
+            a valid hash range is of the form XX[:YY] where XX is a hash prefix, the YY is optional prefix
+            if provided the hash that fallin the the prefix range XX YY will be matched. Destination must
+            be a valid url, currently only supported schemes are 'zdb', 'redis', and 'ardb'
+
+            example:
+            {
+                'pools': {
+                    'local': {
+                        '00:FF': 'redis://192.168.1.2:6379'
+                    }
+                }
+                'lookup': [
+                    'local'
+                ],
+                'cache': [
+                    'local'
+                ]
+            }
+        """
+
+        if not self._client.filesystem.exists(self.PATH):
+            return None
+
+        buf = io.BytesIO()
+        self._client.filesystem.download(self.PATH, buf)
+        buf.seek(0)
+        return yaml.load(buf)
+
+    def _valid_hash_range(self, hr):
+        m = re.match(r'^([0-9a-fA-F]+)(?::([0-9a-fA-F]+))$', hr)
+        if m is None:
+            raise ValueError('invalid hash range "%s"' % hr)
+
+        start = m.group(1)
+        end = m.group(2)
+
+        if end is not None and len(start) != len(end):
+            raise ValueError('invalid hash range start and end of different length')
+
+    def _valid_dest(self, dest):
+        url = urllib.parse.urlparse(dest)
+        if url.scheme not in ['ardb', 'zdb', 'redis']:
+            raise ValueError('invalid destination address "%s" only zdb, redis and ardb are supported' % dest)
+
+    @config.setter
+    def config(self, table):
+
+        for name, pool in table['pools'].items():
+            for hash_range, dest in pool.items():
+                self._valid_hash_range(hash_range)
+                self._valid_dest(dest)
+
+        for lookup in table['lookup']:
+            if lookup not in table['pools']:
+                raise ValueError("unknown pool name '%s' in lookup" % lookup)
+
+        for cache in table.get('cache', []):
+            if cache not in table['pools']:
+                raise ValueError("unknown pool name '%s' in lookup" % lookup)
+
+        final = {
+            'pools': table['pools'],
+            'lookup': table['lookup'],
+            'cache': table.get('cache', []),
+        }
+        buf = io.BytesIO(yaml.dump(final).encode())
+        self._client.filesystem.upload(self.PATH, buf)
+
+    def purge(self):
+        """
+        Remove routing table, this will cause zos to only depend on the routing table
+        provided by the flist, no local pools or caching will happen.
+        """
+        self._client.filesystem.remove(self.PATH)
+
+    def set_cache(self, destination):
+        """
+        A simple method to set local cache redis, or zdb in one go. It overrides
+        any entries in the routing table.
+        """
+
+        self.config = {
+            'pools': {
+                'local': {
+                    '00:FF': destination,
+                }
+            },
+            'lookup': ['local'],
+            'cache': ['local'],
+        }
+
+class SocatManager():
+    def __init__(self, client):
+        self._client = client
+
+    def list(self):
+        """
+        List port forwards
+        """
+        return self._client.json('socat.list', {})
+
+    def reserve(self, number=1):
+        """
+        Resever the given number of ports, and return the reserved ports
+
+        :note: A reserved port is not granteed to be used by u only, it means
+        other call to reserve for the next 2 minutes is granteed to not return
+        this port.
+
+        So to make reservation works properly, u first do `reserve` then use
+        the returned port for your forwards (u have 2 minutes). Once the port
+        forward is done, the port is never returned by reseve. If no port forward
+        was created using this port, the port is returned to the free pool
+
+        :note: port forward creation (using container, or kvm) doesn't check if the
+        port is reserved at all.
+
+        :param number: number of ports to reserve
+        """
+
+        args = {
+            'number': number,
+        }
+
+        return self._client.json('socat.reserve', args)
+
+
 class Client(BaseClient):
     _raw_chk = typchk.Checker({
         'id': str,
@@ -3003,6 +3251,7 @@ class Client(BaseClient):
         'max_time': typchk.Or(int, typchk.IsNone()),
         'stream': bool,
         'tags': typchk.Or([str], typchk.IsNone()),
+        'recurring_period': typchk.Or(typchk.IsNone(), int)
     })
 
     def __init__(self, host, port=6379, password="", db=0, ssl=True, timeout=None, testConnectionAttempts=3):
@@ -3031,6 +3280,9 @@ class Client(BaseClient):
         self._aggregator = AggregatorManager(self)
         self._rtinfo = RTInfoManager(self)
         self._cgroup = CGroupManager(self)
+        self._zfs = ZFSManager(self)
+        self._socat = SocatManager(self)
+
 
         if testConnectionAttempts:
             for _ in range(testConnectionAttempts):
@@ -3041,6 +3293,18 @@ class Client(BaseClient):
                 else:
                     return
             raise ConnectionError("Could not connect to remote host %s" % host)
+
+    @property
+    def socat(self):
+        return self._socat
+
+    @property
+    def zfs(self):
+        """
+        ZeroFS manager
+        :return:
+        """
+        return self._zfs
 
     @property
     def container(self):
@@ -3136,7 +3400,8 @@ class Client(BaseClient):
         """
         return self._cgroup
 
-    def raw(self, command, arguments, queue=None, max_time=None, stream=False, tags=None, id=None):
+    def raw(self, command, arguments, queue=None, max_time=None,
+            stream=False, tags=None, id=None, recurring_period=None):
         """
         Implements the low level command call, this needs to build the command structure
         and push it on the correct queue.
@@ -3163,6 +3428,7 @@ class Client(BaseClient):
             'max_time': max_time,
             'stream': stream,
             'tags': tags,
+            'recurring_period': recurring_period
         }
 
         self._raw_chk.check(payload)
@@ -3176,4 +3442,3 @@ class Client(BaseClient):
 
     def response_for(self, id):
         return Response(self, id)
-

@@ -6,8 +6,8 @@ import (
 	"net"
 	"sync"
 
-	"github.com/zero-os/0-core/base/nft"
-	"github.com/zero-os/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/nft"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 type nftMgr struct {

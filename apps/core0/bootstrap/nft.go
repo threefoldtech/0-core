@@ -3,7 +3,7 @@ package bootstrap
 import (
 	"io/ioutil"
 
-	"github.com/zero-os/0-core/base/nft"
+	"github.com/threefoldtech/0-core/base/nft"
 )
 
 var (

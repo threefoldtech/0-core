@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	psutils "github.com/shirou/gopsutil/process"
-	"github.com/zero-os/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm/stream"
 )
 
 //ContainerCommandArguments arguments for container command
@@ -129,9 +129,16 @@ func (p *containerProcessImpl) Stats() *ProcessStats {
 		stats.Swap = mem.Swap
 	}
 
-	stats.Debug = fmt.Sprintf("%d", p.process.Pid)
-
 	return &stats
+}
+
+func (p *containerProcessImpl) GetPID() int32 {
+	ps := p.process
+	if ps == nil {
+		return -1
+	}
+
+	return ps.Pid
 }
 
 func (p *containerProcessImpl) setupChannel() (*os.File, *os.File, error) {
@@ -218,6 +225,10 @@ func (p *containerProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 
 		return ps.Pid, nil
 	})
+
+	if logf != nil {
+		logf.Close()
+	}
 
 	if err != nil {
 		return

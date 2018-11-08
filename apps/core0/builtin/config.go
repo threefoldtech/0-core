@@ -1,8 +1,8 @@
 package builtin
 
 import (
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/settings"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/settings"
 )
 
 type configMgr struct{}

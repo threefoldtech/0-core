@@ -1,6 +1,6 @@
 package pm
 
-import "github.com/zero-os/0-core/base/pm/stream"
+import "github.com/threefoldtech/0-core/base/pm/stream"
 
 //Handler defines an interface to receiver the process manager events
 //A handler can be any object that implements one or many handle methods below

@@ -2,7 +2,7 @@ package logger
 
 import (
 	"github.com/op/go-logging"
-	"github.com/zero-os/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm/stream"
 )
 
 var (
@@ -44,5 +44,8 @@ func (logger *ConsoleLogger) LogRecord(record *LogRecord) {
 	if !IsLoggable(logger.defaults, record.Message) {
 		return
 	}
-	log.Infof("[%d]%s %s", record.Core, record.Command, record.Message)
+
+	if len(record.Message.Message) > 0 {
+		log.Debugf("[%d]%s %s", record.Core, record.Command, record.Message)
+	}
 }

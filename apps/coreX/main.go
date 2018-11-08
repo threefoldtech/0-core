@@ -5,18 +5,18 @@ import (
 	"os"
 
 	"github.com/op/go-logging"
-	"github.com/zero-os/0-core/apps/coreX/bootstrap"
-	"github.com/zero-os/0-core/apps/coreX/options"
-	"github.com/zero-os/0-core/base"
-	"github.com/zero-os/0-core/base/pm"
+	"github.com/threefoldtech/0-core/apps/coreX/bootstrap"
+	"github.com/threefoldtech/0-core/apps/coreX/options"
+	"github.com/threefoldtech/0-core/base"
+	"github.com/threefoldtech/0-core/base/pm"
 
 	"os/signal"
 	"syscall"
 
 	"encoding/json"
 
-	_ "github.com/zero-os/0-core/apps/coreX/builtin"
-	_ "github.com/zero-os/0-core/base/builtin"
+	_ "github.com/threefoldtech/0-core/apps/coreX/builtin"
+	_ "github.com/threefoldtech/0-core/base/builtin"
 )
 
 const (

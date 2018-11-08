@@ -36,7 +36,7 @@ function preparedisk {
 
     if [ "$DISK" == "" ]; then
         error "no free disks found"
-        exit 1
+        return 1
     fi
 
     parted -s ${DISK} mktable gpt
@@ -88,6 +88,18 @@ function hook {
     return 0
 }
 
+function sharedcache {
+    # try to mount the shared cache if possible
+    CACHEPATH=/var/cache/zerofs
+    if [ ! -d ${CACHEPATH} ]; then
+        mkdir -p ${CACHEPATH}
+    fi
+
+    if ! mount -t 9p zoscache ${CACHEPATH}; then
+        log "No shared cache exposed to the node"
+    fi
+}
+
 function main {
     mkdir -p ${MNT}
     if mountpoint -q ${MNT}; then
@@ -99,11 +111,16 @@ function main {
         # no parition found with that label
         # prepare the first availabel disk
 	    log "${LABEL} not mounted, search for available disk"
-        preparedisk
-        labelmount ${LABEL} ${MNT}
+        if preparedisk; then
+            labelmount ${LABEL} ${MNT}
+        fi
     fi
 
-    hook $MNT
+    if mountpoint -q ${MNT}; then
+        hook ${MNT}
+    fi
+
+    sharedcache
 }
 
 main

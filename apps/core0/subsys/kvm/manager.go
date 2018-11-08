@@ -17,11 +17,12 @@ import (
 	"github.com/libvirt/libvirt-go"
 	"github.com/op/go-logging"
 	"github.com/pborman/uuid"
-	"github.com/zero-os/0-core/apps/core0/helper/socat"
-	"github.com/zero-os/0-core/apps/core0/screen"
-	"github.com/zero-os/0-core/apps/core0/subsys/containers"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/utils"
+	"github.com/threefoldtech/0-core/apps/core0/helper/filesystem"
+	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
+	"github.com/threefoldtech/0-core/apps/core0/screen"
+	"github.com/threefoldtech/0-core/apps/core0/subsys/containers"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/utils"
 )
 
 const (
@@ -204,14 +205,17 @@ type Mount struct {
 
 type CreateParams struct {
 	NicParams
-	Name   string            `json:"name"`
-	CPU    int               `json:"cpu"`
-	Memory int               `json:"memory"`
-	FList  string            `json:"flist"`
-	Mount  []Mount           `json:"mount"`
-	Media  []Media           `json:"media"`
-	Config map[string]string `json:"config"` //overrides vm config (from flist)
-	Tags   pm.Tags           `json:"tags"`
+	Name       string            `json:"name"`
+	CPU        int               `json:"cpu"`
+	Memory     int               `json:"memory"`
+	FList      string            `json:"flist"`
+	ShareCache bool              `json:"share_cache"`
+	Cmdline    string            `json:"cmdline"` //only used with flist
+	Mount      []Mount           `json:"mount"`
+	Media      []Media           `json:"media"`
+	Config     map[string]string `json:"config"` //overrides vm config (from flist)
+	Tags       pm.Tags           `json:"tags"`
+	Storage    string            `json:"storage"` //ardb storage needed for g8ufs mounts.
 }
 
 type FListBootConfig struct {
@@ -245,8 +249,8 @@ func (c *CreateParams) Valid() error {
 	}
 
 	for _, mnt := range c.Mount {
-		if mnt.Target == "root" {
-			return fmt.Errorf("mount target 'root' is reserved")
+		if mnt.Target == "root" || mnt.Target == "zoscache" {
+			return fmt.Errorf("mount target '%s' is reserved", mnt.Target)
 		}
 	}
 
@@ -891,6 +895,41 @@ func (m *kvmManager) updateView() {
 	screen.Refresh()
 }
 
+func (m *kvmManager) prepareFlist(params *CreateParams, domain *Domain) error {
+	config, err := m.flistMount(domain.UUID, params.FList, params.Storage, params.Config)
+	if err != nil {
+		return err
+	}
+
+	var cmdline string
+	if !config.NoDefault {
+		cmdline = "rootfstype=9p rootflags=rw,trans=virtio,cache=loose root=root"
+	}
+
+	cmdline = strings.Join([]string{cmdline, config.Cmdline, params.Cmdline}, " ")
+
+	domain.OS.Kernel = path.Join(config.Root, utils.SafeNormalize(config.Kernel))
+	if len(config.InitRD) != 0 {
+		domain.OS.InitRD = path.Join(config.Root, utils.SafeNormalize(config.InitRD))
+	}
+
+	domain.OS.Cmdline = strings.TrimSpace(cmdline)
+
+	domain.Devices.Filesystems = append(domain.Devices.Filesystems, Filesystem{
+		Source: FilesystemDir{config.Root},
+		Target: FilesystemDir{"root"}, //the <root> here matches the one in the cmdline root=<root>
+	})
+
+	if params.ShareCache {
+		domain.Devices.Filesystems = append(domain.Devices.Filesystems, Filesystem{
+			Source: FilesystemDir{filesystem.CacheZeroFSDir},
+			Target: FilesystemDir{"zoscache"}, //the <root> here matches the one in the cmdline root=<root>
+		})
+	}
+
+	return nil
+}
+
 func (m *kvmManager) create(cmd *pm.Command) (uuid interface{}, err error) {
 	defer m.updateView()
 	var params CreateParams
@@ -912,33 +951,9 @@ func (m *kvmManager) create(cmd *pm.Command) (uuid interface{}, err error) {
 	}
 
 	if len(params.FList) != 0 {
-		var config FListBootConfig
-		config, err = m.flistMount(domain.UUID, params.FList, params.Config)
-		if err != nil {
+		if err := m.prepareFlist(&params, domain); err != nil {
 			return nil, err
 		}
-		var cmdline string
-		if !config.NoDefault {
-			cmdline = "rootfstype=9p rootflags=rw,trans=virtio,cache=loose root=root"
-		}
-
-		if len(config.Cmdline) != 0 {
-			cmdline = fmt.Sprintf("%s %s", cmdline, config.Cmdline)
-		}
-
-		domain.OS.Kernel = path.Join(config.Root, utils.SafeNormalize(config.Kernel))
-		if len(config.InitRD) != 0 {
-			domain.OS.InitRD = path.Join(config.Root, utils.SafeNormalize(config.InitRD))
-		}
-
-		domain.OS.Cmdline = strings.TrimSpace(cmdline)
-
-		fs := Filesystem{
-			Source: FilesystemDir{config.Root},
-			Target: FilesystemDir{"root"}, //the <root> here matches the one in the cmdline root=<root>
-		}
-
-		domain.Devices.Filesystems = append(domain.Devices.Filesystems, fs)
 	}
 
 	m.domainsInfoRWMutex.Lock()
@@ -1533,7 +1548,7 @@ func (m *kvmManager) removeNic(cmd *pm.Command) (interface{}, error) {
 	if err = m.detachDevice(params.UUID, inf.Alias.Name, string(ifxml)); err != nil {
 		return nil, err
 	}
-  
+
 	return nil, m.updateNics(params.UUID)
 }
 

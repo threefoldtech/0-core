@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/zero-os/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 const (
@@ -103,7 +103,7 @@ func (sink *Sink) LExpire(key string, duration int64) (int64, error) {
 //Result handler implementation
 func (sink *Sink) Result(cmd *pm.Command, result *pm.JobResult) {
 	if err := sink.Forward(result); err != nil {
-		log.Errorf("failed to forward result: %s", cmd.ID)
+		log.Debugf("failed to forward result: %s", cmd.ID)
 	}
 }
 

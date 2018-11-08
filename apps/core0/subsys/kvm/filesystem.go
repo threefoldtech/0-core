@@ -7,10 +7,10 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/zero-os/0-core/apps/core0/helper/filesystem"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/settings"
-	"github.com/zero-os/0-core/base/utils"
+	"github.com/threefoldtech/0-core/apps/core0/helper/filesystem"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/settings"
+	"github.com/threefoldtech/0-core/base/utils"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -28,9 +28,12 @@ func (m *kvmManager) flistConfigOverride(target string, cfg map[string]string) e
 	return nil
 }
 
-func (m *kvmManager) flistMount(uuid, src string, cfg map[string]string) (config FListBootConfig, err error) {
+func (m *kvmManager) flistMount(uuid, src, storage string, cfg map[string]string) (config FListBootConfig, err error) {
 	namespace := fmt.Sprintf(VmNamespaceFmt, uuid)
-	storage := settings.Settings.Globals.Get("storage", "ardb://hub.gig.tech:16379")
+
+	if storage == "" {
+		storage = settings.Settings.Globals.Get("storage", "zdb://hub.grid.tf:9900")
+	}
 
 	target := path.Join(VmBaseRoot, uuid)
 	onExit := &pm.ExitHook{

@@ -6,7 +6,12 @@ import (
 	"os"
 
 	logging "github.com/op/go-logging"
-	"github.com/zero-os/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/pm"
+)
+
+const (
+	//NFTDebug if true, nft files will not be deleted for inspection
+	NFTDebug = false
 )
 
 var (
@@ -31,14 +36,16 @@ func Apply(nft Nft) error {
 	}
 	defer func() {
 		f.Close()
-		os.RemoveAll(f.Name())
+		if !NFTDebug {
+			os.RemoveAll(f.Name())
+		}
 	}()
 
 	if _, err := f.Write(data); err != nil {
 		return err
 	}
 	f.Close()
-
+	log.Debugf("nft applying: %s", f.Name())
 	return ApplyFromFile(f.Name())
 }
 

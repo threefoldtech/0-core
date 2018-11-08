@@ -3,28 +3,30 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"time"
 
 	"github.com/op/go-logging"
-	"github.com/zero-os/0-core/apps/core0/assets"
-	"github.com/zero-os/0-core/apps/core0/bootstrap"
-	"github.com/zero-os/0-core/apps/core0/logger"
-	"github.com/zero-os/0-core/apps/core0/options"
-	"github.com/zero-os/0-core/apps/core0/screen"
-	"github.com/zero-os/0-core/apps/core0/stats"
-	"github.com/zero-os/0-core/apps/core0/subsys/cgroups"
-	"github.com/zero-os/0-core/apps/core0/subsys/containers"
-	"github.com/zero-os/0-core/apps/core0/subsys/kvm"
-	"github.com/zero-os/0-core/base"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/settings"
+	"github.com/threefoldtech/0-core/apps/core0/assets"
+	"github.com/threefoldtech/0-core/apps/core0/bootstrap"
+	"github.com/threefoldtech/0-core/apps/core0/logger"
+	"github.com/threefoldtech/0-core/apps/core0/options"
+	"github.com/threefoldtech/0-core/apps/core0/screen"
+	"github.com/threefoldtech/0-core/apps/core0/stats"
+	"github.com/threefoldtech/0-core/apps/core0/subsys/cgroups"
+	"github.com/threefoldtech/0-core/apps/core0/subsys/containers"
+	"github.com/threefoldtech/0-core/apps/core0/subsys/kvm"
+	"github.com/threefoldtech/0-core/base"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/settings"
 
 	"os/signal"
 	"syscall"
 
-	_ "github.com/zero-os/0-core/apps/core0/builtin"
-	_ "github.com/zero-os/0-core/apps/core0/builtin/btrfs"
-	"github.com/zero-os/0-core/apps/core0/transport"
-	_ "github.com/zero-os/0-core/base/builtin"
+	_ "github.com/threefoldtech/0-core/apps/core0/builtin"
+	_ "github.com/threefoldtech/0-core/apps/core0/builtin/btrfs"
+	"github.com/threefoldtech/0-core/apps/core0/transport"
+	_ "github.com/threefoldtech/0-core/base/builtin"
 )
 
 var (
@@ -32,7 +34,7 @@ var (
 )
 
 func init() {
-	formatter := logging.MustStringFormatter("%{time}: %{color}%{module} %{level:.1s} > %{message} %{color:reset}")
+	formatter := logging.MustStringFormatter("%{time}: %{color}%{module} %{level:.1s} > %{color:reset} %{message}")
 	logging.SetFormatter(formatter)
 
 	//we don't use signal.Ignore because the Ignore is actually inherited by children
@@ -47,6 +49,20 @@ func init() {
 	}
 
 	signal.Notify(make(chan os.Signal), signals...)
+}
+
+func updateHostnameOnScreen(hostSection *screen.TextSection) {
+	for {
+		time.Sleep(time.Second * 5)
+
+		hostname, err := os.Hostname()
+		if err != nil {
+			log.Critical(err.Error())
+		} else {
+			hostSection.Text = fmt.Sprintf("Hostname: %s", hostname)
+		}
+	}
+
 }
 
 //Splash setup splash screen
@@ -70,10 +86,21 @@ func Splash() {
 	screen.Push(&screen.TextSection{
 		Attributes: screen.Attributes{screen.Bold},
 		Text: fmt.Sprintf("Boot Params: %s",
-			options.Options.Kernel.String("debug", "organization", "zerotier", "quiet", "development"), //flags we care about
+			options.Options.Kernel.String("debug", "organization", "zerotier", "quiet", "development", "support"), //flags we care about
 		),
 	})
+
 	screen.Push(&screen.TextSection{})
+
+	hostnameSection := &screen.TextSection{
+		Attributes: screen.Attributes{screen.Bold},
+		Text:       "",
+	}
+	screen.Push(hostnameSection)
+	screen.Push(&screen.TextSection{})
+
+	go updateHostnameOnScreen(hostnameSection)
+
 	screen.Push(&screen.TextSection{
 		Text: "[Alt+F1: Kernel logs view] [Alt+F2: This screen]",
 	})
@@ -87,11 +114,22 @@ func (*console) Result(cmd *pm.Command, result *pm.JobResult) {
 	log.Debugf("Job result for command '%s' is '%s'", cmd, result.State)
 }
 
+func startEntropyGenerator() error {
+	log.Debug("starte haveged to generate entropy")
+	cmd := exec.Command("haveged", "-w 1024", "-d 32", "-i 32", "-v 1")
+	_, err := cmd.CombinedOutput()
+	return err
+}
+
 func main() {
 	var options = options.Options
 	fmt.Println(core.Version())
 	if options.Version() {
 		os.Exit(0)
+	}
+
+	if err := startEntropyGenerator(); err != nil {
+		log.Fatalf("fail to start entropy generator: %v", err)
 	}
 
 	pm.New()

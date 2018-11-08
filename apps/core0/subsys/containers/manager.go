@@ -13,14 +13,14 @@ import (
 
 	"github.com/op/go-logging"
 	"github.com/pborman/uuid"
+	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
+	"github.com/threefoldtech/0-core/apps/core0/screen"
+	"github.com/threefoldtech/0-core/apps/core0/subsys/cgroups"
+	"github.com/threefoldtech/0-core/apps/core0/transport"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/settings"
+	"github.com/threefoldtech/0-core/base/utils"
 	"github.com/vishvananda/netlink"
-	"github.com/zero-os/0-core/apps/core0/helper/socat"
-	"github.com/zero-os/0-core/apps/core0/screen"
-	"github.com/zero-os/0-core/apps/core0/subsys/cgroups"
-	"github.com/zero-os/0-core/apps/core0/transport"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/settings"
-	"github.com/zero-os/0-core/base/utils"
 )
 
 const (
@@ -38,6 +38,7 @@ const (
 	cmdContainerRestore           = "corex.restore"
 	cmdContainerPortForwardAdd    = "corex.portforward-add"
 	cmdContainerPortForwardRemove = "corex.portforward-remove"
+	cmdContainerFListLayer        = "corex.flist-layer"
 
 	coreXResponseQueue = "corex:results"
 	coreXBinaryName    = "coreX"
@@ -112,6 +113,7 @@ type ContainerCreateArguments struct {
 	Tags        pm.Tags           `json:"tags"`         //for searching containers
 	Env         map[string]string `json:"env"`          //environment variables.
 	CGroups     []CGroup          `json:"cgroups"`      //container creation cgroups
+	Config      map[string]string `json:"config"`       //overrides container config (from flist)
 }
 
 type ContainerDispatchArguments struct {
@@ -300,6 +302,9 @@ func ContainerSubsystem(sink *transport.Sink, cell *screen.RowCell) (ContainerMa
 	pm.RegisterBuiltIn(cmdContainerPortForwardRemove, containerMgr.portforwardRemove)
 	pm.RegisterBuiltIn(cmdContainerBackup, containerMgr.backup)
 	pm.RegisterBuiltIn(cmdContainerRestore, containerMgr.restore)
+	pm.RegisterBuiltIn(cmdContainerFListLayer, containerMgr.flistLayer)
+	// flist specific commands
+	pm.RegisterBuiltIn(cmdFlistCreate, containerMgr.flistCreate)
 
 	//container specific info
 	pm.RegisterBuiltIn(cmdContainerZerotierInfo, containerMgr.ztInfo)
@@ -783,4 +788,25 @@ func (m *containerManager) portforwardRemove(cmd *pm.Command) (interface{}, erro
 	}
 	delete(container.Args.Port, args.HostPort)
 	return nil, nil
+}
+
+func (m *containerManager) flistLayer(cmd *pm.Command) (interface{}, error) {
+	var args struct {
+		Container uint16 `json:"container"`
+		FList     string `json:"flist"`
+	}
+
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, pm.BadRequestError(err)
+	}
+
+	m.conM.RLock()
+	defer m.conM.RUnlock()
+
+	container, ok := m.containers[args.Container]
+	if !ok {
+		return nil, pm.NotFoundError(fmt.Errorf("container does not exist"))
+	}
+
+	return nil, container.mergeFList(args.FList)
 }

@@ -18,17 +18,17 @@ class BaseTest(unittest.TestCase):
         self.client = client.Client(self.target_ip)
         self.session = requests.Session()
         self.session.headers['Authorization'] = 'Bearer {}'.format(self.zt_access_token)
-        self.root_url = 'https://hub.gig.tech/gig-official-apps/ubuntu1604.flist'
-        self.smallsize_img = 'https://hub.gig.tech/gig-official-apps/0-disk-master.flist'
-        self.ovs_flist = 'https://hub.gig.tech/gig-official-apps/ovs.flist'
-        self.storage = 'ardb://hub.gig.tech:16379'
+        self.root_url = 'https://hub.grid.tf/tf-bootable/ubuntu:16.04.flist'
+        self.smallsize_img = 'https://hub.grid.tf/tf-official-apps/minio.flist'
+        self.ovs_flist = 'https://hub.grid.tf/tf-official-apps/ovs.flist'
+        self.storage = 'zdb://hub.grid.tf:9900'
         self.client.timeout = 80
         super(BaseTest, self).__init__(*args, **kwargs)
 
     def setUp(self):
         self._testID = self._testMethodName
         self._startTime = time.time()
-        self._logger = logging.LoggerAdapter(logging.getLogger('g8os_testsuite'),
+        self._logger = logging.LoggerAdapter(logging.getLogger('zos_testsuite'),
                                              {'testid': self.shortDescription() or self._testID})
 
 
@@ -38,12 +38,12 @@ class BaseTest(unittest.TestCase):
     def lg(self, msg):
         self._logger.info(msg)
 
-    def check_g8os_connection(self, classname):
+    def check_zos_connection(self, classname):
         try:
             self.client.ping()
         except Exception as e:
-            self.lg("can't reach g8os remote machine")
-            print("Can't reach g8os remote machine")
+            self.lg("can't reach zos remote machine")
+            print("Can't reach zos remote machine")
             self.skipTest(classname)
 
     def rand_str(self):
@@ -81,7 +81,7 @@ class BaseTest(unittest.TestCase):
 
     def stdout(self, resource):
         return resource.get().stdout.replace('\n', '').lower()
-        
+
     def create_zerotier_network(self, private=False):
         url = 'https://my.zerotier.com/api/network'
         data = {'config': {'ipAssignmentPools': [{'ipRangeEnd': '10.147.19.254',
@@ -122,9 +122,9 @@ class BaseTest(unittest.TestCase):
             self.lg('can\'t connect to zerotier, {}:{}'.format(r.status_code, r.content))
             return False
 
-    def get_g8os_zt_ip(self, networkId):
+    def get_zos_zt_ip(self, networkId):
         """
-        method to get the zerotier ip address of the g8os client
+        method to get the zerotier ip address of the zos client
         """
         nws = self.client.zerotier.list()
         for nw in nws:
@@ -136,7 +136,7 @@ class BaseTest(unittest.TestCase):
 
     def get_contanier_zt_ip(self, client, networkId):
         """
-        method to get zerotier ip address of the g8os container
+        method to get zerotier ip address of the zos container
         Note: to use this method, make sure that zt is defined first in the nic
         list during creating your container, so it could be attached to etho interface
         """
@@ -188,12 +188,15 @@ class BaseTest(unittest.TestCase):
             img = self.client.filesystem.exists('{}/{}'.format(img_loc, image))
             if not img:
                 rs = self.client.bash('wget {} -P {}'.format(img_dn_path, img_loc))
-                self.assertEqual(rs.get(100).state, 'SUCCESS')
+                state = rs.get(150).state
+                self.assertEqual(state, 'SUCCESS')
         else:
             rs = self.client.bash('mkdir -p {}'.format(img_loc))
-            self.assertEqual(rs.get().state, 'SUCCESS')
+            state = rs.get().state
+            self.assertEqual(state, 'SUCCESS')
             rs = self.client.bash('wget {} -P {}'.format(img_dn_path, img_loc))
-            self.assertEqual(rs.get(100).state, 'SUCCESS')
+            state = rs.get(150).state
+            self.assertEqual(state, 'SUCCESS')
         vm_uuid = self.client.kvm.create(name=name, media=[{'url': '{}/{}'.format(img_loc, image)}])
         return vm_uuid
 

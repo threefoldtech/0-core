@@ -7,7 +7,7 @@ class ExtendedMachines(BaseTest):
 
     def __init__(self, *args, **kwargs):
         super(ExtendedMachines, self).__init__(*args, **kwargs)
-        self.check_g8os_connection(ExtendedMachines)
+        self.check_zos_connection(ExtendedMachines)
         containers = self.client.container.find('ovs')
         ovs_exist = [key for key, value in containers.items()]
         if not ovs_exist:
@@ -22,10 +22,10 @@ class ExtendedMachines(BaseTest):
 
     def setUp(self):
         super(ExtendedMachines, self).setUp()
-        self.check_g8os_connection(ExtendedMachines)
+        self.check_zos_connection(ExtendedMachines)
 
     def test001_kvm_add_remove_nics(self):
-        """ g8os-035
+        """ zos-035
 
         *Test case for testing adding and removing nics for vms*
 
@@ -78,6 +78,7 @@ class ExtendedMachines(BaseTest):
             self.client.kvm.add_nic(vm_uuid, 'bridge', id=bn2)
 
         self.lg('Deattach all these nics, should succeed')
+        time.sleep(2)
         self.client.kvm.remove_nic(vm_uuid, 'vlan', id=str(t1))
         self.client.kvm.remove_nic(vm_uuid, 'vxlan', id=str(vx1_id))
         time.sleep(2)
@@ -89,7 +90,7 @@ class ExtendedMachines(BaseTest):
         self.lg('{} ENDED'.format(self._testID))
 
     def test002_kvm_attach_deattach_disks(self):
-        """ g8os-036
+        """ zos-036
 
         *Test case for testing attaching and deattaching disks for vms*
 
@@ -122,6 +123,7 @@ class ExtendedMachines(BaseTest):
 
         self.lg('Attach L1 to vm1 again, vm1 should still see L1 as one vdisk')
         with self.assertRaises(RuntimeError):
+            time.sleep(2)
             self.client.kvm.attach_disk(vm_uuid, {'url': loop_dev})
         self.assertEqual(len(self.client.kvm.info(vm_uuid)['Block']), l + 1)
 
@@ -136,8 +138,9 @@ class ExtendedMachines(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
+    @unittest.skip('https://github.com/threefoldtech/0-core/issues/46')
     def test_003_containers_backup_restore(self):
-        """ g8os-037
+        """ zos-037
 
         *Test case for container backup and restore*
 
@@ -197,13 +200,12 @@ class ExtendedMachines(BaseTest):
         ccl2 = self.client.container.client(cid2)
         nic_type = self.client.container.list()[str(cid2)]['container']['arguments']['nics'][0]['type']
         self.assertEqual(nic_type, 'default')
-        self.assertEqual(ccl2.filesystem.list("/bin")[0]['name'], 'nbdserver')
+        self.assertEqual(ccl2.filesystem.list("/bin")[0]['name'], 'minio')
 
         self.lg('{} ENDED'.format(self._testID))
 
-    @unittest.skip('https://github.com/zero-os/0-core/issues/679')
     def test_004_container_passthrough_nic(self):
-        """ g8os-043
+        """ zos-043
 
         *Test case for testing nic of type passthrough of a container*
 
@@ -212,8 +214,8 @@ class ExtendedMachines(BaseTest):
         #. Create a bridge (B1).
         #. Check B1 is part of the core0 nics, should succeed.
         #. Create container (C1) and pass B1 as a nic of type passthrough to C1, should fail.
+        #. create container (c1) again without nics, should succeed
         #. Check that B1 hasn't been removed from core0 nics.
-        #. Check that B1 hasn't been added to C1 nics.
         #. Create dunnmy device (D1), should succeed.
         #. Add D1 as a nic of type passthrough to C1.
         #. Check that D1 has been removed from core0 nics.
@@ -231,16 +233,16 @@ class ExtendedMachines(BaseTest):
 
         self.lg('Create container (C1) and pass B1 as a nic of type passthrough to C1, should fail')
         nic = [{"type": "passthrough", "id": bridge_name, "name": bridge_name}]
-        c1 = self.create_container(root_url=self.root_url, storage=self.storage, nics=nic)
-        #creation should fail .. checkon that after the issue is solved
+        with self.assertRaises(RuntimeError):
+            c1 = self.create_container(root_url=self.root_url, storage=self.storage, nics=nic)
+
+        self.lg('create container (c1) again without nics, should succeed')
+        c1 = self.create_container(root_url=self.root_url, storage=self.storage)
+        c1_client = self.client.container.client(c1)
 
         self.lg("Check that B1 hasn't been removed from core0 nics.")
         nic = [n for n in self.client.info.nic() if n['name'] == bridge_name]
         self.assertTrue(nic)
-
-        self.lg("Check that B1 hasn't been added to C1 nics.")
-        nic = [n for n in c1_client.info.nic() if n['name'] == bridge_name]
-        self.assertFalse(nic)
 
         self.lg('Create dunnmy device (D1), should succeed.')
         nic_name = self.rand_str()
@@ -249,21 +251,21 @@ class ExtendedMachines(BaseTest):
         self.assertTrue(nic)
 
         self.lg('Add D1 as a nic of type passthrough to C1.')
-        nic = [{"type": "passthrough", "id": nic_name, "name": nic_name}]
-        c1_client.container.nic_add(c1, nic)
+        nic = {"type": "passthrough", "id": nic_name, "name": nic_name}
+        self.client.container.nic_add(c1, nic)
 
         self.lg('Check that D1 has been removed from core0 nics.')
         nic = [n for n in self.client.info.nic() if n['name'] == nic_name]
         self.assertFalse(nic)
 
         self.lg('Check that D1 has been added to C1 nics.')
-        nic = [n for n in c1_client.info.nic() if n['name'] == bridge_name]
+        nic = [n for n in c1_client.info.nic() if n['name'] == nic_name]
         self.assertTrue(nic)
 
         self.lg('{} ENDED'.format(self._testID))
 
     def test_005_containers_macvlan_nic(self):
-        """ g8os-044
+        """ zos-044
 
         *Test case for testing nic of type macvlan*
 

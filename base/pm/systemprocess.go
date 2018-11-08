@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	psutils "github.com/shirou/gopsutil/process"
-	"github.com/zero-os/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm/stream"
 )
 
 type SystemCommandArguments struct {
@@ -75,9 +75,16 @@ func (p *systemProcessImpl) Stats() *ProcessStats {
 		stats.Swap = mem.Swap
 	}
 
-	stats.Debug = fmt.Sprintf("%d", p.process.Pid)
-
 	return &stats
+}
+
+func (p *systemProcessImpl) GetPID() int32 {
+	ps := p.process
+	if ps == nil {
+		return -1
+	}
+
+	return ps.Pid
 }
 
 func (p *systemProcessImpl) Signal(sig syscall.Signal) error {

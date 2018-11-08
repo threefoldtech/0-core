@@ -7,11 +7,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/zero-os/0-core/base/pm"
+	logging "github.com/op/go-logging"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 var (
+	log = logging.MustGetLogger("btrfs")
+
 	reBtrfsFilesystemDf = regexp.MustCompile(`(?m:(\w+),\s(\w+):\s+total=(\d+),\s+used=(\d+))`)
+	reBtrfsQgroup       = regexp.MustCompile(`(?m:^(\d+/\d+)\s+(\d+)\s+(\d+)\s+(\d+|none)\s+(\d+|none).*$)`)
 )
 
 type btrfsManager struct{}
@@ -37,6 +41,7 @@ type btrfsFS struct {
 	TotalDevices int           `json:"total_devices"`
 	Used         int64         `json:"used"`
 	Devices      []btrfsDevice `json:"devices"`
+	Warnings     string        `json:"warnings"`
 }
 
 type btrfsDataInfo struct {
@@ -66,6 +71,15 @@ type btrfsSubvol struct {
 	Gen      int
 	TopLevel int
 	Path     string
+	Quota    uint64
+}
+
+type btrfsQGroup struct {
+	ID      string
+	Rfer    uint64
+	Excl    uint64
+	MaxRfer uint64
+	MaxExcl uint64
 }
 
 var (
@@ -192,7 +206,6 @@ func (m *btrfsManager) list(cmd *pm.Command, args []string) ([]btrfsFS, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	fss, err := m.parseList(result.Streams.Stdout())
 	if err != nil {
 		return nil, err
@@ -305,6 +318,43 @@ func (m *btrfsManager) SubvolQuota(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
+func (m *btrfsManager) parseQGroups(s string) map[string]btrfsQGroup {
+	qgroups := make(map[string]btrfsQGroup)
+	for _, line := range reBtrfsQgroup.FindAllStringSubmatch(s, -1) {
+		qgroup := btrfsQGroup{
+			ID: line[1],
+		}
+
+		qgroup.Rfer, _ = strconv.ParseUint(line[2], 10, 64)
+		qgroup.Excl, _ = strconv.ParseUint(line[3], 10, 64)
+		if line[4] != "none" {
+			qgroup.MaxRfer, _ = strconv.ParseUint(line[4], 10, 64)
+		}
+
+		if line[5] != "none" {
+			qgroup.MaxExcl, _ = strconv.ParseUint(line[5], 10, 64)
+		}
+
+		qgroups[qgroup.ID] = qgroup
+	}
+
+	return qgroups
+}
+
+func (m *btrfsManager) getQGroups(path string) (map[string]btrfsQGroup, error) {
+	job, err := m.btrfs("qgroup", "show", "-re", "--raw", path)
+	if job == nil && err != nil {
+		return nil, err
+	} else if err != nil {
+		msg := job.Streams.Stderr()
+		if strings.IndexAny(msg, "No such file or directory") != -1 {
+			return nil, nil
+		}
+	}
+
+	return m.parseQGroups(job.Streams.Stdout()), nil
+}
+
 // make a subvol snapshot
 func (m *btrfsManager) SubvolSnapshot(cmd *pm.Command) (interface{}, error) {
 	var args SnapshotArgument
@@ -342,10 +392,31 @@ func (m *btrfsManager) SubvolList(cmd *pm.Command) (interface{}, error) {
 		return nil, err
 	}
 
-	return m.parseSubvolList(result.Streams.Stdout())
+	volumes, err := m.parseSubvolList(result.Streams.Stdout())
+	if err != nil {
+		return nil, err
+	}
+
+	qgroups, err := m.getQGroups(args.Path)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range volumes {
+		volume := &volumes[i]
+		group, ok := qgroups[fmt.Sprintf("0/%d", volume.ID)]
+		if !ok {
+			continue
+		}
+
+		volume.Quota = group.MaxRfer
+	}
+
+	return volumes, nil
 }
 
 func (m *btrfsManager) btrfs(args ...string) (*pm.JobResult, error) {
+	log.Debugf("btrfs %v", args)
 	return pm.System("btrfs", args...)
 }
 
@@ -405,13 +476,21 @@ func (m *btrfsManager) parseList(output string) ([]btrfsFS, error) {
 	var fss []btrfsFS
 
 	blocks := strings.Split(output, "\n\n")
-
 	for _, block := range blocks {
+		if strings.TrimSpace(block) == "" {
+			continue
+		}
+		// Ensure that fsLines starts with Label (and collect all warnings into fs.Warnings)
+		labelIdx := strings.Index(block, "Label:")
+		if labelIdx != 0 {
+			block = block[labelIdx:]
+		}
 		fsLines := strings.Split(block, "\n")
 		if len(fsLines) < 3 {
 			continue
 		}
 		fs, err := m.parseFS(fsLines)
+
 		if err != nil {
 			return fss, err
 		}
@@ -437,8 +516,18 @@ func (m *btrfsManager) parseFS(lines []string) (btrfsFS, error) {
 	if _, err := fmt.Sscanf(strings.TrimSpace(lines[1]), "Total devices %d FS bytes used %d", &totDevice, &used); err != nil {
 		return btrfsFS{}, err
 	}
-
-	devs, err := m.parseDevices(lines[2:])
+	var validDevsLines []string
+	var fsWarnings string
+	for _, line := range lines[2:] {
+		trimmedLine := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmedLine, "**") {
+			// a warning
+			fsWarnings += trimmedLine
+		} else {
+			validDevsLines = append(validDevsLines, line)
+		}
+	}
+	devs, err := m.parseDevices(validDevsLines)
 	if err != nil {
 		return btrfsFS{}, err
 	}
@@ -448,6 +537,7 @@ func (m *btrfsManager) parseFS(lines []string) (btrfsFS, error) {
 		TotalDevices: totDevice,
 		Used:         used,
 		Devices:      devs,
+		Warnings:     fsWarnings,
 	}, nil
 }
 
