@@ -35,6 +35,7 @@ type createArgs struct {
 	Flist     string `json:"flist"`   //path where to create the flist
 	Storage   string `json:"storage"` // zdb://host:port to the data storage
 	Src       string `json:"src"`     //path to the directory to create flist from
+	Token     string `json:"token"`   // jwt token to allows upload
 }
 
 type router struct {
@@ -93,9 +94,17 @@ func (m *containerManager) flistCreate(cmd *pm.Command) (interface{}, error) {
 	// create flist
 	storage := socat.Resolve(args.Storage)
 
-	_, err := zflist("--archive", archivePath, "--create", srcPath, "--backend", storage)
-	if err != nil {
-		return nil, err
+	if args.Token != "" {
+		_, err := zflist("--archive", archivePath, "--create", srcPath, "--backend", storage, "--upload", "--token", args.Token)
+		if err != nil {
+			return nil, err
+		}
+
+	} else {
+		_, err := zflist("--archive", archivePath, "--create", srcPath, "--backend", storage)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// add the router.yaml to the flist archive
