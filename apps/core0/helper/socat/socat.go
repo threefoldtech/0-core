@@ -183,8 +183,10 @@ func (s *socatAPI) SetPortForward(namespace string, ip string, host string, dest
 
 	set := nft.Nft{
 		"nat": nft.Table{
-			Family:   nft.FamilyIP,
-			IPv4Sets: []string{"host"},
+			Family: nft.FamilyIP,
+			Sets: nft.Sets{
+				"host": nft.Set{},
+			},
 			Chains: nft.Chains{
 				"pre": nft.Chain{
 					Rules: rs,

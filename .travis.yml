@@ -25,7 +25,7 @@ matrix:
     - language: go
       sudo: true
       dist: trusty
-      go: 1.8
+      go: "1.10.x"
       before_install:
         - sudo apt-get -qq update
         - sudo apt-get install -y libvirt-dev libcap-dev
