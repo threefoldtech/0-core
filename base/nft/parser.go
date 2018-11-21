@@ -200,7 +200,7 @@ func renderRight(buf *strings.Builder, msg json.RawMessage) error {
 		buf.WriteString(fmt.Sprint(r))
 		return nil
 	case string:
-		if r[0] == '@' {
+		if r[0] == '@' || (r[0] >= '0' && r[0] <= '9') { //check if starts with number probably ip or cird
 			//for sets
 			buf.WriteString(r)
 			return nil
