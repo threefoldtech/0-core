@@ -184,6 +184,7 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 		"--reset",
 		"--backend", backend,
 		"--cache", cache,
+		"--log", path.Join(backend, "fs.log"),
 	}
 
 	if strings.HasPrefix(src, "restic:") {
