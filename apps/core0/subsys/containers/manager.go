@@ -765,6 +765,10 @@ func (m *containerManager) portforwardAdd(cmd *pm.Command) (interface{}, error) 
 		return nil, err
 	}
 
+	if container.Args.Port == nil {
+		container.Args.Port = make(map[string]int)
+	}
+
 	container.Args.Port[args.HostPort] = args.ContainerPort
 	return nil, nil
 }

@@ -43,12 +43,47 @@ func (n Nft) MarshalText() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+type Set struct {
+	//We only support ipv4_addr type
+	Elements []string
+}
+
+func (s *Set) marshal(name string, buf *bytes.Buffer) error {
+	//TODO: validate type and hook
+	buf.WriteString(fmt.Sprintf("\tset %s {\n", name))
+	buf.WriteString("\t\ttype ipv4_addr\n")
+	if len(s.Elements) > 0 {
+		buf.WriteString("\t\telements = {")
+		prefix := "\t\t            "
+
+		for i, elem := range s.Elements {
+			buf.WriteString(" ")
+			buf.WriteString(elem)
+			if i != len(s.Elements)-1 {
+				buf.WriteString(",")
+			} else {
+				buf.WriteString(" }\n")
+				break
+			}
+
+			if i != 0 && i%2 != 0 {
+				buf.WriteString("\n")
+				buf.WriteString(prefix)
+			}
+		}
+	}
+
+	buf.WriteString("\t}\n")
+	return nil
+}
+
 type Chains map[string]Chain
+type Sets map[string]Set
 
 type Table struct {
-	Family   Family
-	Chains   Chains
-	IPv4Sets []string
+	Family Family
+	Chains Chains
+	Sets   Sets
 }
 
 func (t *Table) marshal(name string, buf *bytes.Buffer) error {
@@ -57,8 +92,10 @@ func (t *Table) marshal(name string, buf *bytes.Buffer) error {
 	}
 
 	buf.WriteString(fmt.Sprintf("table %s %s {\n", t.Family, name))
-	for _, ipv4set := range t.IPv4Sets {
-		buf.WriteString(fmt.Sprintf("set %s { type ipv4_addr; }\n", ipv4set))
+	for name, set := range t.Sets {
+		if err := set.marshal(name, buf); err != nil {
+			return err
+		}
 	}
 
 	for name, chain := range t.Chains {

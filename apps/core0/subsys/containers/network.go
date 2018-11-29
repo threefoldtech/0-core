@@ -801,10 +801,16 @@ func (c *container) destroyNetwork() {
 			fallthrough
 		case "vlan":
 			ovs := c.mgr.GetOneWithTags(OVSTag)
-			c.unBridge(idx, network, ovs)
+			if err := c.unBridge(idx, network, ovs); err != nil {
+				log.Errorf("failed to destroy network: %v", err)
+			}
 		case "default":
-			c.unBridge(idx, network, nil)
-			socat.RemoveAll(c.forwardId())
+			if err := c.unBridge(idx, network, nil); err != nil {
+				log.Errorf("failed to destroy network: %v", err)
+			}
+			if err := socat.RemoveAll(c.forwardId()); err != nil {
+				log.Errorf("failed to destroy port forwards: %v", err)
+			}
 		}
 	}
 

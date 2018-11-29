@@ -31,10 +31,12 @@ func containerPath(container *container, path string) string {
 }
 
 type createArgs struct {
-	Container uint16 `json:"container"`
-	Flist     string `json:"flist"`   //path where to create the flist
-	Storage   string `json:"storage"` // zdb://host:port to the data storage
-	Src       string `json:"src"`     //path to the directory to create flist from
+	Container  uint16 `json:"container"`
+	Flist      string `json:"flist"`   //path where to create the flist
+	Storage    string `json:"storage"` // zdb://host:port to the data storage
+	Src        string `json:"src"`     //path to the directory to create flist from
+	Token      string `json:"token"`   // jwt token to allows upload
+	HubAddress string `json:"hub"`     // URL
 }
 
 type router struct {
@@ -54,6 +56,9 @@ func (c createArgs) Validate() error {
 	}
 	if c.Src == "" {
 		return fmt.Errorf("source directory need to be specified")
+	}
+	if c.HubAddress != "" && c.Token == "" {
+		return fmt.Errorf("if hub url is provided, token can not be empty")
 	}
 	return nil
 }
@@ -93,7 +98,16 @@ func (m *containerManager) flistCreate(cmd *pm.Command) (interface{}, error) {
 	// create flist
 	storage := socat.Resolve(args.Storage)
 
-	_, err := zflist("--archive", archivePath, "--create", srcPath, "--backend", storage)
+	zflistArgs := []string{"--archive", archivePath, "--create", srcPath, "--backend", storage}
+	if args.Token != "" {
+		if args.HubAddress != "" {
+			zflistArgs = append(zflistArgs, "--upload", args.HubAddress, "--token", args.Token)
+		} else {
+			zflistArgs = append(zflistArgs, "--upload", "--token", args.Token)
+		}
+	}
+
+	_, err := zflist(zflistArgs...)
 	if err != nil {
 		return nil, err
 	}

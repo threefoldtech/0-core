@@ -184,6 +184,7 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 		"--reset",
 		"--backend", backend,
 		"--cache", cache,
+		"--log", path.Join(backend, "fs.log"),
 	}
 
 	if strings.HasPrefix(src, "restic:") {
@@ -224,6 +225,7 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 	}
 
 	var err error
+	var j pm.Job
 	var o sync.Once
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -237,14 +239,18 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 		Action: func(s bool) {
 			o.Do(func() {
 				if !s {
-					err = fmt.Errorf("abnormal exit of filesystem mount at '%s'", target)
+					result := j.Wait()
+					err = fmt.Errorf("abnormal exit of filesystem mount at '%s': %s", target, result.Streams)
 				}
 				wg.Done()
 			})
 		},
 	})
 
-	pm.Run(cmd, hooks...)
+	j, err = pm.Run(cmd, hooks...)
+	if err != nil {
+		return err
+	}
 
 	//wait for either of the hooks (ready or exit)
 	wg.Wait()
