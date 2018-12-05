@@ -1,15 +1,14 @@
-package pm
+package mgr
 
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"sync"
 	"syscall"
 
 	psutils "github.com/shirou/gopsutil/process"
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 //ContainerCommandArguments arguments for container command
@@ -25,12 +24,6 @@ type ContainerCommandArguments struct {
 
 func (c *ContainerCommandArguments) String() string {
 	return fmt.Sprintf("%s %v %s", c.Name, c.Args, c.Chroot)
-}
-
-//Channel is a 2 way communication channel that is mainly used
-//to talk to the main containerd process `coreX`
-type Channel interface {
-	io.ReadWriteCloser
 }
 
 type channel struct {
@@ -56,27 +49,21 @@ func (c *channel) Write(p []byte) (n int, err error) {
 	return c.w.Write(p)
 }
 
-//ContainerProcess interface
-type ContainerProcess interface {
-	Process
-	Channel() Channel
-}
-
 type containerProcessImpl struct {
-	cmd     *Command
+	cmd     *pm.Command
 	args    ContainerCommandArguments
 	pid     int
 	process *psutils.Process
 	ch      *channel
 
-	table PIDTable
+	table pm.PIDTable
 }
 
 //NewContainerProcess creates a new contained process, used soley from
 //the container subsystem. Clients can't create container process directly they
 //instead has to go throught he container subsystem which does most of the heavy
 //lifting.
-func NewContainerProcess(table PIDTable, cmd *Command) Process {
+func NewContainerProcess(table pm.PIDTable, cmd *pm.Command) pm.Process {
 	process := &containerProcessImpl{
 		cmd:   cmd,
 		table: table,
@@ -86,11 +73,11 @@ func NewContainerProcess(table PIDTable, cmd *Command) Process {
 	return process
 }
 
-func (p *containerProcessImpl) Command() *Command {
+func (p *containerProcessImpl) Command() *pm.Command {
 	return p.cmd
 }
 
-func (p *containerProcessImpl) Channel() Channel {
+func (p *containerProcessImpl) Channel() pm.Channel {
 	return p.ch
 }
 
@@ -103,8 +90,8 @@ func (p *containerProcessImpl) Signal(sig syscall.Signal) error {
 }
 
 //GetStats gets stats of an external process
-func (p *containerProcessImpl) Stats() *ProcessStats {
-	stats := ProcessStats{}
+func (p *containerProcessImpl) Stats() *pm.ProcessStats {
+	stats := pm.ProcessStats{}
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -160,7 +147,7 @@ func (p *containerProcessImpl) setupChannel() (*os.File, *os.File, error) {
 	return rr, lw, nil
 }
 
-func (p *containerProcessImpl) Run() (ch <-chan *stream.Message, err error) {
+func (p *containerProcessImpl) Run() (ch <-chan *pm.Message, err error) {
 	//we don't do lookup on the name because the name
 	//is only available under the chroot
 	name := p.args.Name
@@ -173,7 +160,7 @@ func (p *containerProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 		}
 	}
 
-	channel := make(chan *stream.Message)
+	channel := make(chan *pm.Message)
 	ch = channel
 	defer func() {
 		if err != nil {
@@ -238,7 +225,7 @@ func (p *containerProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 	psProcess, _ := psutils.NewProcess(int32(p.pid))
 	p.process = psProcess
 
-	go func(channel chan *stream.Message) {
+	go func(channel chan *pm.Message) {
 		//make sure all outputs are closed before waiting for the process
 		defer close(channel)
 		state := p.table.WaitPID(p.pid)
@@ -252,12 +239,12 @@ func (p *containerProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 		code := state.ExitStatus()
 		log.Debugf("Process %s exited with state: %d", p.cmd, code)
 		if code == 0 {
-			channel <- &stream.Message{
-				Meta: stream.NewMeta(stream.LevelStdout, stream.ExitSuccessFlag),
+			channel <- &pm.Message{
+				Meta: pm.NewMeta(pm.LevelStdout, pm.ExitSuccessFlag),
 			}
 		} else {
-			channel <- &stream.Message{
-				Meta: stream.NewMetaWithCode(uint32(code), stream.LevelStderr, stream.ExitErrorFlag),
+			channel <- &pm.Message{
+				Meta: pm.NewMetaWithCode(uint32(code), pm.LevelStderr, pm.ExitErrorFlag),
 			}
 		}
 

@@ -1,11 +1,12 @@
-package pm
+package mgr
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 //stateMachine

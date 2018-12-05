@@ -1,23 +1,27 @@
-package pm
+package mgr
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/threefoldtech/0-core/base/pm"
+)
 
 //implement internal processes
 
 /*
 Global command ProcessConstructor registery
 */
-var factories = map[string]ProcessFactory{
-	CommandSystem: NewSystemProcess,
+var factories = map[string]pm.ProcessFactory{
+	pm.CommandSystem: NewSystemProcess,
 }
 
 //GetProcessFactory gets a process factory from command name
-func GetProcessFactory(cmd *Command) ProcessFactory {
+func GetProcessFactory(cmd *pm.Command) pm.ProcessFactory {
 	return factories[cmd.Command]
 }
 
 //Register registers a command process factory
-func Register(name string, factory ProcessFactory) {
+func Register(name string, factory pm.ProcessFactory) {
 	if _, ok := factories[name]; ok {
 		panic(fmt.Sprintf("command registered with same name: %s", name))
 	}

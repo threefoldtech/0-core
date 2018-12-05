@@ -1,4 +1,4 @@
-package pm
+package mgr
 
 import (
 	"encoding/json"
@@ -7,28 +7,28 @@ import (
 	"runtime/debug"
 	"syscall"
 
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 /*
 Runnable represents a runnable built in function that can be managed by the process manager.
 */
-type Runnable func(*Command) (interface{}, error)
+type Runnable func(*pm.Command) (interface{}, error)
 type RunnableWithCtx func(*Context) (interface{}, error)
 
 type Context struct {
-	Command *Command
+	Command *pm.Command
 
-	ch chan *stream.Message
+	ch chan *pm.Message
 }
 
-func (c *Context) Message(msg *stream.Message) {
+func (c *Context) Message(msg *pm.Message) {
 	c.ch <- msg
 }
 
 func (c *Context) Log(text string, level ...uint16) {
 	//optional level
-	var l uint16 = stream.LevelStdout
+	var l uint16 = pm.LevelStdout
 
 	if len(level) == 1 {
 		l = level[0]
@@ -36,9 +36,9 @@ func (c *Context) Log(text string, level ...uint16) {
 		panic("only a single optional level is allowed")
 	}
 
-	c.Message(&stream.Message{
+	c.Message(&pm.Message{
 		Message: text,
-		Meta:    stream.NewMeta(l),
+		Meta:    pm.NewMeta(l),
 	})
 }
 
@@ -53,8 +53,8 @@ type internalProcess struct {
 /*
 NewInternalProcess factory to build Runnable processes
 */
-func NewInternalProcess(runnable Runnable) ProcessFactory {
-	factory := func(_ PIDTable, cmd *Command) Process {
+func NewInternalProcess(runnable Runnable) pm.ProcessFactory {
+	factory := func(_ pm.PIDTable, cmd *pm.Command) pm.Process {
 		return &internalProcess{
 			runnable: runnable,
 			ctx: Context{
@@ -66,8 +66,8 @@ func NewInternalProcess(runnable Runnable) ProcessFactory {
 	return factory
 }
 
-func NewInternalProcessWithCtx(runnable RunnableWithCtx) ProcessFactory {
-	factory := func(_ PIDTable, cmd *Command) Process {
+func NewInternalProcessWithCtx(runnable RunnableWithCtx) pm.ProcessFactory {
+	factory := func(_ pm.PIDTable, cmd *pm.Command) pm.Process {
 		return &internalProcess{
 			runnable: runnable,
 			ctx: Context{
@@ -82,26 +82,26 @@ func NewInternalProcessWithCtx(runnable RunnableWithCtx) ProcessFactory {
 /*
 Cmd returns the internal process command
 */
-func (process *internalProcess) Command() *Command {
+func (process *internalProcess) Command() *pm.Command {
 	return process.ctx.Command
 }
 
 /*
 Run runs the internal process
 */
-func (process *internalProcess) Run() (<-chan *stream.Message, error) {
+func (process *internalProcess) Run() (<-chan *pm.Message, error) {
 
-	channel := make(chan *stream.Message)
+	channel := make(chan *pm.Message)
 	process.ctx.ch = channel
 
-	go func(channel chan *stream.Message) {
+	go func(channel chan *pm.Message) {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("panic: %v", err)
 				debug.PrintStack()
 				m, _ := json.Marshal(fmt.Sprintf("%v", err))
-				channel <- &stream.Message{
-					Meta:    stream.NewMetaWithCode(http.StatusInternalServerError, stream.LevelResultJSON, stream.ExitErrorFlag),
+				channel <- &pm.Message{
+					Meta:    pm.NewMetaWithCode(http.StatusInternalServerError, pm.LevelResultJSON, pm.ExitErrorFlag),
 					Message: string(m),
 				}
 			}
@@ -118,25 +118,25 @@ func (process *internalProcess) Run() (<-chan *stream.Message, error) {
 			value, err = runnable(&process.ctx)
 		}
 
-		var msg *stream.Message
+		var msg *pm.Message
 
 		if err != nil {
 			var code uint32
-			if err, ok := err.(RunError); ok {
+			if err, ok := err.(pm.RunError); ok {
 				code = uint32(err.Code())
 			} else {
 				code = http.StatusInternalServerError
 			}
 
 			m, _ := json.Marshal(err.Error())
-			msg = &stream.Message{
-				Meta:    stream.NewMetaWithCode(code, stream.LevelResultJSON, stream.ExitErrorFlag),
+			msg = &pm.Message{
+				Meta:    pm.NewMetaWithCode(code, pm.LevelResultJSON, pm.ExitErrorFlag),
 				Message: string(m),
 			}
 		} else {
 			m, _ := json.Marshal(value)
-			msg = &stream.Message{
-				Meta:    stream.NewMeta(stream.LevelResultJSON, stream.ExitSuccessFlag),
+			msg = &pm.Message{
+				Meta:    pm.NewMeta(pm.LevelResultJSON, pm.ExitSuccessFlag),
 				Message: string(m),
 			}
 		}

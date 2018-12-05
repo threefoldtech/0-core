@@ -1,4 +1,4 @@
-package pm
+package mgr
 
 import (
 	"encoding/json"
@@ -10,7 +10,8 @@ import (
 	"syscall"
 
 	psutils "github.com/shirou/gopsutil/process"
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/mgr/stream"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 type SystemCommandArguments struct {
@@ -26,15 +27,15 @@ func (s *SystemCommandArguments) String() string {
 }
 
 type systemProcessImpl struct {
-	cmd     *Command
+	cmd     *pm.Command
 	args    SystemCommandArguments
 	pid     int
 	process *psutils.Process
 
-	table PIDTable
+	table pm.PIDTable
 }
 
-func NewSystemProcess(table PIDTable, cmd *Command) Process {
+func NewSystemProcess(table pm.PIDTable, cmd *pm.Command) pm.Process {
 	process := &systemProcessImpl{
 		cmd:   cmd,
 		table: table,
@@ -44,12 +45,12 @@ func NewSystemProcess(table PIDTable, cmd *Command) Process {
 	return process
 }
 
-func (p *systemProcessImpl) Command() *Command {
+func (p *systemProcessImpl) Command() *pm.Command {
 	return p.cmd
 }
 
 //GetStats gets stats of an external p
-func (p *systemProcessImpl) Stats() *ProcessStats {
+func (p *systemProcessImpl) Stats() *pm.ProcessStats {
 	stats := ProcessStats{}
 
 	defer func() {
@@ -105,7 +106,7 @@ func (p *systemProcessImpl) Signal(sig syscall.Signal) error {
 
 }
 
-func (p *systemProcessImpl) Run() (ch <-chan *stream.Message, err error) {
+func (p *systemProcessImpl) Run() (ch <-chan *pm.Message, err error) {
 	var stdin, stdout, stderr *os.File
 
 	name, err := exec.LookPath(p.args.Name)
@@ -122,7 +123,7 @@ func (p *systemProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 		}
 	}
 
-	channel := make(chan *stream.Message)
+	channel := make(chan *pm.Message)
 	ch = channel
 	defer func() {
 		if err != nil {
@@ -149,7 +150,7 @@ func (p *systemProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 	toClose = append(toClose, stdin)
 
 	if !p.cmd.Flags.NoOutput {
-		handler := func(m *stream.Message) {
+		handler := func(m *pm.Message) {
 			defer func() {
 				if err := recover(); err != nil {
 					log.Errorf("error while writing output: %s", err)
@@ -213,7 +214,7 @@ func (p *systemProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 		input.Close()
 	}
 
-	go func(channel chan *stream.Message) {
+	go func(channel chan *pm.Message) {
 		//make sure all outputs are closed before waiting for the p
 		defer close(channel)
 		state := p.table.WaitPID(p.pid)
@@ -223,12 +224,12 @@ func (p *systemProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 		code := state.ExitStatus()
 		log.Debugf("Process %s exited with state: %d", p.cmd, code)
 		if code == 0 {
-			channel <- &stream.Message{
-				Meta: stream.NewMeta(stream.LevelStdout, stream.ExitSuccessFlag),
+			channel <- &pm.Message{
+				Meta: pm.NewMeta(pm.LevelStdout, pm.ExitSuccessFlag),
 			}
 		} else {
-			channel <- &stream.Message{
-				Meta: stream.NewMetaWithCode(uint32(1000+code), stream.LevelStderr, stream.ExitErrorFlag),
+			channel <- &pm.Message{
+				Meta: pm.NewMetaWithCode(uint32(1000+code), pm.LevelStderr, pm.ExitErrorFlag),
 			}
 		}
 	}(channel)

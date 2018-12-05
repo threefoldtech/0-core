@@ -1,27 +1,14 @@
 package pm
 
 import (
+	"io"
 	"syscall"
-
-	"github.com/threefoldtech/0-core/base/pm/stream"
 )
 
 const (
 	//CommandSystem is the first and built in `core.system` command
 	CommandSystem = "core.system"
 )
-
-//GetPID returns a PID of a process
-type GetPID func() (int, error)
-
-//PIDTable a table that keeps track of running process ids
-type PIDTable interface {
-	//PIDTable atomic registration of PID. MUST grantee that that no wait4 will happen
-	//on any of the child process until the register operation is done.
-	RegisterPID(g GetPID) (int, error)
-	//WaitPID waits for a certain ID until it exits
-	WaitPID(pid int) syscall.WaitStatus
-}
 
 //ProcessStats holds process cpu and memory usage
 type ProcessStats struct {
@@ -34,7 +21,19 @@ type ProcessStats struct {
 //Process interface
 type Process interface {
 	Command() *Command
-	Run() (<-chan *stream.Message, error)
+	Run() (<-chan *Message, error)
+}
+
+//Channel is a 2 way communication channel that is mainly used
+//to talk to the main containerd process `coreX`
+type Channel interface {
+	io.ReadWriteCloser
+}
+
+//ContainerProcess interface
+type ContainerProcess interface {
+	Process
+	Channel() Channel
 }
 
 //Signaler a process that supports signals
@@ -47,6 +46,18 @@ type Signaler interface {
 type Stater interface {
 	Process
 	Stats() *ProcessStats
+}
+
+//GetPID returns a PID of a process
+type GetPID func() (int, error)
+
+//PIDTable a table that keeps track of running process ids
+type PIDTable interface {
+	//PIDTable atomic registration of PID. MUST grantee that that no wait4 will happen
+	//on any of the child process until the register operation is done.
+	RegisterPID(g GetPID) (int, error)
+	//WaitPID waits for a certain ID until it exits
+	WaitPID(pid int) syscall.WaitStatus
 }
 
 //PIDer a process that can return a PID

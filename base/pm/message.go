@@ -1,4 +1,4 @@
-package stream
+package pm
 
 import (
 	"fmt"

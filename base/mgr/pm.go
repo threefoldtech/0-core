@@ -1,4 +1,4 @@
-package pm
+package mgr
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ import (
 
 	"github.com/op/go-logging"
 	"github.com/pborman/uuid"
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/settings"
 	"github.com/threefoldtech/0-core/base/utils"
 )
@@ -41,7 +41,7 @@ var (
 
 	n        sync.Once
 	s        sync.Once
-	jobs     map[string]Job
+	jobs     map[string]pm.Job
 	jobsM    sync.RWMutex
 	jobsCond *sync.Cond
 
@@ -59,7 +59,7 @@ var (
 func New() {
 	n.Do(func() {
 		log.Debugf("initializing manager")
-		jobs = make(map[string]Job)
+		jobs = make(map[string]pm.Job)
 		jobsCond = sync.NewCond(&sync.Mutex{})
 		pids = make(map[int]chan syscall.WaitStatus)
 
@@ -80,7 +80,7 @@ func SetUnprivileged() {
 
 //RunFactory run a command by creating a process by calling the factory with that command.
 //accepts optional hooks to certain process events.
-func RunFactory(cmd *Command, factory ProcessFactory, hooks ...RunnerHook) (Job, error) {
+func RunFactory(cmd *pm.Command, factory pm.ProcessFactory, hooks ...pm.RunnerHook) (pm.Job, error) {
 	if len(cmd.ID) == 0 {
 		cmd.ID = uuid.New()
 	}
@@ -107,7 +107,7 @@ func RunFactory(cmd *Command, factory ProcessFactory, hooks ...RunnerHook) (Job,
 }
 
 //Run runs a command immediately (no pre-processors)
-func Run(cmd *Command, hooks ...RunnerHook) (Job, error) {
+func Run(cmd *pm.Command, hooks ...pm.RunnerHook) (pm.Job, error) {
 	factory := GetProcessFactory(cmd)
 	if factory == nil {
 		return nil, UnknownCommandErr
@@ -127,7 +127,7 @@ func loop() {
 		jobsCond.L.Unlock()
 		job := <-ch
 		log.Debugf("starting job: %s", job.Command())
-		go job.start(unprivileged)
+		go job.Start(unprivileged)
 	}
 }
 
@@ -165,7 +165,7 @@ func processWait() {
 	}
 }
 
-func registerPID(g GetPID) (int, error) {
+func registerPID(g pm.GetPID) (int, error) {
 	pidsMux.Lock()
 	defer pidsMux.Unlock()
 	pid, err := g()
@@ -286,19 +286,19 @@ func RunSlice(slice settings.StartupSlice) {
 
 		processArgs(startup.Args, cmdline)
 
-		cmd := &Command{
+		cmd := &pm.Command{
 			ID:              startup.Key(),
 			Command:         startup.Name,
 			RecurringPeriod: startup.RecurringPeriod,
 			MaxRestart:      startup.MaxRestart,
 			Tags:            startup.Tags,
-			Arguments:       MustArguments(startup.Args),
-			Flags: JobFlags{
+			Arguments:       pm.MustArguments(startup.Args),
+			Flags: pm.JobFlags{
 				Protected: startup.Protected,
 			},
 		}
 
-		go func(up settings.Startup, c *Command) {
+		go func(up settings.Startup, c *pm.Command) {
 			log.Debugf("Waiting for %s to run %s", up.After, cmd)
 			canRun := state.Wait(up.After...)
 
@@ -309,13 +309,13 @@ func RunSlice(slice settings.StartupSlice) {
 			}
 
 			log.Infof("Starting %s", c)
-			var hooks []RunnerHook
+			var hooks []pm.RunnerHook
 
 			if up.RunningMatch != "" {
 				//NOTE: If r match is provided it take presence over the delay
-				hooks = append(hooks, &MatchHook{
+				hooks = append(hooks, &pm.MatchHook{
 					Match: up.RunningMatch,
-					Action: func(msg *stream.Message) {
+					Action: func(msg *pm.Message) {
 						log.Infof("Got '%s' from '%s' signal running", msg.Message, c.ID)
 						state.Release(c.ID, true)
 					},
@@ -326,7 +326,7 @@ func RunSlice(slice settings.StartupSlice) {
 					d = time.Duration(up.RunningDelay) * time.Second
 				}
 
-				hook := &DelayHook{
+				hook := &pm.DelayHook{
 					Delay: d,
 					Action: func() {
 						state.Release(c.ID, true)
@@ -335,7 +335,7 @@ func RunSlice(slice settings.StartupSlice) {
 				hooks = append(hooks, hook)
 			}
 
-			hooks = append(hooks, &ExitHook{
+			hooks = append(hooks, &pm.ExitHook{
 				Action: func(s bool) {
 					state.Release(c.ID, s)
 				},
@@ -355,7 +355,7 @@ func RunSlice(slice settings.StartupSlice) {
 	state.WaitAll()
 }
 
-func cleanUp(runner Job) {
+func cleanUp(runner pm.Job) {
 	jobsM.Lock()
 	delete(jobs, runner.Command().ID)
 	jobsM.Unlock()
@@ -365,8 +365,8 @@ func cleanUp(runner Job) {
 }
 
 //Processes returs a list of running processes
-func Jobs() map[string]Job {
-	res := make(map[string]Job)
+func Jobs() map[string]pm.Job {
+	res := make(map[string]pm.Job)
 	jobsM.RLock()
 	defer jobsM.RUnlock()
 
@@ -377,7 +377,7 @@ func Jobs() map[string]Job {
 	return res
 }
 
-func JobOf(id string) (Job, bool) {
+func JobOf(id string) (pm.Job, bool) {
 	jobsM.RLock()
 	defer jobsM.RUnlock()
 	r, ok := jobs[id]
@@ -417,7 +417,7 @@ func Aggregate(op, key string, value float64, id string, tags ...Tag) {
 	}
 }
 
-func handleStatsMessage(cmd *Command, msg *stream.Message) {
+func handleStatsMessage(cmd *pm.Command, msg *pm.Message) {
 	parts := strings.Split(msg.Message, "|")
 	if len(parts) < 2 {
 		log.Errorf("Invalid statsd string, expecting data|type[|options], got '%s'", msg.Message)
@@ -470,16 +470,16 @@ func handleStatsMessage(cmd *Command, msg *stream.Message) {
 	Aggregate(optype, key, v, id, tags...)
 }
 
-func msgCallback(cmd *Command, msg *stream.Message) {
+func msgCallback(cmd *pm.Command, msg *pm.Message) {
 	//handle stats messages
-	if msg.Meta.Assert(stream.LevelStatsd) {
+	if msg.Meta.Assert(pm.LevelStatsd) {
 		handleStatsMessage(cmd, msg)
 	}
 
 	//update message
 	msg.Epoch = time.Now().UnixNano()
 	if cmd.Stream {
-		msg.Meta = msg.Meta.Set(stream.StreamFlag)
+		msg.Meta = msg.Meta.Set(pm.StreamFlag)
 	}
 
 	for _, handler := range handlers {
@@ -489,7 +489,7 @@ func msgCallback(cmd *Command, msg *stream.Message) {
 	}
 }
 
-func callback(cmd *Command, result *JobResult) {
+func callback(cmd *pm.Command, result *pm.JobResult) {
 	result.Tags = cmd.Tags
 	for _, handler := range handlers {
 		if handler, ok := handler.(ResultHandler); ok {
@@ -499,12 +499,12 @@ func callback(cmd *Command, result *JobResult) {
 }
 
 //System is a wrapper around core.system
-func System(bin string, args ...string) (*JobResult, error) {
-	var output StreamHook
-	runner, err := Run(&Command{
+func System(bin string, args ...string) (*pm.JobResult, error) {
+	var output pm.StreamHook
+	runner, err := Run(&pm.Command{
 		ID:      uuid.New(),
-		Command: CommandSystem,
-		Arguments: MustArguments(
+		Command: pm.CommandSystem,
+		Arguments: pm.MustArguments(
 			SystemCommandArguments{
 				Name: bin,
 				Args: args,
@@ -517,8 +517,8 @@ func System(bin string, args ...string) (*JobResult, error) {
 	}
 
 	job := runner.Wait()
-	if job.State != StateSuccess {
-		return job, Error(job.Code, fmt.Errorf("(%s): %v", job.State, job.Streams))
+	if job.State != pm.StateSuccess {
+		return job, pm.Error(job.Code, fmt.Errorf("(%s): %v", job.State, job.Streams))
 	}
 
 	//to make sure job has all the output we update the streams on the job
@@ -532,11 +532,11 @@ func System(bin string, args ...string) (*JobResult, error) {
 }
 
 //Internal run builtin command by name
-func Internal(cmd string, args M, out interface{}) error {
-	runner, err := Run(&Command{
+func Internal(cmd string, args pm.M, out interface{}) error {
+	runner, err := Run(&pm.Command{
 		ID:        uuid.New(),
 		Command:   cmd,
-		Arguments: MustArguments(args),
+		Arguments: pm.MustArguments(args),
 	})
 
 	if err != nil {
@@ -544,11 +544,11 @@ func Internal(cmd string, args M, out interface{}) error {
 	}
 
 	job := runner.Wait()
-	if job.State != StateSuccess {
-		return Error(job.Code, fmt.Errorf("(%s): %v", job.State, job.Streams))
+	if job.State != pm.StateSuccess {
+		return pm.Error(job.Code, fmt.Errorf("(%s): %v", job.State, job.Streams))
 	}
 
-	if job.Level != stream.LevelResultJSON {
+	if job.Level != pm.LevelResultJSON {
 		return fmt.Errorf("invalid return format expecting json, got %d", job.Level)
 	}
 

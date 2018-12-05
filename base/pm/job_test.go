@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ngaut/log"
 	"github.com/threefoldtech/0-core/base/pm/stream"
 
 	"github.com/stretchr/testify/assert"

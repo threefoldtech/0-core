@@ -1,8 +1,10 @@
-package pm
+package mgr
 
 import (
 	"container/list"
 	"sync"
+
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 /**
@@ -10,7 +12,7 @@ Queue is used for sequential cmds exectuions
 */
 type Queue struct {
 	queues map[string]*list.List
-	ch     chan Job
+	ch     chan pm.Job
 	lock   sync.Mutex
 	o      sync.Once
 }
@@ -22,11 +24,11 @@ func (q *Queue) Init() {
 	})
 }
 
-func (q *Queue) Channel() <-chan Job {
+func (q *Queue) Channel() <-chan pm.Job {
 	return q.ch
 }
 
-func (q *Queue) Push(job Job) {
+func (q *Queue) Push(job pm.Job) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
@@ -49,7 +51,7 @@ func (q *Queue) Push(job Job) {
 	}
 }
 
-func (q *Queue) Notify(job Job) {
+func (q *Queue) Notify(job pm.Job) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	name := job.Command().Queue

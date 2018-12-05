@@ -1,21 +1,21 @@
-package pm
+package mgr
 
 import (
 	"encoding/json"
 	"fmt"
 	"syscall"
 
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/utils"
 )
 
 type extensionProcess struct {
-	system Process
-	cmd    *Command
+	system pm.Process
+	cmd    *pm.Command
 }
 
-func extensionProcessFactory(exe string, dir string, args []string, env map[string]string) ProcessFactory {
-	constructor := func(table PIDTable, cmd *Command) Process {
+func extensionProcessFactory(exe string, dir string, args []string, env map[string]string) pm.ProcessFactory {
+	constructor := func(table pm.PIDTable, cmd *pm.Command) pm.Process {
 		sysargs := SystemCommandArguments{
 			Name: exe,
 			Dir:  dir,
@@ -44,10 +44,10 @@ func extensionProcessFactory(exe string, dir string, args []string, env map[stri
 			sysargs.Args = append(sysargs.Args, utils.Format(arg, input))
 		}
 
-		extcmd := &Command{
+		extcmd := &pm.Command{
 			ID:        cmd.ID,
-			Command:   CommandSystem,
-			Arguments: MustArguments(sysargs),
+			Command:   pm.CommandSystem,
+			Arguments: pm.MustArguments(sysargs),
 			Tags:      cmd.Tags,
 		}
 
@@ -60,24 +60,24 @@ func extensionProcessFactory(exe string, dir string, args []string, env map[stri
 	return constructor
 }
 
-func (process *extensionProcess) Command() *Command {
+func (process *extensionProcess) Command() *pm.Command {
 	return process.cmd
 }
 
-func (process *extensionProcess) Run() (<-chan *stream.Message, error) {
+func (process *extensionProcess) Run() (<-chan *pm.Message, error) {
 	return process.system.Run()
 }
 
 func (process *extensionProcess) Signal(sig syscall.Signal) error {
-	if ps, ok := process.system.(Signaler); ok {
+	if ps, ok := process.system.(pm.Signaler); ok {
 		return ps.Signal(sig)
 	}
 
 	return fmt.Errorf("not supported")
 }
 
-func (process *extensionProcess) Stats() *ProcessStats {
-	if sys, ok := process.system.(Stater); ok {
+func (process *extensionProcess) Stats() *pm.ProcessStats {
+	if sys, ok := process.system.(pm.Stater); ok {
 		return sys.Stats()
 	}
 
