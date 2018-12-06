@@ -10,8 +10,8 @@ import (
 	"syscall"
 
 	psutils "github.com/shirou/gopsutil/process"
-	"github.com/threefoldtech/0-core/base/mgr/stream"
 	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 type SystemCommandArguments struct {
@@ -32,10 +32,10 @@ type systemProcessImpl struct {
 	pid     int
 	process *psutils.Process
 
-	table pm.PIDTable
+	table PIDTable
 }
 
-func NewSystemProcess(table pm.PIDTable, cmd *pm.Command) pm.Process {
+func NewSystemProcess(table PIDTable, cmd *pm.Command) pm.Process {
 	process := &systemProcessImpl{
 		cmd:   cmd,
 		table: table,
@@ -51,7 +51,7 @@ func (p *systemProcessImpl) Command() *pm.Command {
 
 //GetStats gets stats of an external p
 func (p *systemProcessImpl) Stats() *pm.ProcessStats {
-	stats := ProcessStats{}
+	stats := pm.ProcessStats{}
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -106,12 +106,12 @@ func (p *systemProcessImpl) Signal(sig syscall.Signal) error {
 
 }
 
-func (p *systemProcessImpl) Run() (ch <-chan *pm.Message, err error) {
+func (p *systemProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 	var stdin, stdout, stderr *os.File
 
 	name, err := exec.LookPath(p.args.Name)
 	if err != nil {
-		return nil, NotFoundError(err)
+		return nil, pm.NotFoundError(err)
 	}
 
 	var env []string
@@ -123,7 +123,7 @@ func (p *systemProcessImpl) Run() (ch <-chan *pm.Message, err error) {
 		}
 	}
 
-	channel := make(chan *pm.Message)
+	channel := make(chan *stream.Message)
 	ch = channel
 	defer func() {
 		if err != nil {
@@ -150,7 +150,7 @@ func (p *systemProcessImpl) Run() (ch <-chan *pm.Message, err error) {
 	toClose = append(toClose, stdin)
 
 	if !p.cmd.Flags.NoOutput {
-		handler := func(m *pm.Message) {
+		handler := func(m *stream.Message) {
 			defer func() {
 				if err := recover(); err != nil {
 					log.Errorf("error while writing output: %s", err)
@@ -214,7 +214,7 @@ func (p *systemProcessImpl) Run() (ch <-chan *pm.Message, err error) {
 		input.Close()
 	}
 
-	go func(channel chan *pm.Message) {
+	go func(channel chan *stream.Message) {
 		//make sure all outputs are closed before waiting for the p
 		defer close(channel)
 		state := p.table.WaitPID(p.pid)
@@ -224,12 +224,12 @@ func (p *systemProcessImpl) Run() (ch <-chan *pm.Message, err error) {
 		code := state.ExitStatus()
 		log.Debugf("Process %s exited with state: %d", p.cmd, code)
 		if code == 0 {
-			channel <- &pm.Message{
-				Meta: pm.NewMeta(pm.LevelStdout, pm.ExitSuccessFlag),
+			channel <- &stream.Message{
+				Meta: stream.NewMeta(pm.LevelStdout, stream.ExitSuccessFlag),
 			}
 		} else {
-			channel <- &pm.Message{
-				Meta: pm.NewMetaWithCode(uint32(1000+code), pm.LevelStderr, pm.ExitErrorFlag),
+			channel <- &stream.Message{
+				Meta: stream.NewMetaWithCode(uint32(1000+code), pm.LevelStderr, stream.ExitErrorFlag),
 			}
 		}
 	}(channel)

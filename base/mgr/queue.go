@@ -12,7 +12,7 @@ Queue is used for sequential cmds exectuions
 */
 type Queue struct {
 	queues map[string]*list.List
-	ch     chan pm.Job
+	ch     chan *jobImb
 	lock   sync.Mutex
 	o      sync.Once
 }
@@ -20,15 +20,15 @@ type Queue struct {
 func (q *Queue) Init() {
 	q.o.Do(func() {
 		q.queues = make(map[string]*list.List)
-		q.ch = make(chan Job)
+		q.ch = make(chan *jobImb)
 	})
 }
 
-func (q *Queue) Channel() <-chan pm.Job {
+func (q *Queue) Channel() <-chan *jobImb {
 	return q.ch
 }
 
-func (q *Queue) Push(job pm.Job) {
+func (q *Queue) Push(job *jobImb) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
@@ -65,6 +65,6 @@ func (q *Queue) Notify(job pm.Job) {
 		return
 	}
 
-	next := queue.Front().Value.(Job)
+	next := queue.Front().Value.(*jobImb)
 	q.ch <- next
 }

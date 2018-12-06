@@ -11,13 +11,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/threefoldtech/0-core/base/mgr/stream"
 	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 type jobImb struct {
 	command        *pm.Command
-	factory        pm.ProcessFactory
+	factory        ProcessFactory
 	signal         chan syscall.Signal
 	unschedule     chan struct{}
 	unscheduleOnce sync.Once
@@ -26,13 +26,13 @@ type jobImb struct {
 	hooks       []pm.RunnerHook
 	startTime   time.Time
 	backlog     *stream.Buffer
-	subscribers []pm.MessageHandler
+	subscribers []stream.MessageHandler
 
 	o      sync.Once
 	result *pm.JobResult
 	wg     sync.WaitGroup
 
-	registerPID func(pm.GetPID) (int, error)
+	registerPID func(GetPID) (int, error)
 	waitPID     func(int) syscall.WaitStatus
 	running     int32
 }
@@ -54,7 +54,7 @@ NewRunner creates a new r object that is bind to this PM instance.
         The r is considered running, if it ran with no errors for 2 seconds, or exited before the 2 seconds passes
         with SUCCESS exit code.
 */
-func newJob(command *pm.Command, factory pm.ProcessFactory, hooks ...pm.RunnerHook) *jobImb {
+func newJob(command *pm.Command, factory ProcessFactory, hooks ...pm.RunnerHook) *jobImb {
 	job := &jobImb{
 		command:    command,
 		factory:    factory,
@@ -71,7 +71,7 @@ func newJob(command *pm.Command, factory pm.ProcessFactory, hooks ...pm.RunnerHo
 	return job
 }
 
-func newTestJob(command *pm.Command, factory pm.ProcessFactory, hooks ...pm.RunnerHook) *jobImb {
+func newTestJob(command *pm.Command, factory ProcessFactory, hooks ...pm.RunnerHook) *jobImb {
 	job := newJob(command, factory, hooks...)
 	var testTable TestingPIDTable
 	job.registerPID = testTable.RegisterPID
@@ -129,19 +129,19 @@ func (r *jobImb) setUnprivileged() {
 	}
 }
 
-func (r *jobImb) Subscribe(listener pm.MessageHandler) {
+func (r *jobImb) Subscribe(listener stream.MessageHandler) {
 	//TODO: a race condition might happen here because, while we send the backlog
 	//a new message might arrive and missed by this listener
 	for l := r.backlog.Front(); l != nil; l = l.Next() {
 		switch v := l.Value.(type) {
-		case *pm.Message:
+		case *stream.Message:
 			listener(v)
 		}
 	}
 	r.subscribers = append(r.subscribers, listener)
 }
 
-func (r *jobImb) callback(msg *pm.Message) {
+func (r *jobImb) callback(msg *stream.Message) {
 	defer func() {
 		//protection against subscriber crashes.
 		if err := recover(); err != nil {
@@ -196,7 +196,7 @@ func (r *jobImb) run(unprivileged bool) (jobresult *pm.JobResult) {
 		return jobresult
 	}
 
-	var result *pm.Message
+	var result *stream.Message
 	var critical string
 
 	stdout := stream.NewBuffer(pm.StandardStreamBufferSize)
@@ -227,7 +227,7 @@ loop:
 			r.backlog.Append(message)
 
 			//messages with Exit flags are always the last.
-			if message.Meta.Is(pm.ExitSuccessFlag) {
+			if message.Meta.Is(stream.ExitSuccessFlag) {
 				jobresult.State = pm.StateSuccess
 			}
 
@@ -254,7 +254,7 @@ loop:
 
 			//by default, all messages are forwarded to the manager for further processing.
 			r.callback(message)
-			if message.Meta.Is(pm.ExitSuccessFlag | pm.ExitErrorFlag) {
+			if message.Meta.Is(stream.ExitSuccessFlag | stream.ExitErrorFlag) {
 				jobresult.Code = code
 				break loop
 			}
@@ -380,7 +380,7 @@ func (r *jobImb) Wait() *pm.JobResult {
 
 //implement PIDTable
 //intercept pid registration to fire the correct hooks.
-func (r *jobImb) RegisterPID(g pm.GetPID) (int, error) {
+func (r *jobImb) RegisterPID(g GetPID) (int, error) {
 	pid, err := r.registerPID(g)
 	if err != nil {
 		return 0, err

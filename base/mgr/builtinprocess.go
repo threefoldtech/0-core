@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 /*
@@ -19,10 +20,10 @@ type RunnableWithCtx func(*Context) (interface{}, error)
 type Context struct {
 	Command *pm.Command
 
-	ch chan *pm.Message
+	ch chan *stream.Message
 }
 
-func (c *Context) Message(msg *pm.Message) {
+func (c *Context) Message(msg *stream.Message) {
 	c.ch <- msg
 }
 
@@ -36,9 +37,9 @@ func (c *Context) Log(text string, level ...uint16) {
 		panic("only a single optional level is allowed")
 	}
 
-	c.Message(&pm.Message{
+	c.Message(&stream.Message{
 		Message: text,
-		Meta:    pm.NewMeta(l),
+		Meta:    stream.NewMeta(l),
 	})
 }
 
@@ -53,8 +54,8 @@ type internalProcess struct {
 /*
 NewInternalProcess factory to build Runnable processes
 */
-func NewInternalProcess(runnable Runnable) pm.ProcessFactory {
-	factory := func(_ pm.PIDTable, cmd *pm.Command) pm.Process {
+func NewInternalProcess(runnable Runnable) ProcessFactory {
+	factory := func(_ PIDTable, cmd *pm.Command) pm.Process {
 		return &internalProcess{
 			runnable: runnable,
 			ctx: Context{
@@ -66,8 +67,8 @@ func NewInternalProcess(runnable Runnable) pm.ProcessFactory {
 	return factory
 }
 
-func NewInternalProcessWithCtx(runnable RunnableWithCtx) pm.ProcessFactory {
-	factory := func(_ pm.PIDTable, cmd *pm.Command) pm.Process {
+func NewInternalProcessWithCtx(runnable RunnableWithCtx) ProcessFactory {
+	factory := func(_ PIDTable, cmd *pm.Command) pm.Process {
 		return &internalProcess{
 			runnable: runnable,
 			ctx: Context{
@@ -89,19 +90,19 @@ func (process *internalProcess) Command() *pm.Command {
 /*
 Run runs the internal process
 */
-func (process *internalProcess) Run() (<-chan *pm.Message, error) {
+func (process *internalProcess) Run() (<-chan *stream.Message, error) {
 
-	channel := make(chan *pm.Message)
+	channel := make(chan *stream.Message)
 	process.ctx.ch = channel
 
-	go func(channel chan *pm.Message) {
+	go func(channel chan *stream.Message) {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("panic: %v", err)
 				debug.PrintStack()
 				m, _ := json.Marshal(fmt.Sprintf("%v", err))
-				channel <- &pm.Message{
-					Meta:    pm.NewMetaWithCode(http.StatusInternalServerError, pm.LevelResultJSON, pm.ExitErrorFlag),
+				channel <- &stream.Message{
+					Meta:    stream.NewMetaWithCode(http.StatusInternalServerError, pm.LevelResultJSON, stream.ExitErrorFlag),
 					Message: string(m),
 				}
 			}
@@ -118,7 +119,7 @@ func (process *internalProcess) Run() (<-chan *pm.Message, error) {
 			value, err = runnable(&process.ctx)
 		}
 
-		var msg *pm.Message
+		var msg *stream.Message
 
 		if err != nil {
 			var code uint32
@@ -129,14 +130,14 @@ func (process *internalProcess) Run() (<-chan *pm.Message, error) {
 			}
 
 			m, _ := json.Marshal(err.Error())
-			msg = &pm.Message{
-				Meta:    pm.NewMetaWithCode(code, pm.LevelResultJSON, pm.ExitErrorFlag),
+			msg = &stream.Message{
+				Meta:    stream.NewMetaWithCode(code, pm.LevelResultJSON, stream.ExitErrorFlag),
 				Message: string(m),
 			}
 		} else {
 			m, _ := json.Marshal(value)
-			msg = &pm.Message{
-				Meta:    pm.NewMeta(pm.LevelResultJSON, pm.ExitSuccessFlag),
+			msg = &stream.Message{
+				Meta:    stream.NewMeta(pm.LevelResultJSON, stream.ExitSuccessFlag),
 				Message: string(m),
 			}
 		}

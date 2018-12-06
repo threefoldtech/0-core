@@ -9,6 +9,7 @@ import (
 
 	psutils "github.com/shirou/gopsutil/process"
 	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 //ContainerCommandArguments arguments for container command
@@ -56,14 +57,14 @@ type containerProcessImpl struct {
 	process *psutils.Process
 	ch      *channel
 
-	table pm.PIDTable
+	table PIDTable
 }
 
 //NewContainerProcess creates a new contained process, used soley from
 //the container subsystem. Clients can't create container process directly they
 //instead has to go throught he container subsystem which does most of the heavy
 //lifting.
-func NewContainerProcess(table pm.PIDTable, cmd *pm.Command) pm.Process {
+func NewContainerProcess(table PIDTable, cmd *pm.Command) pm.ContainerProcess {
 	process := &containerProcessImpl{
 		cmd:   cmd,
 		table: table,
@@ -147,7 +148,7 @@ func (p *containerProcessImpl) setupChannel() (*os.File, *os.File, error) {
 	return rr, lw, nil
 }
 
-func (p *containerProcessImpl) Run() (ch <-chan *pm.Message, err error) {
+func (p *containerProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 	//we don't do lookup on the name because the name
 	//is only available under the chroot
 	name := p.args.Name
@@ -160,7 +161,7 @@ func (p *containerProcessImpl) Run() (ch <-chan *pm.Message, err error) {
 		}
 	}
 
-	channel := make(chan *pm.Message)
+	channel := make(chan *stream.Message)
 	ch = channel
 	defer func() {
 		if err != nil {
@@ -225,7 +226,7 @@ func (p *containerProcessImpl) Run() (ch <-chan *pm.Message, err error) {
 	psProcess, _ := psutils.NewProcess(int32(p.pid))
 	p.process = psProcess
 
-	go func(channel chan *pm.Message) {
+	go func(channel chan *stream.Message) {
 		//make sure all outputs are closed before waiting for the process
 		defer close(channel)
 		state := p.table.WaitPID(p.pid)
@@ -239,12 +240,12 @@ func (p *containerProcessImpl) Run() (ch <-chan *pm.Message, err error) {
 		code := state.ExitStatus()
 		log.Debugf("Process %s exited with state: %d", p.cmd, code)
 		if code == 0 {
-			channel <- &pm.Message{
-				Meta: pm.NewMeta(pm.LevelStdout, pm.ExitSuccessFlag),
+			channel <- &stream.Message{
+				Meta: stream.NewMeta(pm.LevelStdout, stream.ExitSuccessFlag),
 			}
 		} else {
-			channel <- &pm.Message{
-				Meta: pm.NewMetaWithCode(uint32(code), pm.LevelStderr, pm.ExitErrorFlag),
+			channel <- &stream.Message{
+				Meta: stream.NewMetaWithCode(uint32(code), pm.LevelStderr, stream.ExitErrorFlag),
 			}
 		}
 

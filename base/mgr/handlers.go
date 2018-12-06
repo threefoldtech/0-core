@@ -1,6 +1,9 @@
 package mgr
 
-import "github.com/threefoldtech/0-core/base/pm"
+import (
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/stream"
+)
 
 //Handler defines an interface to receiver the process manager events
 //A handler can be any object that implements one or many handle methods below
@@ -14,7 +17,7 @@ type ResultHandler interface {
 //MessageHandler gets called on the receive of each single message
 //from all commands
 type MessageHandler interface {
-	Message(*pm.Command, *pm.Message)
+	Message(*pm.Command, *stream.Message)
 }
 
 //StatsHandler receives parsed stats messages

@@ -2,6 +2,8 @@ package pm
 
 import (
 	"syscall"
+
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 const (
@@ -15,6 +17,6 @@ type Job interface {
 	Process() Process
 	Wait() *JobResult
 	StartTime() int64
-	Subscribe(MessageHandler)
+	Subscribe(stream.MessageHandler)
 	Unschedule()
 }

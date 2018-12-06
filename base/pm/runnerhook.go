@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ngaut/log"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 //RunnerHook is a per process event handler
@@ -14,7 +15,7 @@ type RunnerHook interface {
 	//Tick is called if certain amount has passed sicne process starting
 	Tick(delay time.Duration)
 	//Message is called on each received message from the process
-	Message(msg *Message)
+	Message(msg *stream.Message)
 	//Exit is called on process exit
 	Exit(state JobState)
 	//PID is executed once the child process is started and got an PID
@@ -24,10 +25,10 @@ type RunnerHook interface {
 //NOOPHook empty handler
 type NOOPHook struct{}
 
-func (h *NOOPHook) Tick(delay time.Duration) {}
-func (h *NOOPHook) Message(msg *Message)     {}
-func (h *NOOPHook) Exit(state JobState)      {}
-func (h *NOOPHook) PID(pid int)              {}
+func (h *NOOPHook) Tick(delay time.Duration)    {}
+func (h *NOOPHook) Message(msg *stream.Message) {}
+func (h *NOOPHook) Exit(state JobState)         {}
+func (h *NOOPHook) PID(pid int)                 {}
 
 //DelayHook called after a certain amount of time passes from process start
 type DelayHook struct {
@@ -81,14 +82,14 @@ func (h *PIDHook) PID(pid int) {
 type MatchHook struct {
 	NOOPHook
 	Match  string
-	Action func(msg *Message)
+	Action func(msg *stream.Message)
 
 	io sync.Once
 	p  *regexp.Regexp
 	o  sync.Once
 }
 
-func (h *MatchHook) Message(msg *Message) {
+func (h *MatchHook) Message(msg *stream.Message) {
 	h.io.Do(func() {
 		p, e := regexp.CompilePOSIX(h.Match)
 		if e != nil {
@@ -117,11 +118,11 @@ type StreamHook struct {
 	Stderr bytes.Buffer
 }
 
-func (h *StreamHook) append(buf *bytes.Buffer, msg *Message) {
+func (h *StreamHook) append(buf *bytes.Buffer, msg *stream.Message) {
 	buf.WriteString(msg.Message)
 }
 
-func (h *StreamHook) Message(msg *Message) {
+func (h *StreamHook) Message(msg *stream.Message) {
 	if msg.Meta.Level() == LevelStdout {
 		h.append(&h.Stdout, msg)
 	} else if msg.Meta.Level() == LevelStderr {

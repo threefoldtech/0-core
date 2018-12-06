@@ -6,6 +6,7 @@ import (
 	"syscall"
 
 	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/stream"
 	"github.com/threefoldtech/0-core/base/utils"
 )
 
@@ -14,8 +15,8 @@ type extensionProcess struct {
 	cmd    *pm.Command
 }
 
-func extensionProcessFactory(exe string, dir string, args []string, env map[string]string) pm.ProcessFactory {
-	constructor := func(table pm.PIDTable, cmd *pm.Command) pm.Process {
+func extensionProcessFactory(exe string, dir string, args []string, env map[string]string) ProcessFactory {
+	constructor := func(table PIDTable, cmd *pm.Command) pm.Process {
 		sysargs := SystemCommandArguments{
 			Name: exe,
 			Dir:  dir,
@@ -64,7 +65,7 @@ func (process *extensionProcess) Command() *pm.Command {
 	return process.cmd
 }
 
-func (process *extensionProcess) Run() (<-chan *pm.Message, error) {
+func (process *extensionProcess) Run() (<-chan *stream.Message, error) {
 	return process.system.Run()
 }
 

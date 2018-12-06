@@ -16,6 +16,7 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/settings"
+	"github.com/threefoldtech/0-core/base/stream"
 	"github.com/threefoldtech/0-core/base/utils"
 )
 
@@ -80,7 +81,7 @@ func SetUnprivileged() {
 
 //RunFactory run a command by creating a process by calling the factory with that command.
 //accepts optional hooks to certain process events.
-func RunFactory(cmd *pm.Command, factory pm.ProcessFactory, hooks ...pm.RunnerHook) (pm.Job, error) {
+func RunFactory(cmd *pm.Command, factory ProcessFactory, hooks ...pm.RunnerHook) (pm.Job, error) {
 	if len(cmd.ID) == 0 {
 		cmd.ID = uuid.New()
 	}
@@ -127,7 +128,7 @@ func loop() {
 		jobsCond.L.Unlock()
 		job := <-ch
 		log.Debugf("starting job: %s", job.Command())
-		go job.Start(unprivileged)
+		go job.start(unprivileged)
 	}
 }
 
@@ -165,7 +166,7 @@ func processWait() {
 	}
 }
 
-func registerPID(g pm.GetPID) (int, error) {
+func registerPID(g GetPID) (int, error) {
 	pidsMux.Lock()
 	defer pidsMux.Unlock()
 	pid, err := g()
@@ -315,7 +316,7 @@ func RunSlice(slice settings.StartupSlice) {
 				//NOTE: If r match is provided it take presence over the delay
 				hooks = append(hooks, &pm.MatchHook{
 					Match: up.RunningMatch,
-					Action: func(msg *pm.Message) {
+					Action: func(msg *stream.Message) {
 						log.Infof("Got '%s' from '%s' signal running", msg.Message, c.ID)
 						state.Release(c.ID, true)
 					},
@@ -417,7 +418,7 @@ func Aggregate(op, key string, value float64, id string, tags ...Tag) {
 	}
 }
 
-func handleStatsMessage(cmd *pm.Command, msg *pm.Message) {
+func handleStatsMessage(cmd *pm.Command, msg *stream.Message) {
 	parts := strings.Split(msg.Message, "|")
 	if len(parts) < 2 {
 		log.Errorf("Invalid statsd string, expecting data|type[|options], got '%s'", msg.Message)
@@ -470,7 +471,7 @@ func handleStatsMessage(cmd *pm.Command, msg *pm.Message) {
 	Aggregate(optype, key, v, id, tags...)
 }
 
-func msgCallback(cmd *pm.Command, msg *pm.Message) {
+func msgCallback(cmd *pm.Command, msg *stream.Message) {
 	//handle stats messages
 	if msg.Meta.Assert(pm.LevelStatsd) {
 		handleStatsMessage(cmd, msg)
@@ -479,7 +480,7 @@ func msgCallback(cmd *pm.Command, msg *pm.Message) {
 	//update message
 	msg.Epoch = time.Now().UnixNano()
 	if cmd.Stream {
-		msg.Meta = msg.Meta.Set(pm.StreamFlag)
+		msg.Meta = msg.Meta.Set(stream.StreamFlag)
 	}
 
 	for _, handler := range handlers {

@@ -2,8 +2,6 @@ package mgr
 
 import (
 	"syscall"
-
-	"github.com/threefoldtech/0-core/base/pm"
 )
 
 //TestingPIDTable is used for testing to mock the process manager
@@ -11,7 +9,7 @@ type TestingPIDTable struct{}
 
 //RegisterPID notify the process manager that a process has been started
 //with the given PID
-func (t *TestingPIDTable) RegisterPID(g pm.GetPID) (int, error) {
+func (t *TestingPIDTable) RegisterPID(g GetPID) (int, error) {
 	return g()
 }
 

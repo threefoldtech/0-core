@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	logging "github.com/op/go-logging"
-	"github.com/threefoldtech/0-core/base/pm"
 )
 
 const (
@@ -31,7 +30,7 @@ var (
 
 type consumerImpl struct {
 	level   uint16
-	handler pm.MessageHandler
+	handler MessageHandler
 	source  io.Reader
 
 	multi      *bytes.Buffer
@@ -45,7 +44,7 @@ type header struct {
 }
 
 //Consume consumes a stream to the end, and calls the handler with the parsed stream messages
-func Consume(wg *sync.WaitGroup, source io.ReadCloser, level uint16, handler pm.MessageHandler) {
+func Consume(wg *sync.WaitGroup, source io.ReadCloser, level uint16, handler MessageHandler) {
 	c := &consumerImpl{
 		level:   level,
 		handler: handler,
@@ -98,8 +97,8 @@ func (c *consumerImpl) process(buffer []byte) {
 	if c.multi != nil {
 		//we are in a middle of a multi line message
 		if c.multi.Len() > 0 && c.multi.Bytes()[c.multi.Len()-1] == '\n' && bytes.HasPrefix(buffer, []byte(":::\n")) {
-			c.handler(&pm.Message{
-				Meta:    pm.NewMeta(c.multiLevel),
+			c.handler(&Message{
+				Meta:    NewMeta(c.multiLevel),
 				Message: c.multi.String(),
 			})
 			c.multi = nil
@@ -107,8 +106,8 @@ func (c *consumerImpl) process(buffer []byte) {
 		} else if end := strings.Index(string(buffer), multiLineTerm); end != -1 {
 			//we found the termination string
 			c.multi.Write(buffer[:end])
-			c.handler(&pm.Message{
-				Meta:    pm.NewMeta(c.multiLevel),
+			c.handler(&Message{
+				Meta:    NewMeta(c.multiLevel),
 				Message: c.multi.String(),
 			})
 			c.multi = nil
@@ -130,8 +129,8 @@ func (c *consumerImpl) process(buffer []byte) {
 
 		//if we reach here then we can safely flush what we have in buffer as a message
 		if i > start {
-			c.handler(&pm.Message{
-				Meta:    pm.NewMeta(c.level),
+			c.handler(&Message{
+				Meta:    NewMeta(c.level),
 				Message: string(buffer[start:i]),
 			})
 		}
@@ -148,8 +147,8 @@ func (c *consumerImpl) process(buffer []byte) {
 			} else {
 				msg = string(buffer[start : i+1]) //include the new line
 			}
-			c.handler(&pm.Message{
-				Meta:    pm.NewMeta(h.level),
+			c.handler(&Message{
+				Meta:    NewMeta(h.level),
 				Message: msg,
 			})
 
@@ -169,8 +168,8 @@ func (c *consumerImpl) process(buffer []byte) {
 		j := i + h.length
 		if end := strings.Index(string(buffer[j:]), multiLineTerm); end != -1 {
 			//we found the termination string
-			c.handler(&pm.Message{
-				Meta:    pm.NewMeta(h.level),
+			c.handler(&Message{
+				Meta:    NewMeta(h.level),
 				Message: string(buffer[j : j+end]),
 			})
 			i = j + end + len(multiLineTerm) // 4 is the width of the termination string
@@ -185,8 +184,8 @@ func (c *consumerImpl) process(buffer []byte) {
 	}
 
 	if start < len(buffer) {
-		c.handler(&pm.Message{
-			Meta:    pm.NewMeta(c.level),
+		c.handler(&Message{
+			Meta:    NewMeta(c.level),
 			Message: string(buffer[start:]),
 		})
 	}
