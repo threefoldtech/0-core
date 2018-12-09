@@ -6,9 +6,9 @@ import (
 	"sync"
 
 	"github.com/pborman/uuid"
-	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/pm/stream"
 	"github.com/threefoldtech/0-core/apps/core0/transport"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 const (
@@ -44,8 +44,8 @@ func NewLedisLogger(sink *transport.Sink, defaults []uint16, size int64) Logger 
 		ch:       make(chan *LogRecord, MaxRedisQueueSize),
 	}
 
-	pm.RegisterBuiltIn("logger.subscribe", rl.subscribe)
-	pm.RegisterBuiltIn("logger.unsubscribe", rl.unSubscribe)
+	// pm.RegisterBuiltIn("logger.subscribe", rl.subscribe)
+	// pm.RegisterBuiltIn("logger.unsubscribe", rl.unSubscribe)
 
 	go rl.pusher()
 	return rl

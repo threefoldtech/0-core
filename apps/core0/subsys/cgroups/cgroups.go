@@ -10,7 +10,6 @@ import (
 	"syscall"
 
 	logging "github.com/op/go-logging"
-	"github.com/threefoldtech/0-core/base/pm"
 )
 
 type mkg func(name string, subsys Subsystem) Group
@@ -73,18 +72,18 @@ func Init() (err error) {
 			}
 		}
 
-		pm.RegisterBuiltIn("cgroup.list", list)
-		pm.RegisterBuiltIn("cgroup.ensure", ensure)
-		pm.RegisterBuiltIn("cgroup.remove", remove)
+		// pm.RegisterBuiltIn("cgroup.list", list)
+		// pm.RegisterBuiltIn("cgroup.ensure", ensure)
+		// pm.RegisterBuiltIn("cgroup.remove", remove)
 
-		pm.RegisterBuiltIn("cgroup.tasks", tasks)
-		pm.RegisterBuiltIn("cgroup.task-add", taskAdd)
-		pm.RegisterBuiltIn("cgroup.task-remove", taskRemove)
+		// pm.RegisterBuiltIn("cgroup.tasks", tasks)
+		// pm.RegisterBuiltIn("cgroup.task-add", taskAdd)
+		// pm.RegisterBuiltIn("cgroup.task-remove", taskRemove)
 
-		pm.RegisterBuiltIn("cgroup.reset", reset)
+		// pm.RegisterBuiltIn("cgroup.reset", reset)
 
-		pm.RegisterBuiltIn("cgroup.cpuset.spec", cpusetSpec)
-		pm.RegisterBuiltIn("cgroup.memory.spec", memorySpec)
+		// pm.RegisterBuiltIn("cgroup.cpuset.spec", cpusetSpec)
+		// pm.RegisterBuiltIn("cgroup.memory.spec", memorySpec)
 	})
 
 	return

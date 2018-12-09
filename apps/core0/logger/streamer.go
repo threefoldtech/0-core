@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/threefoldtech/0-core/base/pm/stream"
 	"github.com/threefoldtech/0-core/apps/core0/transport"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 const (

@@ -16,9 +16,10 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/pm/stream"
 	"github.com/threefoldtech/0-core/base/settings"
+	"github.com/threefoldtech/0-core/base/stream"
 	"github.com/threefoldtech/0-core/base/utils"
 )
 
@@ -218,7 +219,7 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 	cmd := &pm.Command{
 		ID:      path.Join(namespace, target),
 		Command: pm.CommandSystem,
-		Arguments: pm.MustArguments(pm.SystemCommandArguments{
+		Arguments: pm.MustArguments(mgr.SystemCommandArguments{
 			Name: "g8ufs",
 			Args: g8ufs,
 		}),
@@ -247,7 +248,7 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 		},
 	})
 
-	j, err = pm.Run(cmd, hooks...)
+	j, err = mgr.Run(cmd, hooks...)
 	if err != nil {
 		return err
 	}
@@ -265,7 +266,7 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 // is the original flist used on the call to MountFlist
 func MergeFList(namespace, target, base, flist string) error {
 	id := path.Join(namespace, target)
-	job, ok := pm.JobOf(id)
+	job, ok := mgr.JobOf(id)
 	if !ok {
 		return fmt.Errorf("no filesystem running for the provided namespace and target (%s/%s)", namespace, target)
 	}

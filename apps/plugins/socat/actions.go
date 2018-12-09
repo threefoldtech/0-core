@@ -1,4 +1,4 @@
-package socat
+package main
 
 import (
 	"encoding/json"
@@ -7,17 +7,7 @@ import (
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
-const (
-	cmdSocatList   = "socat.list"
-	cmdSocalReseve = "socat.reserve"
-)
-
-func init() {
-	pm.RegisterBuiltIn(cmdSocatList, socat.list)
-	pm.RegisterBuiltIn(cmdSocalReseve, socat.reserve)
-}
-
-func (s *socatAPI) list(cmd *pm.Command) (interface{}, error) {
+func (s *socatAPI) list(ctx pm.Context) (interface{}, error) {
 	s.rm.Lock()
 	defer s.rm.Unlock()
 
@@ -37,11 +27,11 @@ func (s *socatAPI) list(cmd *pm.Command) (interface{}, error) {
 	return m, nil
 }
 
-func (s *socatAPI) reserve(cmd *pm.Command) (interface{}, error) {
+func (s *socatAPI) reserve(ctx pm.Context) (interface{}, error) {
 	var query struct {
 		Numer int `json:"number"`
 	}
-
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &query); err != nil {
 		return nil, pm.BadRequestError(err)
 	}

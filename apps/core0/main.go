@@ -14,8 +14,6 @@ import (
 	"github.com/threefoldtech/0-core/apps/core0/screen"
 	"github.com/threefoldtech/0-core/apps/core0/stats"
 	"github.com/threefoldtech/0-core/apps/core0/subsys/cgroups"
-	"github.com/threefoldtech/0-core/apps/core0/subsys/containers"
-	"github.com/threefoldtech/0-core/apps/core0/subsys/kvm"
 	"github.com/threefoldtech/0-core/base"
 	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
@@ -133,7 +131,7 @@ func main() {
 		log.Fatalf("fail to start entropy generator: %v", err)
 	}
 
-	mgr.New()
+	mgr.New(nil)
 
 	if err := settings.LoadSettings(options.Config()); err != nil {
 		log.Fatal(err)
@@ -166,13 +164,13 @@ func main() {
 
 	var config = settings.Settings
 
-	pm.MaxJobs = config.Main.MaxJobs
+	mgr.MaxJobs = config.Main.MaxJobs
 
 	//start process mgr.
 	log.Infof("Starting process manager")
 
-	pm.AddHandle((*console)(nil))
-	pm.Start()
+	mgr.AddHandle((*console)(nil))
+	mgr.Start()
 
 	//configure logging handlers from configurations
 	log.Infof("Configure logging")
@@ -204,24 +202,24 @@ func main() {
 		log.Fatal("failed to initialize cgroups subsystem")
 	}
 
-	contMgr, err := containers.ContainerSubsystem(sink, &row.Cells[0])
-	if err != nil {
-		log.Fatal("failed to intialize container subsystem", err)
-	}
+	// contMgr, err := containers.ContainerSubsystem(sink, &row.Cells[0])
+	// if err != nil {
+	// 	log.Fatal("failed to intialize container subsystem", err)
+	// }
 
 	bs.Second()
 
-	if err := kvm.KVMSubsystem(contMgr, &row.Cells[1]); err != nil {
-		log.Errorf("failed to initialize kvm subsystem: %s", err)
-	}
+	// if err := kvm.KVMSubsystem(contMgr, &row.Cells[1]); err != nil {
+	// 	log.Errorf("failed to initialize kvm subsystem: %s", err)
+	// }
 
-	log.Infof("Starting local transport")
-	local, err := NewLocal(contMgr, "/var/run/core.sock")
-	if err != nil {
-		log.Errorf("Failed to start local transport: %s", err)
-	} else {
-		local.Start()
-	}
+	// log.Infof("Starting local transport")
+	// local, err := NewLocal(contMgr, "/var/run/core.sock")
+	// if err != nil {
+	// 	log.Errorf("Failed to start local transport: %s", err)
+	// } else {
+	// 	local.Start()
+	// }
 
 	//start jobs sinks.
 	log.Infof("Starting Sinks")
@@ -231,7 +229,7 @@ func main() {
 
 	if config.Stats.Enabled {
 		aggregator := stats.NewLedisStatsAggregator(sink)
-		pm.AddHandle(aggregator)
+		mgr.AddHandle(aggregator)
 	}
 
 	select {}

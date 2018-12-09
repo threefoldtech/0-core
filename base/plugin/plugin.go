@@ -6,10 +6,11 @@ import (
 
 //Plugin description type
 type Plugin struct {
-	Name     string
-	Version  string //float?
-	Requires []string
-	Open     func(API) error
-	Close    func() error
-	Actions  map[string]pm.Action
+	Name    string
+	Version string //float?
+	//Requires []string
+	Open    func(API) error
+	Close   func() error
+	API     func() interface{}
+	Actions map[string]pm.Action
 }

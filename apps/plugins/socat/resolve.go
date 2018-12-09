@@ -1,4 +1,4 @@
-package socat
+package main
 
 import (
 	"fmt"

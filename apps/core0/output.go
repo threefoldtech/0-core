@@ -9,7 +9,7 @@ import (
 
 	"github.com/op/go-logging"
 	"github.com/threefoldtech/0-core/apps/core0/options"
-	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/mgr"
 )
 
 const (
@@ -83,7 +83,7 @@ func Rotate() error {
 		)
 	}
 
-	pm.Kill("syslogd") // make sure we also restart syslogd (in case /var/log) has changed.
+	mgr.Kill("syslogd") // make sure we also restart syslogd (in case /var/log) has changed.
 	return setLogging(LogPath, CrashPath)
 }
 

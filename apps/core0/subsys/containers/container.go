@@ -12,7 +12,7 @@ import (
 	"github.com/threefoldtech/0-core/apps/core0/logger"
 	"github.com/threefoldtech/0-core/apps/core0/subsys/cgroups"
 	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 const (

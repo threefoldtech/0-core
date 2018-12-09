@@ -1,10 +1,11 @@
 package logger
 
 import (
-	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/pm/stream"
-	"github.com/threefoldtech/0-core/base/settings"
 	"github.com/threefoldtech/0-core/apps/core0/transport"
+	"github.com/threefoldtech/0-core/base/mgr"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/settings"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 var (
@@ -35,5 +36,5 @@ func ConfigureLogging(sink *transport.Sink) {
 		NewStreamLogger(sink, 0),
 	)
 
-	pm.AddHandle(Current)
+	mgr.AddHandle(Current)
 }

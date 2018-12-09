@@ -67,11 +67,11 @@ func NewBootstrap(agent bool) *Bootstrap {
 }
 
 func (b *Bootstrap) registerExtensions(extensions map[string]settings.Extension) {
-	for extKey, extCfg := range extensions {
-		if err := mgr.RegisterExtension(extKey, extCfg.Binary, extCfg.Cwd, extCfg.Args, extCfg.Env); err != nil {
-			log.Error(err)
-		}
-	}
+	// for extKey, extCfg := range extensions {
+	// 	if err := mgr.RegisterExtension(extKey, extCfg.Binary, extCfg.Cwd, extCfg.Args, extCfg.Env); err != nil {
+	// 		log.Error(err)
+	// 	}
+	// }
 }
 
 func (b *Bootstrap) startupServices(s, e settings.After) {

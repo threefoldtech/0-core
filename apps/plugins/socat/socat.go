@@ -1,4 +1,4 @@
-package socat
+package main
 
 import (
 	"fmt"
@@ -7,8 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/threefoldtech/0-core/base/nft"
+	"github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
+
+	"github.com/threefoldtech/0-core/base/nft"
 
 	"github.com/op/go-logging"
 	"github.com/patrickmn/go-cache"
@@ -18,10 +20,41 @@ const (
 	addressAll = "0.0.0.0"
 )
 
-var (
-	log   = logging.MustGetLogger("socat")
-	socat socatAPI
+type API interface {
+	SetPortForward(namespace string, ip string, host string, dest int) error
+	RemovePortForward(namespace string, host string, dest int) error
+	RemoveAll(namespace string) error
+	Resolve(address string) string
+	ResolveURL(raw string) (string, error)
+}
 
+var (
+	log = logging.MustGetLogger("socat")
+
+	socat socatAPI
+	_     API = (*socatAPI)(nil) //validation
+
+	//Plugin plugin entry point
+	Plugin = plugin.Plugin{
+		Name:    "socat",
+		Version: "1.0",
+		Open: func(api plugin.API) error {
+			socat.api = api
+			socat.rules = make(map[int]rule)
+			socat.reserved = cache.New(2*time.Minute, 1*time.Minute)
+			return nil
+		},
+		API: func() interface{} {
+			return &socat
+		},
+		Actions: map[string]pm.Action{
+			"list":     socat.list,
+			"reserver": socat.reserve,
+		},
+	}
+)
+
+var (
 	defaultProtocols = []string{"tcp"}
 	validProtocols   = map[string]struct{}{
 		"tcp": struct{}{},
@@ -30,16 +63,13 @@ var (
 )
 
 type socatAPI struct {
+	api plugin.API
+
 	rm    sync.Mutex
 	rules map[int]rule
 
 	sm       sync.Mutex
 	reserved *cache.Cache
-}
-
-func init() {
-	socat.rules = make(map[int]rule)
-	socat.reserved = cache.New(2*time.Minute, 1*time.Minute)
 }
 
 type source struct {
@@ -319,7 +349,7 @@ func (s *socatAPI) Reserve(n int) ([]int, error) {
 		the initial bootstrap, so we almost safe by using this returned
 		list
 	*/
-	if err := pm.Internal("info.port", nil, &ports); err != nil {
+	if err := s.api.Internal("info.port", nil, &ports); err != nil {
 		return nil, err
 	}
 

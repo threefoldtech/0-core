@@ -1,23 +1,10 @@
-package nft
+package main
 
 import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/threefoldtech/0-core/base/mgr"
 )
-
-//Get gets current nft ruleset
-func Get() (Nft, error) {
-	//NOTE: YES --numeric MUST BE THERE 2 TIMES, PLEASE DO NOT REMOVE
-	job, err := mgr.System("nft", "--json", "--handle", "--numeric", "--numeric", "list", "ruleset")
-	if err != nil {
-		return nil, err
-	}
-
-	return Parse(job.Streams.Stdout())
-}
 
 //NftJsonBlock defines a nft json block
 type NftJsonBlock map[string]json.RawMessage

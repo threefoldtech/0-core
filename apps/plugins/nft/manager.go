@@ -1,4 +1,4 @@
-package nft
+package main
 
 import (
 	"fmt"
@@ -6,7 +6,6 @@ import (
 	"os"
 
 	logging "github.com/op/go-logging"
-	"github.com/threefoldtech/0-core/base/mgr"
 )
 
 const (
@@ -19,13 +18,13 @@ var (
 )
 
 //ApplyFromFile applies nft rules from a file
-func ApplyFromFile(cfg string) error {
-	_, err := mgr.System("nft", "-f", cfg)
+func (m *manager) ApplyFromFile(cfg string) error {
+	_, err := m.api.System("nft", "-f", cfg)
 	return err
 }
 
 //Apply (merge) nft rules
-func Apply(nft Nft) error {
+func (m *manager) Apply(nft Nft) error {
 	data, err := nft.MarshalText()
 	if err != nil {
 		return err
@@ -46,7 +45,7 @@ func Apply(nft Nft) error {
 	}
 	f.Close()
 	log.Debugf("nft applying: %s", f.Name())
-	return ApplyFromFile(f.Name())
+	return m.ApplyFromFile(f.Name())
 }
 
 //findRules validate that the sub is part of the ruleset, and fill the
@@ -81,8 +80,8 @@ func findRules(ruleset, sub Nft) (Nft, error) {
 }
 
 //DropRules removes nft rules from a file
-func DropRules(sub Nft) error {
-	ruleset, err := Get()
+func (m *manager) DropRules(sub Nft) error {
+	ruleset, err := m.Get()
 
 	if err != nil {
 		return err
@@ -96,7 +95,7 @@ func DropRules(sub Nft) error {
 	for tn, t := range sub {
 		for cn, c := range t.Chains {
 			for _, r := range c.Rules {
-				if err := Drop(t.Family, tn, cn, r.Handle); err != nil {
+				if err := m.Drop(t.Family, tn, cn, r.Handle); err != nil {
 					return err
 				}
 			}
@@ -106,7 +105,18 @@ func DropRules(sub Nft) error {
 }
 
 //Drop drops a single rule given a handle
-func Drop(family Family, table, chain string, handle int) error {
-	_, err := mgr.System("nft", "delete", "rule", string(family), table, chain, "handle", fmt.Sprint(handle))
+func (m *manager) Drop(family Family, table, chain string, handle int) error {
+	_, err := m.api.System("nft", "delete", "rule", string(family), table, chain, "handle", fmt.Sprint(handle))
 	return err
+}
+
+//Get gets current nft ruleset
+func (m *manager) Get() (Nft, error) {
+	//NOTE: YES --numeric MUST BE THERE 2 TIMES, PLEASE DO NOT REMOVE
+	job, err := m.api.System("nft", "--json", "--handle", "--numeric", "--numeric", "list", "ruleset")
+	if err != nil {
+		return nil, err
+	}
+
+	return Parse(job.Streams.Stdout())
 }

@@ -10,8 +10,9 @@ import (
 
 	"github.com/op/go-logging"
 	"github.com/patrickmn/go-cache"
-	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/apps/core0/transport"
+	"github.com/threefoldtech/0-core/base/mgr"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 const (
@@ -33,7 +34,7 @@ that are collected via the process manager. Flush happens when buffer is full or
 The StatsBuffer.Handler should be registers as StatsFlushHandler on the process manager object.
 */
 
-type Tags []pm.Tag
+type Tags []mgr.Tag
 
 func (t Tags) Len() int {
 	return len(t)
@@ -54,7 +55,7 @@ type Stats struct {
 	Operation Operation `json:"operation"`
 	Key       string    `json:"key"`
 	Value     float64   `json:"value"`
-	Tags      []pm.Tag  `json:"tags"`
+	Tags      []mgr.Tag `json:"tags"`
 }
 
 type redisStatsBuffer struct {
@@ -62,7 +63,7 @@ type redisStatsBuffer struct {
 	cache *cache.Cache
 }
 
-func NewLedisStatsAggregator(sink *transport.Sink) pm.StatsHandler {
+func NewLedisStatsAggregator(sink *transport.Sink) mgr.StatsHandler {
 	redisBuffer := &redisStatsBuffer{
 		db:    sink,
 		cache: cache.New(1*time.Hour, 5*time.Minute),
@@ -74,7 +75,7 @@ func NewLedisStatsAggregator(sink *transport.Sink) pm.StatsHandler {
 		}
 	})
 
-	pm.RegisterBuiltIn("aggregator.query", redisBuffer.query)
+	//pm.RegisterBuiltIn("aggregator.query", redisBuffer.query)
 
 	return redisBuffer
 }
@@ -150,14 +151,14 @@ func (r *redisStatsBuffer) query(cmd *pm.Command) (interface{}, error) {
 	return result, nil
 }
 
-func (r *redisStatsBuffer) hash(tags []pm.Tag) string {
+func (r *redisStatsBuffer) hash(tags []mgr.Tag) string {
 	sort.Sort(Tags(tags))
 	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%v", tags))))
 }
 
-func (r *redisStatsBuffer) Stats(op string, key string, value float64, id string, tags ...pm.Tag) {
+func (r *redisStatsBuffer) Stats(op string, key string, value float64, id string, tags ...mgr.Tag) {
 	if len(id) != 0 {
-		tags = append(tags, pm.Tag{IDTag, id})
+		tags = append(tags, mgr.Tag{IDTag, id})
 	}
 
 	hash := r.hash(tags)

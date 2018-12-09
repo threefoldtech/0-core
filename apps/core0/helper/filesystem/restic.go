@@ -2,8 +2,10 @@ package filesystem
 
 import (
 	"fmt"
-	"github.com/threefoldtech/0-core/base/pm"
 	"net/url"
+
+	"github.com/threefoldtech/0-core/base/mgr"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 func RestoreRepo(repo, target string, include ...string) error {
@@ -35,11 +37,11 @@ func RestoreRepo(repo, target string, include ...string) error {
 
 	restic = append(restic, snapshot)
 
-	job, err := pm.Run(
+	job, err := mgr.Run(
 		&pm.Command{
 			Command: pm.CommandSystem,
 			Arguments: pm.MustArguments(
-				pm.SystemCommandArguments{
+				mgr.SystemCommandArguments{
 					Name:  "restic",
 					Args:  restic,
 					StdIn: password,

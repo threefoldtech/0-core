@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
@@ -33,7 +34,7 @@ func NewSink(c SinkConfig) (*Sink, error) {
 		ch:   newChannel(pool),
 	}
 
-	pm.AddHandle(sink)
+	mgr.AddHandle(sink)
 
 	return sink, nil
 }
@@ -132,9 +133,9 @@ func (sink *Sink) process() {
 		sink.ch.Flag(command.ID)
 		log.Debugf("Starting command %s", &command)
 
-		_, err = pm.Run(&command)
+		_, err = mgr.Run(&command)
 
-		if err == pm.UnknownCommandErr {
+		if err == mgr.UnknownCommandErr {
 			result := pm.NewJobResult(&command)
 			result.State = pm.StateUnknownCmd
 			sink.Forward(result)
