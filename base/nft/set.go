@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/mgr"
 )
 
 //IPv4Set creates/updates element set of type ipv4_addr
@@ -12,7 +12,7 @@ func IPv4Set(family Family, table string, name string, ips ...string) error {
 	//nft add set ip nat host { type ipv4_addr\; }
 	//nft add element ip nat host { 172^C9.0.1, 172.18.0.1 }
 
-	_, err := pm.System("nft", "add", "set", string(family), table, name, "{", "type", "ipv4_addr;", "}")
+	_, err := mgr.System("nft", "add", "set", string(family), table, name, "{", "type", "ipv4_addr;", "}")
 	if err != nil {
 		return err
 	}
@@ -22,7 +22,7 @@ func IPv4Set(family Family, table string, name string, ips ...string) error {
 	}
 
 	m := strings.Join(ips, ", ")
-	_, err = pm.System("nft", "add", "element", string(family), table, name, "{", m, "}")
+	_, err = mgr.System("nft", "add", "element", string(family), table, name, "{", m, "}")
 
 	return err
 }
@@ -34,7 +34,7 @@ func IPv4SetDel(family Family, table, name string, ips ...string) error {
 	}
 
 	m := strings.Join(ips, ", ")
-	_, err := pm.System("nft", "delete", "element", string(family), table, name, "{", m, "}")
+	_, err := mgr.System("nft", "delete", "element", string(family), table, name, "{", m, "}")
 
 	return err
 }

@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/mgr"
 )
 
 //Get gets current nft ruleset
 func Get() (Nft, error) {
 	//NOTE: YES --numeric MUST BE THERE 2 TIMES, PLEASE DO NOT REMOVE
-	job, err := pm.System("nft", "--json", "--handle", "--numeric", "--numeric", "list", "ruleset")
+	job, err := mgr.System("nft", "--json", "--handle", "--numeric", "--numeric", "list", "ruleset")
 	if err != nil {
 		return nil, err
 	}

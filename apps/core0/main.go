@@ -17,16 +17,17 @@ import (
 	"github.com/threefoldtech/0-core/apps/core0/subsys/containers"
 	"github.com/threefoldtech/0-core/apps/core0/subsys/kvm"
 	"github.com/threefoldtech/0-core/base"
+	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/settings"
 
 	"os/signal"
 	"syscall"
 
-	_ "github.com/threefoldtech/0-core/apps/core0/builtin"
-	_ "github.com/threefoldtech/0-core/apps/core0/builtin/btrfs"
+	//_ "github.com/threefoldtech/0-core/apps/core0/builtin"
+	//_ "github.com/threefoldtech/0-core/apps/core0/builtin/btrfs"
 	"github.com/threefoldtech/0-core/apps/core0/transport"
-	_ "github.com/threefoldtech/0-core/base/builtin"
+	//_ "github.com/threefoldtech/0-core/base/builtin"
 )
 
 var (
@@ -132,7 +133,7 @@ func main() {
 		log.Fatalf("fail to start entropy generator: %v", err)
 	}
 
-	pm.New()
+	mgr.New()
 
 	if err := settings.LoadSettings(options.Config()); err != nil {
 		log.Fatal(err)

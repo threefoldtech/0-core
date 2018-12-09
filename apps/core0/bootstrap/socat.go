@@ -3,10 +3,11 @@ package bootstrap
 import (
 	"strings"
 
+	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/nft"
 
 	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/stream"
 	"github.com/threefoldtech/0-core/base/utils"
 	"github.com/vishvananda/netlink"
 )
@@ -83,14 +84,14 @@ func MonitorIPChangesUpdateSocat() error {
 		}
 	}
 
-	_, err := pm.Run(&pm.Command{
+	_, err := mgr.Run(&pm.Command{
 		ID:      "socat.notify",
 		Command: pm.CommandSystem,
 		Flags: pm.JobFlags{
 			Protected: true,
 		},
 		Arguments: pm.MustArguments(
-			pm.SystemCommandArguments{
+			mgr.SystemCommandArguments{
 				Name: "ip",
 				Args: []string{"monitor", "address"},
 			},

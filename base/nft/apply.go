@@ -6,7 +6,7 @@ import (
 	"os"
 
 	logging "github.com/op/go-logging"
-	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/mgr"
 )
 
 const (
@@ -20,7 +20,7 @@ var (
 
 //ApplyFromFile applies nft rules from a file
 func ApplyFromFile(cfg string) error {
-	_, err := pm.System("nft", "-f", cfg)
+	_, err := mgr.System("nft", "-f", cfg)
 	return err
 }
 
@@ -107,6 +107,6 @@ func DropRules(sub Nft) error {
 
 //Drop drops a single rule given a handle
 func Drop(family Family, table, chain string, handle int) error {
-	_, err := pm.System("nft", "delete", "rule", string(family), table, chain, "handle", fmt.Sprint(handle))
+	_, err := mgr.System("nft", "delete", "rule", string(family), table, chain, "handle", fmt.Sprint(handle))
 	return err
 }

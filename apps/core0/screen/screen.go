@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/op/go-logging"
-	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/mgr"
 )
 
 const (
@@ -43,7 +43,7 @@ var (
 )
 
 func getSize(tty string) {
-	result, err := pm.System("sh", "-c", fmt.Sprintf("ttysize < %s", tty))
+	result, err := mgr.System("sh", "-c", fmt.Sprintf("ttysize < %s", tty))
 	if err != nil {
 		return
 	}
@@ -52,7 +52,7 @@ func getSize(tty string) {
 
 func newScreen(vt int) error {
 	o.Do(func() {
-		_, serr = pm.System("chvt", fmt.Sprintf("%d", vt))
+		_, serr = mgr.System("chvt", fmt.Sprintf("%d", vt))
 		if serr != nil {
 			return
 		}

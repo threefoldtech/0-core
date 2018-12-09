@@ -62,32 +62,32 @@ var (
 		},
 	}
 
-	zt = nft.Nft{
-		"filter": nft.Table{
-			Family: nft.FamilyINET,
-			Chains: nft.Chains{
-				"input": nft.Chain{
-					Rules: []nft.Rule{
-						{Body: `iifname "zt*" tcp dport 6379 counter packets 0 bytes 0 accept`},
-						{Body: `tcp dport 6379 counter packets 0 bytes 0 drop`},
-					},
-				},
-			},
-		},
-	}
+	// zt = nft.Nft{
+	// 	"filter": nft.Table{
+	// 		Family: nft.FamilyINET,
+	// 		Chains: nft.Chains{
+	// 			"input": nft.Chain{
+	// 				Rules: []nft.Rule{
+	// 					{Body: `iifname "zt*" tcp dport 6379 counter packets 0 bytes 0 accept`},
+	// 					{Body: `tcp dport 6379 counter packets 0 bytes 0 drop`},
+	// 				},
+	// 			},
+	// 		},
+	// 	},
+	// }
 
-	pub = nft.Nft{
-		"filter": nft.Table{
-			Family: nft.FamilyINET,
-			Chains: nft.Chains{
-				"input": nft.Chain{
-					Rules: []nft.Rule{
-						{Body: "tcp dport 6379 accept"},
-					},
-				},
-			},
-		},
-	}
+	// pub = nft.Nft{
+	// 	"filter": nft.Table{
+	// 		Family: nft.FamilyINET,
+	// 		Chains: nft.Chains{
+	// 			"input": nft.Chain{
+	// 				Rules: []nft.Rule{
+	// 					{Body: "tcp dport 6379 accept"},
+	// 				},
+	// 			},
+	// 		},
+	// 	},
+	// }
 )
 
 func (b *Bootstrap) writeRules(r string) (string, error) {
