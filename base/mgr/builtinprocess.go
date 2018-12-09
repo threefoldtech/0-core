@@ -18,9 +18,13 @@ type Runnable func(*pm.Command) (interface{}, error)
 type RunnableWithCtx func(*Context) (interface{}, error)
 
 type Context struct {
-	Command *pm.Command
+	cmd *pm.Command
 
 	ch chan *stream.Message
+}
+
+func (c *Context) Command() *pm.Command {
+	return c.cmd
 }
 
 func (c *Context) Message(msg *stream.Message) {
@@ -47,32 +51,16 @@ func (c *Context) Log(text string, level ...uint16) {
 internalProcess implements a Procss interface and represents an internal (go) process that can be managed by the process manager
 */
 type internalProcess struct {
-	runnable interface{}
-	ctx      Context
+	action pm.Action
+	ctx    Context
 }
 
-/*
-NewInternalProcess factory to build Runnable processes
-*/
-func NewInternalProcess(runnable Runnable) ProcessFactory {
+func NewInternalProcess(runnable pm.Action) ProcessFactory {
 	factory := func(_ PIDTable, cmd *pm.Command) pm.Process {
 		return &internalProcess{
-			runnable: runnable,
+			action: runnable,
 			ctx: Context{
-				Command: cmd,
-			},
-		}
-	}
-
-	return factory
-}
-
-func NewInternalProcessWithCtx(runnable RunnableWithCtx) ProcessFactory {
-	factory := func(_ PIDTable, cmd *pm.Command) pm.Process {
-		return &internalProcess{
-			runnable: runnable,
-			ctx: Context{
-				Command: cmd,
+				cmd: cmd,
 			},
 		}
 	}
@@ -84,7 +72,7 @@ func NewInternalProcessWithCtx(runnable RunnableWithCtx) ProcessFactory {
 Cmd returns the internal process command
 */
 func (process *internalProcess) Command() *pm.Command {
-	return process.ctx.Command
+	return process.ctx.Command()
 }
 
 /*
@@ -110,14 +98,7 @@ func (process *internalProcess) Run() (<-chan *stream.Message, error) {
 			close(channel)
 		}()
 
-		var value interface{}
-		var err error
-		switch runnable := process.runnable.(type) {
-		case Runnable:
-			value, err = runnable(process.ctx.Command)
-		case RunnableWithCtx:
-			value, err = runnable(&process.ctx)
-		}
+		value, err := process.action(&process.ctx)
 
 		var msg *stream.Message
 

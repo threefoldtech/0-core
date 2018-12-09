@@ -45,6 +45,7 @@ var (
 	jobs     map[string]pm.Job
 	jobsM    sync.RWMutex
 	jobsCond *sync.Cond
+	router   Router
 
 	//needs clean up
 	handlers []Handler
@@ -57,12 +58,13 @@ var (
 )
 
 //New initialize singleton process manager
-func New() {
+func New(router Router) {
 	n.Do(func() {
 		log.Debugf("initializing manager")
 		jobs = make(map[string]pm.Job)
 		jobsCond = sync.NewCond(&sync.Mutex{})
 		pids = make(map[int]chan syscall.WaitStatus)
+		router = router
 
 		queue.Init()
 	})
@@ -109,9 +111,9 @@ func RunFactory(cmd *pm.Command, factory ProcessFactory, hooks ...pm.RunnerHook)
 
 //Run runs a command immediately (no pre-processors)
 func Run(cmd *pm.Command, hooks ...pm.RunnerHook) (pm.Job, error) {
-	factory := GetProcessFactory(cmd)
-	if factory == nil {
-		return nil, UnknownCommandErr
+	factory, err := getFactory(cmd)
+	if err != nil {
+		return nil, err
 	}
 
 	return RunFactory(cmd, factory, hooks...)

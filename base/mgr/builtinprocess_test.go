@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/threefoldtech/0-core/base/pm"
+
 	"github.com/stretchr/testify/assert"
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 func TestBuiltInProcess(t *testing.T) {
-	work := func(cmd *Command) (interface{}, error) {
+	work := func(ctx pm.Context) (interface{}, error) {
 		return nil, nil
 	}
 
@@ -37,7 +39,7 @@ func TestBuiltInProcess(t *testing.T) {
 
 	msg := msgs[0]
 
-	if ok := assert.Equal(t, stream.LevelResultJSON, msg.Meta.Level()); !ok {
+	if ok := assert.Equal(t, pm.LevelResultJSON, msg.Meta.Level()); !ok {
 		t.Fatal()
 	}
 
@@ -47,7 +49,7 @@ func TestBuiltInProcess(t *testing.T) {
 }
 
 func TestBuiltInProcessData(t *testing.T) {
-	work := func(cmd *Command) (interface{}, error) {
+	work := func(ctx pm.Context) (interface{}, error) {
 		return "some data", nil
 	}
 
@@ -75,7 +77,7 @@ func TestBuiltInProcessData(t *testing.T) {
 
 	msg := msgs[0]
 
-	if ok := assert.Equal(t, stream.LevelResultJSON, msg.Meta.Level()); !ok {
+	if ok := assert.Equal(t, pm.LevelResultJSON, msg.Meta.Level()); !ok {
 		t.Fatal()
 	}
 
@@ -89,7 +91,7 @@ func TestBuiltInProcessData(t *testing.T) {
 }
 
 func TestBuiltInProcessError(t *testing.T) {
-	work := func(cmd *Command) (interface{}, error) {
+	work := func(ctx pm.Context) (interface{}, error) {
 		return nil, fmt.Errorf("error string")
 	}
 
@@ -117,7 +119,7 @@ func TestBuiltInProcessError(t *testing.T) {
 
 	msg := msgs[0]
 
-	if ok := assert.Equal(t, stream.LevelResultJSON, msg.Meta.Level()); !ok {
+	if ok := assert.Equal(t, pm.LevelResultJSON, msg.Meta.Level()); !ok {
 		t.Fatal()
 	}
 
@@ -131,7 +133,7 @@ func TestBuiltInProcessError(t *testing.T) {
 }
 
 func TestBuiltInProcessRecover(t *testing.T) {
-	work := func(cmd *Command) (interface{}, error) {
+	work := func(ctx pm.Context) (interface{}, error) {
 		panic("i paniced")
 	}
 
@@ -159,7 +161,7 @@ func TestBuiltInProcessRecover(t *testing.T) {
 
 	msg := msgs[0]
 
-	if ok := assert.Equal(t, stream.LevelResultJSON, msg.Meta.Level()); !ok {
+	if ok := assert.Equal(t, pm.LevelResultJSON, msg.Meta.Level()); !ok {
 		t.Fatal()
 	}
 

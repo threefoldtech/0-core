@@ -4,12 +4,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 func TestSystemProcess_Run(t *testing.T) {
-	ps := NewSystemProcess(&TestingPIDTable{}, &Command{
-		Arguments: MustArguments(
+	ps := NewSystemProcess(&TestingPIDTable{}, &pm.Command{
+		Arguments: pm.MustArguments(
 			SystemCommandArguments{
 				Name: "echo",
 				Args: []string{"hello", "world"},
@@ -41,8 +42,8 @@ func TestSystemProcess_Run(t *testing.T) {
 }
 
 func TestSystemProcess_RunStderr(t *testing.T) {
-	ps := NewSystemProcess(&TestingPIDTable{}, &Command{
-		Arguments: MustArguments(
+	ps := NewSystemProcess(&TestingPIDTable{}, &pm.Command{
+		Arguments: pm.MustArguments(
 			SystemCommandArguments{
 				Name: "sh",
 				Args: []string{"-c", "echo 'hello world' 1>&2"},
@@ -78,8 +79,8 @@ func TestSystemProcess_RunStderr(t *testing.T) {
 }
 
 func TestSystemProcess_RunStdin(t *testing.T) {
-	ps := NewSystemProcess(&TestingPIDTable{}, &Command{
-		Arguments: MustArguments(
+	ps := NewSystemProcess(&TestingPIDTable{}, &pm.Command{
+		Arguments: pm.MustArguments(
 			SystemCommandArguments{
 				Name:  "cat",
 				StdIn: "hello world",
