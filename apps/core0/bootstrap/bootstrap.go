@@ -240,24 +240,20 @@ func (b *Bootstrap) watchers() {
 	go func() {
 		for {
 			result, err := pm.System("zerotier-cli", "-D/tmp/zt", "info")
-			ztstatus := result.Streams.Stdout()
-			if err != nil {
-				ztstatus = result.Streams.Stderr()
-			}
+			if err == nil {
+				ztstatus := result.Streams.Stdout()
 
-			ztstatus = strings.TrimSpace(ztstatus)
-			zerotier.Text = fmt.Sprintf(screenStateLine, "Zerotier", ztstatus, "")
+				ztstatus = strings.TrimSpace(ztstatus)
+				zerotier.Text = fmt.Sprintf(screenStateLine, "Zerotier", ztstatus, "")
+			}
 
 			result, err = pm.System("uptime")
-			uptimestatus := result.Streams.Stdout()
-			if err != nil {
-				uptimestatus = result.Streams.Stderr()
+			if err == nil {
+				uptimestatus := result.Streams.Stdout()
+				uptime.Text = fmt.Sprintf(screenStateLine, "Uptime", uptimestatus, "")
 			}
 
-			uptime.Text = fmt.Sprintf(screenStateLine, "Uptime", uptimestatus, "")
-
 			screen.Refresh()
-
 			<-time.After(30 * time.Second)
 		}
 	}()

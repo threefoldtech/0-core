@@ -70,7 +70,7 @@ NewRunner creates a new r object that is bind to this PM instance.
         The r is considered running, if it ran with no errors for 2 seconds, or exited before the 2 seconds passes
         with SUCCESS exit code.
 */
-func newJob(command *Command, factory ProcessFactory, hooks ...RunnerHook) Job {
+func newJob(command *Command, factory ProcessFactory, hooks ...RunnerHook) *jobImb {
 	job := &jobImb{
 		command:    command,
 		factory:    factory,
@@ -88,7 +88,7 @@ func newJob(command *Command, factory ProcessFactory, hooks ...RunnerHook) Job {
 }
 
 func newTestJob(command *Command, factory ProcessFactory, hooks ...RunnerHook) Job {
-	job := newJob(command, factory, hooks...).(*jobImb)
+	job := newJob(command, factory, hooks...)
 	var testTable TestingPIDTable
 	job.registerPID = testTable.RegisterPID
 	job.waitPID = testTable.WaitPID
@@ -392,6 +392,12 @@ func (r *jobImb) Process() Process {
 func (r *jobImb) Wait() *JobResult {
 	r.wg.Wait()
 	return r.result
+}
+
+func (r *jobImb) Terminate(sig syscall.Signal) error {
+	r.Unschedule()
+	r.command.Flags.Protected = false
+	return r.Signal(sig)
 }
 
 //implement PIDTable
