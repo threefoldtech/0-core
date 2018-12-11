@@ -34,23 +34,39 @@ const (
 )
 
 func init() {
-	pm.RegisterBuiltIn(cmdReboot, restart)
-	pm.RegisterBuiltIn(cmdPowerOff, poweroff)
+	pm.RegisterBuiltInWithCtx(cmdReboot, restart)
+	pm.RegisterBuiltInWithCtx(cmdPowerOff, poweroff)
 	pm.RegisterBuiltInWithCtx(cmdUpdate, update)
 }
 
-func restart(cmd *pm.Command) (interface{}, error) {
+func restart(ctx *pm.Context) (interface{}, error) {
 	log.Info("rebooting")
 	pm.Shutdown(RedisJobID, RedisProxyJobID)
 	syscall.Sync()
+
+	//we send the message to signal client that job finished
+	//before it's actually done
+	ctx.Message(&stream.Message{
+		Message: "rebooting...\n",
+		Meta:    stream.NewMeta(1, stream.ExitSuccessFlag),
+	})
+
 	syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
 	return nil, nil
 }
 
-func poweroff(cmd *pm.Command) (interface{}, error) {
+func poweroff(ctx *pm.Context) (interface{}, error) {
 	log.Info("shutting down")
 	pm.Shutdown(RedisJobID, RedisProxyJobID)
 	syscall.Sync()
+
+	//we send the message to signal client that job finished
+	//before it's actually done
+	ctx.Message(&stream.Message{
+		Message: "powering off...\n",
+		Meta:    stream.NewMeta(1, stream.ExitSuccessFlag),
+	})
+
 	syscall.Reboot(syscall.LINUX_REBOOT_CMD_POWER_OFF)
 	return nil, nil
 }
