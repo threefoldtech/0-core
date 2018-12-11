@@ -58,6 +58,9 @@ func poweroff(cmd *pm.Command) (interface{}, error) {
 func wget(ctx *pm.Context, file, url string) error {
 	msgs := pm.MessageHook{
 		Action: func(msg *stream.Message) {
+			//drop the flag part so stream reader (client) doesn't think
+			//no more logs are coming on wget termination
+			msg.Meta = stream.NewMeta(msg.Meta.Level())
 			ctx.Message(msg)
 		},
 	}
