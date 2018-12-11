@@ -52,6 +52,7 @@ class Utils(object):
         zdb_name = str(uuid.uuid4())[0:8]
         mount_path = zos_client.zerodbs.prepare()
         zdb = zos_client.primitives.create_zerodb(name=zdb_name, path=mount_path[0],
+                                                  node_port=random.randint(4000, 5000),
                                                   mode='user', sync=False, admin='mypassword')
         zdb.deploy()
         disk = zos_client.primitives.create_disk('mydisk', zdb, size=50)
