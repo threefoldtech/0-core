@@ -109,7 +109,7 @@ dhclient $interface
     vm_zos.memory = 8192
     disk = utils.create_disk(zos_client)
     vm_zos.disks.add(disk)
-    vm_zos.kernel_args.add(name='connect', key='development')
+    vm_zos.kernel_args.add(name='development', key='development')
     vm_zos.deploy()
 
     # create sshkey and provide the public key
