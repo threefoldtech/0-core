@@ -60,7 +60,10 @@ func wget(ctx *pm.Context, file, url string) error {
 		Action: func(msg *stream.Message) {
 			//drop the flag part so stream reader (client) doesn't think
 			//no more logs are coming on wget termination
-			msg.Meta = stream.NewMeta(msg.Meta.Level())
+			if msg.Meta.Is(stream.ExitErrorFlag | stream.ExitSuccessFlag) {
+				return
+			}
+
 			ctx.Message(msg)
 		},
 	}
@@ -134,7 +137,7 @@ func update(ctx *pm.Context) (interface{}, error) {
 		return nil, pm.InternalError(err)
 	}
 
-	ctx.Log("terminating all running process... point of no return")
+	ctx.Log("terminating all running process. point of no return...")
 
 	pm.Shutdown(RedisJobID, RedisProxyJobID)
 	syscall.Sync()
