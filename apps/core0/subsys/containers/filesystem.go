@@ -152,6 +152,7 @@ func (c *container) sandbox() error {
 
 	onSBExit := &pm.ExitHook{
 		Action: func(_ bool) {
+			c.Terminate()
 			c.cleanSandbox()
 		},
 	}
@@ -209,6 +210,18 @@ func (c *container) sandbox() error {
 	}
 
 	return syscall.Mount(coreXSrc, coreXTarget, "", syscall.MS_BIND, "")
+}
+
+func (c *container) cleanSandbox() {
+	c.unMountAll()
+
+	if c.getFSType(BackendBaseDir) == "btrfs" {
+		pm.System("btrfs", "subvolume", "delete", path.Join(BackendBaseDir, c.name()))
+	} else {
+		os.RemoveAll(path.Join(BackendBaseDir, c.name()))
+	}
+
+	os.RemoveAll(c.root())
 }
 
 func (c *container) unMountAll() error {
