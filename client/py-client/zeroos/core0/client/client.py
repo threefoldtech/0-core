@@ -3266,7 +3266,7 @@ class Client(BaseClient):
         if hasattr(socket, 'TCP_KEEPIDLE'):
             socket_keepalive_options[socket.TCP_KEEPIDLE] = 1
         self._redis = redis.Redis(host=host, port=port, password=password, db=db, ssl=ssl,
-                                  socket_timeout=socket_timeout,
+                                  socket_timeout=socket_timeout, ssl_cert_reqs=None,
                                   socket_keepalive=True, socket_keepalive_options=socket_keepalive_options)
         self._container_manager = ContainerManager(self)
         self._bridge_manager = BridgeManager(self)

@@ -37,10 +37,13 @@ example
 cl.kvm.create(
     name='azmy',
     flist='file:///var/cache/ubuntu-xenial-bootable-sshd.flist',
-    port={2200: 22}, 
+    port={2200: 22},
     config={'/root/.ssh/authorized_keys': 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDXKwi6QhxCb/Ep7Kp+3vkffRVcS9OIJAIuk3TS/fNkRU9lXijlvThuV4+hkz2ZDtK5D+DBHwRrNj8SY3b9X1WC/Xhh3pQl9RlDld+459c966iqOrdLjchnRqiQ6fQXwPA0rJqa5suKGMoGFdJDcNtiIkf3Ht0hF6Hps/EMaDxkVAUvaIS5uqg/iNVUK9x5rFOd3Y2KDtu0PTiPQ5zNGOhmhLOy1QQ1kDraIuvb3tJR7c9Y8H4WyB42j6nG/m8ZdHfnMwLp5ERTkRfZLF5sBit7gBfSCNVgFH4d7zEQzY1FtBPzqg15cgt7eVhIcwn9A6TojfCQnxv6m2VZ22oxlOxn azmy@curiosity'},
     nics=[{'type': 'default'}]
 )
 ```
 
 Which will override the root `authorized_keys` file with the given content. Note, the file path is absolute from the root of the flist.
+
+## Build Script
+You can find here an [example build script](https://gist.github.com/muhamadazmy/ea4517e4fa0d836b69211f4402d459f1) that builds an `ubuntu` flist
