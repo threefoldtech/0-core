@@ -24,6 +24,7 @@ class ExtendedMachines(BaseTest):
         super(ExtendedMachines, self).setUp()
         self.check_zos_connection(ExtendedMachines)
 
+    @unittest.skip('https://github.com/threefoldtech/0-core/issues/96')
     def test001_kvm_add_remove_nics(self):
         """ zos-035
 
@@ -89,6 +90,7 @@ class ExtendedMachines(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
+    @unittest.skip('https://github.com/threefoldtech/0-core/issues/96')
     def test002_kvm_attach_deattach_disks(self):
         """ zos-036
 

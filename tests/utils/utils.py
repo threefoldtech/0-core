@@ -7,6 +7,7 @@ import configparser
 import requests
 import json
 import os
+import socket
 
 
 class BaseTest(unittest.TestCase):
@@ -143,8 +144,13 @@ class BaseTest(unittest.TestCase):
         nws = client.zerotier.list()
         for nw in nws:
             if nw['nwid'] == networkId:
-                address = nw['assignedAddresses'][0]
-                return address[:address.find('/')]
+                for address in nw['assignedAddresses']:
+                    try:
+                        ip = address[:address.find('/')]
+                        socket.inet_aton(ip)
+                    except:
+                        continue
+                    return ip
         else:
             self.lg('can\'t find network in zerotier.list()')
 

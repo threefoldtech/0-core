@@ -52,6 +52,7 @@ class Utils(object):
         zdb_name = str(uuid.uuid4())[0:8]
         mount_path = zos_client.zerodbs.prepare()
         zdb = zos_client.primitives.create_zerodb(name=zdb_name, path=mount_path[0],
+                                                  node_port=random.randint(4000, 5000),
                                                   mode='user', sync=False, admin='mypassword')
         zdb.deploy()
         disk = zos_client.primitives.create_disk('mydisk', zdb, size=50)
@@ -108,7 +109,7 @@ dhclient $interface
     vm_zos.memory = 8192
     disk = utils.create_disk(zos_client)
     vm_zos.disks.add(disk)
-    vm_zos.kernel_args.add(name='connect', key='development')
+    vm_zos.kernel_args.add(name='development', key='development')
     vm_zos.deploy()
 
     # create sshkey and provide the public key
