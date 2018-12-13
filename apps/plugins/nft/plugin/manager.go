@@ -6,6 +6,7 @@ import (
 	"os"
 
 	logging "github.com/op/go-logging"
+	"github.com/threefoldtech/0-core/apps/plugins/nft"
 )
 
 const (
@@ -24,7 +25,7 @@ func (m *manager) ApplyFromFile(cfg string) error {
 }
 
 //Apply (merge) nft rules
-func (m *manager) Apply(nft Nft) error {
+func (m *manager) Apply(nft nft.Nft) error {
 	data, err := nft.MarshalText()
 	if err != nil {
 		return err
@@ -50,7 +51,7 @@ func (m *manager) Apply(nft Nft) error {
 
 //findRules validate that the sub is part of the ruleset, and fill the
 //rules handle with the values from the ruleset
-func findRules(ruleset, sub Nft) (Nft, error) {
+func findRules(ruleset, sub nft.Nft) (nft.Nft, error) {
 	for tn, t := range sub {
 		currenttable, ok := ruleset[tn]
 		if !ok {
@@ -80,7 +81,7 @@ func findRules(ruleset, sub Nft) (Nft, error) {
 }
 
 //DropRules removes nft rules from a file
-func (m *manager) DropRules(sub Nft) error {
+func (m *manager) DropRules(sub nft.Nft) error {
 	ruleset, err := m.Get()
 
 	if err != nil {
@@ -105,13 +106,13 @@ func (m *manager) DropRules(sub Nft) error {
 }
 
 //Drop drops a single rule given a handle
-func (m *manager) Drop(family Family, table, chain string, handle int) error {
+func (m *manager) Drop(family nft.Family, table, chain string, handle int) error {
 	_, err := m.api.System("nft", "delete", "rule", string(family), table, chain, "handle", fmt.Sprint(handle))
 	return err
 }
 
 //Get gets current nft ruleset
-func (m *manager) Get() (Nft, error) {
+func (m *manager) Get() (nft.Nft, error) {
 	//NOTE: YES --numeric MUST BE THERE 2 TIMES, PLEASE DO NOT REMOVE
 	job, err := m.api.System("nft", "--json", "--handle", "--numeric", "--numeric", "list", "ruleset")
 	if err != nil {

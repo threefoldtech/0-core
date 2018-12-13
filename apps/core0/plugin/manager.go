@@ -17,12 +17,12 @@ var (
 
 //Manager a plugin manager
 type Manager struct {
-	path    string
+	path    []string
 	plugins map[string]*plg.Plugin
 }
 
 //New create a new plugin manager
-func New(path string) (*Manager, error) {
+func New(path ...string) (*Manager, error) {
 	m := &Manager{
 		path:    path,
 		plugins: make(map[string]*plg.Plugin),
@@ -37,7 +37,7 @@ func (m *Manager) Get(name string) (pm.Action, error) {
 }
 
 func (m *Manager) open(p string) (*plg.Plugin, error) {
-	log.Info("loading plugin %s", p)
+	log.Infof("loading plugin %s", p)
 	plug, err := plugin.Open(p)
 	if err != nil {
 		return nil, err
@@ -56,7 +56,28 @@ func (m *Manager) open(p string) (*plg.Plugin, error) {
 }
 
 func (m *Manager) load() error {
-	items, err := ioutil.ReadDir(m.path)
+	for _, p := range m.path {
+		if err := m.loadPath(p); err != nil {
+			return err
+		}
+	}
+
+	for _, plugin := range m.plugins {
+		if plugin.Open != nil {
+			if err := plugin.Open(m); err != nil {
+				log.Errorf("failed to initialize plugin %s: %s", plugin.Name, err)
+				continue
+			}
+		}
+
+		log.Infof("plugin %s loaded", plugin.Name)
+	}
+
+	return nil
+}
+
+func (m *Manager) loadPath(p string) error {
+	items, err := ioutil.ReadDir(p)
 	if err != nil {
 		return err
 	}
@@ -70,20 +91,12 @@ func (m *Manager) load() error {
 			continue
 		}
 
-		plugin, err := m.open(path.Join(m.path, item.Name()))
+		plugin, err := m.open(path.Join(p, item.Name()))
 
 		if err != nil {
 			return err
 		}
 
-		if plugin.Open != nil {
-			if err := plugin.Open(m); err != nil {
-				log.Errorf("failed to initialize plugin %s: %s", plugin.Name, err)
-				continue
-			}
-		}
-
-		log.Infof("plugin %s loaded", plugin.Name)
 		m.plugins[plugin.Name] = plugin
 	}
 

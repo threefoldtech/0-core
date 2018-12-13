@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"strings"
+
+	"github.com/threefoldtech/0-core/apps/plugins/nft"
 )
 
 //IPv4Set creates/updates element set of type ipv4_addr
-func (m *manager) IPv4Set(family Family, table string, name string, ips ...string) error {
+func (m *manager) IPv4Set(family nft.Family, table string, name string, ips ...string) error {
 	//nft add set ip nat host { type ipv4_addr\; }
 	//nft add element ip nat host { 172^C9.0.1, 172.18.0.1 }
 
@@ -26,7 +28,7 @@ func (m *manager) IPv4Set(family Family, table string, name string, ips ...strin
 }
 
 //IPv4SetDel delete ips from a ipv4_addr set
-func (m *manager) IPv4SetDel(family Family, table, name string, ips ...string) error {
+func (m *manager) IPv4SetDel(family nft.Family, table, name string, ips ...string) error {
 	if len(ips) == 0 {
 		return nil
 	}
@@ -38,6 +40,6 @@ func (m *manager) IPv4SetDel(family Family, table, name string, ips ...string) e
 }
 
 //IPv4SetGet gets the current ipv4 set
-func (m *manager) IPv4SetGet(family Family, table, name string) ([]string, error) {
+func (m *manager) IPv4SetGet(family nft.Family, table, name string) ([]string, error) {
 	return nil, fmt.Errorf("not implemented")
 }

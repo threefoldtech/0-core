@@ -5,15 +5,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/threefoldtech/0-core/apps/plugins/nft"
 )
 
 func TestMarshal(t *testing.T) {
-	nft := Nft{
-		"nat": Table{
-			Family: FamilyIP,
-			Chains: Chains{
-				"post": Chain{
-					Rules: []Rule{
+	nft := nft.Nft{
+		"nat": nft.Table{
+			Family: nft.FamilyIP,
+			Chains: nft.Chains{
+				"post": nft.Chain{
+					Rules: []nft.Rule{
 						{Body: fmt.Sprintf("ip saddr %s masquerade", "1.1.1.1")},
 					},
 				},
@@ -47,22 +48,22 @@ func TestFindRules(t *testing.T) {
 		t.Fatal()
 	}
 
-	sub := Nft{
-		"nat": Table{
-			Family: FamilyIP,
-			Chains: Chains{
-				"pre": Chain{
-					Rules: []Rule{
+	sub := nft.Nft{
+		"nat": nft.Table{
+			Family: nft.FamilyIP,
+			Chains: nft.Chains{
+				"pre": nft.Chain{
+					Rules: []nft.Rule{
 						{Body: "ip daddr @host iifname \"eth0\" tcp dport 8000 dnat to 172.18.0.2:7999"},
 					},
 				},
 			},
 		},
-		"filter": Table{
-			Family: FamilyINET,
-			Chains: Chains{
-				"input": Chain{
-					Rules: []Rule{
+		"filter": nft.Table{
+			Family: nft.FamilyINET,
+			Chains: nft.Chains{
+				"input": nft.Chain{
+					Rules: []nft.Rule{
 						{Body: "tcp dport 5900 accept"},
 					},
 				},
@@ -93,12 +94,12 @@ func TestFindRules2(t *testing.T) {
 		t.Fatal()
 	}
 
-	sub := Nft{
-		"nat": Table{
-			Family: FamilyIP,
-			Chains: Chains{
-				"pre": Chain{
-					Rules: []Rule{
+	sub := nft.Nft{
+		"nat": nft.Table{
+			Family: nft.FamilyIP,
+			Chains: nft.Chains{
+				"pre": nft.Chain{
+					Rules: []nft.Rule{
 						{Body: "ip daddr @host ip saddr 10.2.10.8 tcp dport 8001 dnat to 172.18.0.12:7999"},
 					},
 				},
@@ -125,12 +126,12 @@ func TestFindRules3(t *testing.T) {
 		t.Fatal()
 	}
 
-	sub := Nft{
-		"nat": Table{
-			Family: FamilyIP,
-			Chains: Chains{
-				"pre": Chain{
-					Rules: []Rule{
+	sub := nft.Nft{
+		"nat": nft.Table{
+			Family: nft.FamilyIP,
+			Chains: nft.Chains{
+				"pre": nft.Chain{
+					Rules: []nft.Rule{
 						{Body: "ip daddr @host ip saddr 10.2.0.0/16 tcp dport 8002 dnat to 172.18.0.2:7999"},
 					},
 				},

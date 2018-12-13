@@ -7,7 +7,7 @@ import (
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
-func (s *socatAPI) list(ctx pm.Context) (interface{}, error) {
+func (s *socatManager) list(ctx pm.Context) (interface{}, error) {
 	s.rm.Lock()
 	defer s.rm.Unlock()
 
@@ -27,7 +27,7 @@ func (s *socatAPI) list(ctx pm.Context) (interface{}, error) {
 	return m, nil
 }
 
-func (s *socatAPI) reserve(ctx pm.Context) (interface{}, error) {
+func (s *socatManager) reserve(ctx pm.Context) (interface{}, error) {
 	var query struct {
 		Numer int `json:"number"`
 	}

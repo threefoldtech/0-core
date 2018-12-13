@@ -26,9 +26,9 @@ const (
 )
 
 var (
-	MaxJobs           int
-	UnknownCommandErr = errors.New("unkonw command")
-	DuplicateIDErr    = errors.New("duplicate job id")
+	MaxJobs           int = 100
+	UnknownCommandErr     = errors.New("unkonw command")
+	DuplicateIDErr        = errors.New("duplicate job id")
 )
 
 type Tag struct {
@@ -58,13 +58,13 @@ var (
 )
 
 //New initialize singleton process manager
-func New(router Router) {
+func New(r Router) {
 	n.Do(func() {
 		log.Debugf("initializing manager")
 		jobs = make(map[string]pm.Job)
 		jobsCond = sync.NewCond(&sync.Mutex{})
 		pids = make(map[int]chan syscall.WaitStatus)
-		router = router
+		router = r
 
 		queue.Init()
 	})
@@ -104,7 +104,6 @@ func RunFactory(cmd *pm.Command, factory ProcessFactory, hooks ...pm.RunnerHook)
 
 	job := newJob(cmd, factory, hooks...)
 	jobs[cmd.ID] = job
-
 	queue.Push(job)
 	return job, nil
 }

@@ -1,29 +1,4 @@
-package main
-
-import (
-	"github.com/threefoldtech/0-core/base/plugin"
-)
-
-var (
-	nft manager
-	_   API = (*manager)(nil)
-
-	Plugin = plugin.Plugin{
-		Name:    "nft",
-		Version: "1.0",
-		Open: func(api plugin.API) error {
-			nft.api = api
-			return nil
-		},
-		API: func() interface{} {
-			return &nft
-		},
-	}
-)
-
-type manager struct {
-	api plugin.API
-}
+package nft
 
 //API defines nft api
 type API interface {

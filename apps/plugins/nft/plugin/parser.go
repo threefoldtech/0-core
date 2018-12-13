@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/threefoldtech/0-core/apps/plugins/nft"
 )
 
 //NftJsonBlock defines a nft json block
@@ -11,9 +13,9 @@ type NftJsonBlock map[string]json.RawMessage
 
 type NftTableBlock struct {
 	//{'family': 'ip', 'name': 'nat', 'handle': 0}
-	Family Family `json:"family"`
-	Name   string `json:"name"`
-	Handle int    `json:"handle"`
+	Family nft.Family `json:"family"`
+	Name   string     `json:"name"`
+	Handle int        `json:"handle"`
 }
 
 type NftSetBlock struct {
@@ -26,12 +28,12 @@ type NftSetBlock struct {
 		'handle': 0}
 	*/
 
-	Family   Family   `json:"family"`
-	Name     string   `json:"name"`
-	Table    string   `json:"table"`
-	Elements []string `json:"elem"`
-	Type     string   `json:"type"`
-	Handle   int      `json:"handle"`
+	Family   nft.Family `json:"family"`
+	Name     string     `json:"name"`
+	Table    string     `json:"table"`
+	Elements []string   `json:"elem"`
+	Type     string     `json:"type"`
+	Handle   int        `json:"handle"`
 }
 
 type NftChainBlock struct {
@@ -45,14 +47,14 @@ type NftChainBlock struct {
 		'type': 'nat',
 		'policy': 'accept'}
 	*/
-	Hook     string `json:"hook"`
-	Family   Family `json:"family"`
-	Priority int    `json:"prio"`
-	Table    string `json:"table"`
-	Name     string `json:"name"`
-	Handle   int    `json:"handle"`
-	Type     Type   `json:"type"`
-	Policy   string `json:"policy"`
+	Hook     string     `json:"hook"`
+	Family   nft.Family `json:"family"`
+	Priority int        `json:"prio"`
+	Table    string     `json:"table"`
+	Name     string     `json:"name"`
+	Handle   int        `json:"handle"`
+	Type     nft.Type   `json:"type"`
+	Policy   string     `json:"policy"`
 }
 
 type NftRuleBlock struct {
@@ -65,64 +67,64 @@ type NftRuleBlock struct {
 		'handle': 5,
 		'chain': 'input'}
 	*/
-	Family    Family         `json:"family"`
+	Family    nft.Family     `json:"family"`
 	Expresion []NftJsonBlock `json:"expr"`
 	Table     string         `json:"table"`
 	Handle    int            `json:"handle"`
 	Chain     string         `json:"chain"`
 }
 
-func setTableBlock(nft Nft, msg json.RawMessage) error {
+func setTableBlock(set nft.Nft, msg json.RawMessage) error {
 	var table NftTableBlock
 	if err := json.Unmarshal(msg, &table); err != nil {
 		return err
 	}
 
-	nft[table.Name] = Table{
-		Chains: Chains{},
-		Sets:   Sets{},
+	set[table.Name] = nft.Table{
+		Chains: nft.Chains{},
+		Sets:   nft.Sets{},
 		Family: table.Family,
 	}
 
 	return nil
 }
 
-func setSetBlock(nft Nft, msg json.RawMessage) error {
+func setSetBlock(n nft.Nft, msg json.RawMessage) error {
 	var set NftSetBlock
 	if err := json.Unmarshal(msg, &set); err != nil {
 		return err
 	}
-	table, ok := nft[set.Table]
+	table, ok := n[set.Table]
 	if !ok {
 		return fmt.Errorf("unknown table %s", set.Table)
 	}
 
-	table.Sets[set.Name] = Set{
+	table.Sets[set.Name] = nft.Set{
 		Elements: set.Elements,
 	}
 
-	nft[set.Table] = table
+	n[set.Table] = table
 	return nil
 }
 
-func setChainBlock(nft Nft, msg json.RawMessage) error {
+func setChainBlock(set nft.Nft, msg json.RawMessage) error {
 	var chain NftChainBlock
 	if err := json.Unmarshal(msg, &chain); err != nil {
 		return err
 	}
-	table, ok := nft[chain.Table]
+	table, ok := set[chain.Table]
 	if !ok {
 		return fmt.Errorf("unknown table %s", chain.Table)
 	}
 
-	table.Chains[chain.Name] = Chain{
+	table.Chains[chain.Name] = nft.Chain{
 		Type:     chain.Type,
 		Hook:     chain.Hook,
 		Priority: chain.Priority,
 		Policy:   chain.Policy,
 	}
 
-	nft[chain.Table] = table
+	set[chain.Table] = table
 
 	return nil
 }
@@ -285,12 +287,12 @@ func renderRule(expr []NftJsonBlock) (string, error) {
 	return buf.String(), nil
 }
 
-func setRuleBlock(nft Nft, msg json.RawMessage) error {
+func setRuleBlock(set nft.Nft, msg json.RawMessage) error {
 	var rule NftRuleBlock
 	if err := json.Unmarshal(msg, &rule); err != nil {
 		return err
 	}
-	table, ok := nft[rule.Table]
+	table, ok := set[rule.Table]
 	if !ok {
 		return fmt.Errorf("unknown table %s", rule.Table)
 	}
@@ -304,19 +306,19 @@ func setRuleBlock(nft Nft, msg json.RawMessage) error {
 	if err != nil {
 		return err
 	}
-	chain.Rules = append(chain.Rules, Rule{
+	chain.Rules = append(chain.Rules, nft.Rule{
 		Handle: rule.Handle,
 		Body:   body,
 	})
 
 	table.Chains[rule.Chain] = chain
-	nft[rule.Table] = table
+	set[rule.Table] = table
 	return nil
 }
 
 //Parse nft json output
-func Parse(config string) (Nft, error) {
-	nft := Nft{}
+func Parse(config string) (nft.Nft, error) {
+	nft := nft.Nft{}
 
 	var loaded struct {
 		Blocks []NftJsonBlock `json:"nftables"`

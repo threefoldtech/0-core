@@ -8,20 +8,22 @@ import (
 
 func TestResolveInvalidSyntax(t *testing.T) {
 	address := "1234"
+	mgr := &socatManager{}
 
-	if ok := assert.Equal(t, address, Resolve(address)); !ok {
+	if ok := assert.Equal(t, address, mgr.Resolve(address)); !ok {
 		t.Error()
 	}
 
 	address = ":1234"
-	if ok := assert.Equal(t, address, Resolve(address)); !ok {
+	if ok := assert.Equal(t, address, mgr.Resolve(address)); !ok {
 		t.Error()
 	}
 }
 
 func TestResolveAny(t *testing.T) {
 	src, _ := getSource("8080")
-	socat.rules = map[int]rule{
+	mgr := &socatManager{}
+	mgr.rules = map[int]rule{
 		src.port: rule{
 			source: src,
 			port:   80,
@@ -29,14 +31,15 @@ func TestResolveAny(t *testing.T) {
 		},
 	}
 
-	if ok := assert.Equal(t, "1.2.3.4:80", Resolve("127.0.0.1:8080")); !ok {
+	if ok := assert.Equal(t, "1.2.3.4:80", mgr.Resolve("127.0.0.1:8080")); !ok {
 		t.Error()
 	}
 }
 
 func TestResolveNetwork(t *testing.T) {
 	src, _ := getSource("127.0.0.0/8:8080")
-	socat.rules = map[int]rule{
+	mgr := &socatManager{}
+	mgr.rules = map[int]rule{
 		src.port: rule{
 			source: src,
 			port:   80,
@@ -44,18 +47,19 @@ func TestResolveNetwork(t *testing.T) {
 		},
 	}
 
-	if ok := assert.Equal(t, "1.2.3.4:80", Resolve("127.0.0.1:8080")); !ok {
+	if ok := assert.Equal(t, "1.2.3.4:80", mgr.Resolve("127.0.0.1:8080")); !ok {
 		t.Error()
 	}
 
-	if ok := assert.Equal(t, "128.0.0.1:8080", Resolve("128.0.0.1:8080")); !ok {
+	if ok := assert.Equal(t, "128.0.0.1:8080", mgr.Resolve("128.0.0.1:8080")); !ok {
 		t.Error()
 	}
 }
 
 func TestResolveInf(t *testing.T) {
 	src, _ := getSource("lo:8080")
-	socat.rules = map[int]rule{
+	mgr := &socatManager{}
+	mgr.rules = map[int]rule{
 		src.port: rule{
 			source: src,
 			port:   80,
@@ -63,18 +67,19 @@ func TestResolveInf(t *testing.T) {
 		},
 	}
 
-	if ok := assert.Equal(t, "1.2.3.4:80", Resolve("127.0.0.1:8080")); !ok {
+	if ok := assert.Equal(t, "1.2.3.4:80", mgr.Resolve("127.0.0.1:8080")); !ok {
 		t.Error()
 	}
 
-	if ok := assert.Equal(t, "192.168.1.1:8080", Resolve("192.168.1.1:8080")); !ok {
+	if ok := assert.Equal(t, "192.168.1.1:8080", mgr.Resolve("192.168.1.1:8080")); !ok {
 		t.Error()
 	}
 }
 
 func TestResolveInfParital(t *testing.T) {
 	src, _ := getSource("l*:8080")
-	socat.rules = map[int]rule{
+	mgr := &socatManager{}
+	mgr.rules = map[int]rule{
 		src.port: rule{
 			source: src,
 			port:   80,
@@ -82,18 +87,19 @@ func TestResolveInfParital(t *testing.T) {
 		},
 	}
 
-	if ok := assert.Equal(t, "1.2.3.4:80", Resolve("127.0.0.1:8080")); !ok {
+	if ok := assert.Equal(t, "1.2.3.4:80", mgr.Resolve("127.0.0.1:8080")); !ok {
 		t.Error()
 	}
 
-	if ok := assert.Equal(t, "192.168.1.1:8080", Resolve("192.168.1.1:8080")); !ok {
+	if ok := assert.Equal(t, "192.168.1.1:8080", mgr.Resolve("192.168.1.1:8080")); !ok {
 		t.Error()
 	}
 }
 
 func TestResolveURL(t *testing.T) {
 	src, _ := getSource(":80")
-	socat.rules = map[int]rule{
+	mgr := &socatManager{}
+	mgr.rules = map[int]rule{
 		src.port: rule{
 			source: src,
 			port:   8080,
@@ -101,7 +107,7 @@ func TestResolveURL(t *testing.T) {
 		},
 	}
 
-	url, err := ResolveURL("http://127.0.0.1/")
+	url, err := mgr.ResolveURL("http://127.0.0.1/")
 
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
@@ -111,7 +117,7 @@ func TestResolveURL(t *testing.T) {
 		t.Error()
 	}
 
-	url, err = ResolveURL("http://127.0.0.1:9000/")
+	url, err = mgr.ResolveURL("http://127.0.0.1:9000/")
 
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
@@ -121,7 +127,7 @@ func TestResolveURL(t *testing.T) {
 		t.Error()
 	}
 
-	url, err = ResolveURL("http://localhost/")
+	url, err = mgr.ResolveURL("http://localhost/")
 
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
@@ -131,7 +137,7 @@ func TestResolveURL(t *testing.T) {
 		t.Error()
 	}
 
-	url, err = ResolveURL("zdb://127.0.0.1:80/")
+	url, err = mgr.ResolveURL("zdb://127.0.0.1:80/")
 
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
