@@ -988,6 +988,8 @@ class SystemTests(BaseTest):
         self.client.cgroup.task_remove(subsystem, cg_name, pid)
         res = self.client.cgroup.tasks(subsystem, cg_name)
         self.assertFalse(res)
+        self.lg('Remove cgroup')
+        self.client.cgroup.remove(subsystem, cg_name)
 
         self.lg('{} ENDED'.format(self._testID))
 
