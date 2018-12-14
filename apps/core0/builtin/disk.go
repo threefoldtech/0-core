@@ -38,6 +38,7 @@ func init() {
 	pm.RegisterBuiltIn("disk.smartctl-info", d.smartctlInfo)
 	pm.RegisterBuiltIn("disk.smartctl-health", d.smartctlHealth)
 	pm.RegisterBuiltIn("disk.spindown", d.spindown)
+	pm.RegisterBuiltIn("disk.isstandby", d.isStandby)
 	pm.RegisterBuiltIn("disk.seektime", d.seektime)
 }
 
@@ -703,6 +704,34 @@ func (d *diskMgr) spindown(cmd *pm.Command) (interface{}, error) {
 	}
 
 	return nil, nil
+}
+
+func (d *diskMgr) isStandby(cmd *pm.Command) (interface{}, error) {
+	var args struct {
+		Disk string `json:"disk"`
+	}
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+	// assert disk exists
+	if !utils.Exists(args.Disk) {
+		return nil, pm.BadRequestError(fmt.Errorf("disk doesn't exist: %s", args.Disk))
+
+	}
+	bytes, err := pm.System("hdparm", "-C", fmt.Sprintf(args.Disk))
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(bytes.Streams.Stdout(), "\n")
+	for _, i := range lines {
+		d := strings.Split(i, ":")
+		if strings.Contains(d[0], "drive state") {
+			if strings.TrimSpace(d[1]) == "standby" {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 func (d *diskMgr) seektime(cmd *pm.Command) (interface{}, error) {
