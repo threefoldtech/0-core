@@ -39,7 +39,7 @@ class SystemTests(BaseTest):
         self.lg('Create a vm, should succeed')
         vm_name = self.rand_str()
         nics = [{'id': 'None', 'type': 'default'}]
-        pub_port = 4444
+        pub_port = randint(4000,5000)
         ports = {pub_port:6379}
         vm_uuid = self.create_vm(name=vm_name, flist=self.zos_flist
                                  ports=ports, nics=nics)
