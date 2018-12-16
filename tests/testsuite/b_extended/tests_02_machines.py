@@ -46,7 +46,7 @@ class ExtendedMachines(BaseTest):
 
         self.lg('Create Virtual machine (vm1)')
         vm_name = self.rand_str()
-        vm_uuid = self.create_vm(name=vm_name)
+        vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist)
 
         self.lg('Create vlan (v1) and specific name')
         t1 = randint(1, 4094)
@@ -113,7 +113,7 @@ class ExtendedMachines(BaseTest):
 
         self.lg('Create Virtual machine (vm1)')
         vm_name = self.rand_str()
-        vm_uuid = self.create_vm(name=vm_name)
+        vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist)
 
         self.lg('Create loop device (L1)')
         loop_dev = self.setup_loop_devices(['bd0'], '500M', deattach=True)[0]
