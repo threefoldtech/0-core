@@ -34,7 +34,6 @@ class SystemTests(BaseTest):
         #. Create a vm, should succeed.
         #. Update zos vm version.
         #. Wait till the node is back, then check if the version has been updated.
-        #. Update the node back to its old version and check again.
         """
         self.lg('Create a vm, should succeed')
         vm_name = self.rand_str()
