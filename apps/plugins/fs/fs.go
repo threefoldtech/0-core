@@ -19,18 +19,6 @@ import (
 )
 
 const (
-	cmdFilesystemOpen   = "filesystem.open"
-	cmdFilesystemRead   = "filesystem.read"
-	cmdFilesystemWrite  = "filesystem.write"
-	cmdFilesystemClose  = "filesystem.close"
-	cmdFilesystemMkDir  = "filesystem.mkdir"
-	cmdFilesystemRemove = "filesystem.remove"
-	cmdFilesystemChmod  = "filesystem.chmod"
-	cmdFilesystemChown  = "filesystem.chown"
-	cmdFilesystemExists = "filesystem.exists"
-	cmdFilesystemList   = "filesystem.list"
-	cmdFilesystemMove   = "filesystem.move"
-
 	fsReadBS = 512 * 1024 //512K
 )
 

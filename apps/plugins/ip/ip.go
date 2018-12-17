@@ -27,6 +27,7 @@ var (
 		Version: "1.0",
 		Open: func(api plugin.API) error {
 			ip.api = api
+			return nil
 		},
 		Actions: map[string]pm.Action{
 			"bridge.add":   ip.brAdd,
@@ -37,7 +38,7 @@ var (
 			"link.up":   ip.linkUp,
 			"link.down": ip.linkDown,
 			"link.name": ip.linkName,
-			"link.link": ip.linkList,
+			"link.list": ip.linkList,
 			"link.mtu":  ip.linkMTU,
 
 			"addr.add":  ip.addrAdd,
@@ -195,7 +196,7 @@ func (m *ipmgr) bondAdd(ctx pm.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	if _, err := pm.System("ifenslave", enslave...); err != nil {
+	if _, err := m.api.System("ifenslave", enslave...); err != nil {
 		return nil, err
 	}
 
