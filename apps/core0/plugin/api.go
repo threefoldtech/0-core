@@ -27,6 +27,10 @@ func (m *Manager) JobOf(id string) (pm.Job, bool) {
 	return mgr.JobOf(id)
 }
 
+func (m *Manager) Jobs() map[string]pm.Job {
+	return mgr.Jobs()
+}
+
 //Plugin plugin API getter
 func (m *Manager) Plugin(name string) (interface{}, error) {
 	plg, ok := m.plugins[name]

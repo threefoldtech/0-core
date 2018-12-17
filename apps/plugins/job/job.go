@@ -1,10 +1,11 @@
-package builtin
+package job
 
 import (
 	"encoding/json"
 	"fmt"
 	"syscall"
 
+	"github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
@@ -15,12 +16,23 @@ const (
 	cmdJobUnschedule = "job.unschedule"
 )
 
-func init() {
-	pm.RegisterBuiltIn(cmdJobList, jobList)
-	pm.RegisterBuiltIn(cmdJobKill, jobKill)
-	pm.RegisterBuiltIn(cmdJobKillAll, jobKillAll)
-	pm.RegisterBuiltIn(cmdJobUnschedule, jobUnschedule)
-}
+var (
+	api plugin.API
+	//Plugin entry point
+	Plugin = plugin.Plugin{
+		Name:    "job",
+		Version: "1.0",
+		Open: func(a plugin.API) error {
+			api = a
+			return nil
+		},
+		Actions: map[string]pm.Action{
+			"list":       list,
+			"kill":       kill,
+			"unschedule": unschedule,
+		},
+	}
+)
 
 type jobArguments struct {
 	ID string `json:"id"`
@@ -33,9 +45,10 @@ type processData struct {
 	PID       int32       `json:"pid"`
 }
 
-func jobList(cmd *pm.Command) (interface{}, error) {
+func list(ctx pm.Context) (interface{}, error) {
 	//load data
 	var data jobArguments
+	cmd := ctx.Command()
 	err := json.Unmarshal(*cmd.Arguments, &data)
 	if err != nil {
 		return nil, err
@@ -45,7 +58,7 @@ func jobList(cmd *pm.Command) (interface{}, error) {
 	var runners []pm.Job
 
 	if data.ID != "" {
-		job, ok := pm.JobOf(data.ID)
+		job, ok := api.JobOf(data.ID)
 
 		if !ok {
 			return nil, fmt.Errorf("Process with id '%s' doesn't exist", data.ID)
@@ -53,7 +66,7 @@ func jobList(cmd *pm.Command) (interface{}, error) {
 
 		runners = []pm.Job{job}
 	} else {
-		for _, runner := range pm.Jobs() {
+		for _, runner := range api.Jobs() {
 			runners = append(runners, runner)
 		}
 	}
@@ -89,9 +102,10 @@ type jobKillArguments struct {
 	Signal syscall.Signal `json:"signal"`
 }
 
-func jobKill(cmd *pm.Command) (interface{}, error) {
+func kill(ctx pm.Context) (interface{}, error) {
 	//load data
 	data := jobKillArguments{}
+	cmd := ctx.Command()
 	err := json.Unmarshal(*cmd.Arguments, &data)
 
 	if err != nil {
@@ -102,7 +116,7 @@ func jobKill(cmd *pm.Command) (interface{}, error) {
 		data.Signal = syscall.SIGTERM
 	}
 
-	job, ok := pm.JobOf(data.ID)
+	job, ok := api.JobOf(data.ID)
 	if !ok {
 		return false, nil
 	}
@@ -115,26 +129,22 @@ func jobKill(cmd *pm.Command) (interface{}, error) {
 
 }
 
-func jobUnschedule(cmd *pm.Command) (interface{}, error) {
+func unschedule(ctx pm.Context) (interface{}, error) {
 	//load data
 	data := jobArguments{}
+	cmd := ctx.Command()
 	err := json.Unmarshal(*cmd.Arguments, &data)
 
 	if err != nil {
 		return nil, err
 	}
 
-	job, ok := pm.JobOf(data.ID)
+	job, ok := api.JobOf(data.ID)
 	if !ok {
 		return false, nil
 	}
 
 	job.Unschedule()
 
-	return true, nil
-}
-
-func jobKillAll(cmd *pm.Command) (interface{}, error) {
-	pm.Killall()
 	return true, nil
 }

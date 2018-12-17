@@ -18,11 +18,5 @@ type PIDTable interface {
 	WaitPID(pid int) syscall.WaitStatus
 }
 
-//PIDer a process that can return a PID
-type PIDer interface {
-	pm.Process
-	GetPID() int32
-}
-
 //ProcessFactory interface
 type ProcessFactory func(PIDTable, *pm.Command) pm.Process

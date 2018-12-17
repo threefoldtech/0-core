@@ -63,3 +63,9 @@ type Stater interface {
 	Process
 	Stats() *ProcessStats
 }
+
+//PIDer a process that can return a PID
+type PIDer interface {
+	Process
+	GetPID() int32
+}

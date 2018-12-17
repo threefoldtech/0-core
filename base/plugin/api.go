@@ -8,5 +8,6 @@ type API interface {
 	System(bin string, args ...string) (*pm.JobResult, error)
 	Internal(cmd string, args pm.M, out interface{}) error
 	JobOf(id string) (pm.Job, bool)
+	Jobs() map[string]pm.Job
 	Plugin(name string) (interface{}, error)
 }
