@@ -1,4 +1,4 @@
-package builtin
+package ip
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/vishvananda/netlink"
 )
@@ -17,40 +18,51 @@ const (
 	bondingBaseDir = "/proc/net/bonding/"
 )
 
+var (
+	//Plugin entry point
+	ip ipmgr
+
+	Plugin = plugin.Plugin{
+		Name:    "ip",
+		Version: "1.0",
+		Open: func(api plugin.API) error {
+			ip.api = api
+		},
+		Actions: map[string]pm.Action{
+			"bridge.add":   ip.brAdd,
+			"bridge.del":   ip.brDel,
+			"bridge.addif": ip.brAddInf,
+			"bridge.delif": ip.brDelInf,
+
+			"link.up":   ip.linkUp,
+			"link.down": ip.linkDown,
+			"link.name": ip.linkName,
+			"link.link": ip.linkList,
+			"link.mtu":  ip.linkMTU,
+
+			"addr.add":  ip.addrAdd,
+			"addr.del":  ip.addrDel,
+			"addr.list": ip.addrList,
+
+			"route.add":  ip.routeAdd,
+			"route.del":  ip.routeDel,
+			"route.list": ip.routeList,
+
+			"bond.add":  ip.bondAdd,
+			"bond.del":  ip.bondDel,
+			"bond.list": ip.bondList,
+		},
+	}
+)
+
 type ipmgr struct {
 	bondOnce sync.Once
-}
-
-func init() {
-	var mgr ipmgr
-
-	pm.RegisterBuiltIn("ip.bridge.add", mgr.brAdd)
-	pm.RegisterBuiltIn("ip.bridge.del", mgr.brDel)
-	pm.RegisterBuiltIn("ip.bridge.addif", mgr.brAddInf)
-	pm.RegisterBuiltIn("ip.bridge.delif", mgr.brDelInf)
-
-	pm.RegisterBuiltIn("ip.link.up", mgr.linkUp)
-	pm.RegisterBuiltIn("ip.link.down", mgr.linkDown)
-	pm.RegisterBuiltIn("ip.link.name", mgr.linkName)
-	pm.RegisterBuiltIn("ip.link.list", mgr.linkList)
-	pm.RegisterBuiltIn("ip.link.mtu", mgr.linkMTU)
-
-	pm.RegisterBuiltIn("ip.addr.add", mgr.addrAdd)
-	pm.RegisterBuiltIn("ip.addr.del", mgr.addrDel)
-	pm.RegisterBuiltIn("ip.addr.list", mgr.addrList)
-
-	pm.RegisterBuiltIn("ip.route.add", mgr.routeAdd)
-	pm.RegisterBuiltIn("ip.route.del", mgr.routeDel)
-	pm.RegisterBuiltIn("ip.route.list", mgr.routeList)
-
-	pm.RegisterBuiltIn("ip.bond.add", mgr.bondAdd)
-	pm.RegisterBuiltIn("ip.bond.list", mgr.bondList)
-	pm.RegisterBuiltIn("ip.bond.del", mgr.bondDel)
+	api      plugin.API
 }
 
 func (m *ipmgr) initBonding() {
 	m.bondOnce.Do(func() {
-		pm.System("modprobe", "bonding")
+		m.api.System("modprobe", "bonding")
 		link, err := netlink.LinkByName("bond0")
 		if err != nil {
 			return
@@ -89,7 +101,7 @@ func (_ *ipmgr) parseBond(c string) interface{} {
 	return l
 }
 
-func (m *ipmgr) bondList(cmd *pm.Command) (interface{}, error) {
+func (m *ipmgr) bondList(ctx pm.Context) (interface{}, error) {
 	m.initBonding()
 	files, err := ioutil.ReadDir(bondingBaseDir)
 	if err != nil {
@@ -110,11 +122,11 @@ func (m *ipmgr) bondList(cmd *pm.Command) (interface{}, error) {
 	return bonds, nil
 }
 
-func (m *ipmgr) bondDel(cmd *pm.Command) (interface{}, error) {
+func (m *ipmgr) bondDel(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Bond string `json:"bond"`
 	}
-
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -127,7 +139,7 @@ func (m *ipmgr) bondDel(cmd *pm.Command) (interface{}, error) {
 	return nil, netlink.LinkDel(link)
 }
 
-func (m *ipmgr) bondAdd(cmd *pm.Command) (interface{}, error) {
+func (m *ipmgr) bondAdd(ctx pm.Context) (interface{}, error) {
 	m.initBonding()
 
 	var args struct {
@@ -135,6 +147,8 @@ func (m *ipmgr) bondAdd(cmd *pm.Command) (interface{}, error) {
 		Interfaces []string `json:"interfaces"`
 		MTU        int      `json:"mtu"`
 	}
+
+	cmd := ctx.Command()
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
@@ -197,8 +211,9 @@ type BridgeArguments struct {
 	HwAddress string `json:"hwaddr"`
 }
 
-func (_ *ipmgr) brAdd(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) brAdd(ctx pm.Context) (interface{}, error) {
 	var args BridgeArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -238,8 +253,9 @@ func (_ *ipmgr) brAdd(cmd *pm.Command) (interface{}, error) {
 	return nil, err
 }
 
-func (_ *ipmgr) brDel(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) brDel(ctx pm.Context) (interface{}, error) {
 	var args LinkArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -260,8 +276,9 @@ type BridgeInfArguments struct {
 	Inf string `json:"inf"`
 }
 
-func (_ *ipmgr) brAddInf(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) brAddInf(ctx pm.Context) (interface{}, error) {
 	var args BridgeInfArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -282,8 +299,9 @@ func (_ *ipmgr) brAddInf(cmd *pm.Command) (interface{}, error) {
 	return nil, netlink.LinkSetMaster(inf, link.(*netlink.Bridge))
 }
 
-func (_ *ipmgr) brDelInf(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) brDelInf(ctx pm.Context) (interface{}, error) {
 	var args BridgeInfArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -308,8 +326,9 @@ func (_ *ipmgr) brDelInf(cmd *pm.Command) (interface{}, error) {
 	return nil, netlink.LinkSetNoMaster(inf)
 }
 
-func (_ *ipmgr) linkUp(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) linkUp(ctx pm.Context) (interface{}, error) {
 	var args LinkArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -332,8 +351,9 @@ type LinkMTUArguments struct {
 	MTU int `json:"mtu"`
 }
 
-func (_ *ipmgr) linkName(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) linkName(ctx pm.Context) (interface{}, error) {
 	var args LinkNameArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -346,8 +366,9 @@ func (_ *ipmgr) linkName(cmd *pm.Command) (interface{}, error) {
 	return nil, netlink.LinkSetName(link, args.New)
 }
 
-func (_ *ipmgr) linkMTU(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) linkMTU(ctx pm.Context) (interface{}, error) {
 	var args LinkMTUArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
@@ -360,8 +381,9 @@ func (_ *ipmgr) linkMTU(cmd *pm.Command) (interface{}, error) {
 	return nil, netlink.LinkSetMTU(link, args.MTU)
 }
 
-func (_ *ipmgr) linkDown(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) linkDown(ctx pm.Context) (interface{}, error) {
 	var args LinkArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -383,7 +405,7 @@ type Link struct {
 	MTU    int    `json:"mtu"`
 }
 
-func (_ *ipmgr) linkList(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) linkList(ctx pm.Context) (interface{}, error) {
 	links, err := netlink.LinkList()
 	if err != nil {
 		return nil, err
@@ -422,8 +444,9 @@ type AddrArguments struct {
 	IP string `json:"ip"`
 }
 
-func (_ *ipmgr) addrAdd(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) addrAdd(ctx pm.Context) (interface{}, error) {
 	var args AddrArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -441,8 +464,9 @@ func (_ *ipmgr) addrAdd(cmd *pm.Command) (interface{}, error) {
 	return nil, netlink.AddrAdd(link, addr)
 }
 
-func (_ *ipmgr) addrDel(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) addrDel(ctx pm.Context) (interface{}, error) {
 	var args AddrArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -460,8 +484,9 @@ func (_ *ipmgr) addrDel(cmd *pm.Command) (interface{}, error) {
 	return nil, netlink.AddrDel(link, addr)
 }
 
-func (_ *ipmgr) addrList(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) addrList(ctx pm.Context) (interface{}, error) {
 	var args LinkArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -519,8 +544,9 @@ func (r *Route) route() (*netlink.Route, error) {
 	return route, nil
 }
 
-func (_ *ipmgr) routeAdd(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) routeAdd(ctx pm.Context) (interface{}, error) {
 	var args Route
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -533,8 +559,9 @@ func (_ *ipmgr) routeAdd(cmd *pm.Command) (interface{}, error) {
 	return nil, netlink.RouteAdd(route)
 }
 
-func (_ *ipmgr) routeDel(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) routeDel(ctx pm.Context) (interface{}, error) {
 	var args Route
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -566,7 +593,7 @@ func (_ *ipmgr) routeDel(cmd *pm.Command) (interface{}, error) {
 	return nil, netlink.RouteDel(&routes[0])
 }
 
-func (_ *ipmgr) routeList(cmd *pm.Command) (interface{}, error) {
+func (_ *ipmgr) routeList(ctx pm.Context) (interface{}, error) {
 	routes, err := netlink.RouteList(nil, netlink.FAMILY_ALL)
 	if err != nil {
 		return nil, err

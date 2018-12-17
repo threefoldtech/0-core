@@ -1,4 +1,4 @@
-package main
+package info
 
 import (
 	"fmt"
@@ -17,8 +17,26 @@ import (
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
 	base "github.com/threefoldtech/0-core/base"
+	"github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
 	"gopkg.in/bufio.v1"
+)
+
+var (
+	//Plugin entry point
+	Plugin = plugin.Plugin{
+		Name:    "info",
+		Version: "1.0",
+		Actions: map[string]pm.Action{
+			"cpu":     getCPUInfo,
+			"mem":     getMemInfo,
+			"disk":    getDiskInfo,
+			"nic":     getNicInfo,
+			"os":      getOsInfo,
+			"port":    getPortInfo,
+			"version": getVersionInfo,
+		},
+	}
 )
 
 type Version struct {
@@ -28,6 +46,7 @@ type Version struct {
 }
 
 func getVersionInfo(ctx pm.Context) (interface{}, error) {
+	//TODO: version should return the core version not the version this module build against
 	return Version{Branch: base.Branch, Revision: base.Revision, Dirty: base.Dirty != ""}, nil
 }
 

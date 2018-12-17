@@ -1,4 +1,4 @@
-package builtin
+package fs
 
 import (
 	"encoding/base64"
@@ -14,6 +14,7 @@ import (
 
 	"github.com/patrickmn/go-cache"
 	"github.com/pborman/uuid"
+	"github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
@@ -31,6 +32,32 @@ const (
 	cmdFilesystemMove   = "filesystem.move"
 
 	fsReadBS = 512 * 1024 //512K
+)
+
+var (
+	//Plugin entry point
+	fs filesystem
+
+	Plugin = plugin.Plugin{
+		Name:    "filesystem",
+		Version: "1.0",
+		Open: func(api plugin.API) error {
+			return initFS(&fs)
+		},
+		Actions: map[string]pm.Action{
+			"open":   fs.open,
+			"read":   fs.read,
+			"write":  fs.write,
+			"close":  fs.close,
+			"mkdir":  fs.mkdir,
+			"remove": fs.remove,
+			"chmod":  fs.chmod,
+			"chown":  fs.chown,
+			"exists": fs.exists,
+			"list":   fs.list,
+			"move":   fs.move,
+		},
+	}
 )
 
 type filesystem struct {
@@ -81,24 +108,10 @@ type FSEntry struct {
 	IsDir bool        `json:"is_dir"` // abbreviation for Mode().IsDir()
 }
 
-func init() {
-	fs := filesystem{
-		cache: cache.New(5*time.Minute, 30*time.Second),
-	}
-
+func initFS(fs *filesystem) error {
+	fs.cache = cache.New(5*time.Minute, 30*time.Second)
 	fs.cache.OnEvicted(fs.evicted)
-
-	pm.RegisterBuiltIn(cmdFilesystemOpen, fs.open)
-	pm.RegisterBuiltIn(cmdFilesystemRead, fs.read)
-	pm.RegisterBuiltIn(cmdFilesystemWrite, fs.write)
-	pm.RegisterBuiltIn(cmdFilesystemClose, fs.close)
-	pm.RegisterBuiltIn(cmdFilesystemMkDir, fs.mkdir)
-	pm.RegisterBuiltIn(cmdFilesystemRemove, fs.remove)
-	pm.RegisterBuiltIn(cmdFilesystemChmod, fs.chmod)
-	pm.RegisterBuiltIn(cmdFilesystemChown, fs.chown)
-	pm.RegisterBuiltIn(cmdFilesystemExists, fs.exists)
-	pm.RegisterBuiltIn(cmdFilesystemList, fs.list)
-	pm.RegisterBuiltIn(cmdFilesystemMove, fs.move)
+	return nil
 }
 
 func (fs *filesystem) evicted(_ string, f interface{}) {
@@ -154,8 +167,9 @@ func (fs *filesystem) mode(m string) (int, error) {
 	return mode, nil
 }
 
-func (fs *filesystem) open(cmd *pm.Command) (interface{}, error) {
+func (fs *filesystem) open(ctx pm.Context) (interface{}, error) {
 	var args FSOpenArgs
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -176,8 +190,9 @@ func (fs *filesystem) open(cmd *pm.Command) (interface{}, error) {
 	return id, nil
 }
 
-func (fs *filesystem) close(cmd *pm.Command) (interface{}, error) {
+func (fs *filesystem) close(ctx pm.Context) (interface{}, error) {
 	var args FSFileDescriptorArgs
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -188,8 +203,9 @@ func (fs *filesystem) close(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (fs *filesystem) read(cmd *pm.Command) (interface{}, error) {
+func (fs *filesystem) read(ctx pm.Context) (interface{}, error) {
 	var args FSFileDescriptorArgs
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -220,8 +236,9 @@ func (fs *filesystem) read(cmd *pm.Command) (interface{}, error) {
 	return base64.StdEncoding.EncodeToString(buffer[0:n]), err
 }
 
-func (fs *filesystem) write(cmd *pm.Command) (interface{}, error) {
+func (fs *filesystem) write(ctx pm.Context) (interface{}, error) {
 	var args FSWriteArgs
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -250,8 +267,9 @@ func (fs *filesystem) write(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (fs *filesystem) mkdir(cmd *pm.Command) (interface{}, error) {
+func (fs *filesystem) mkdir(ctx pm.Context) (interface{}, error) {
 	var p FSPathArgs
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &p); err != nil {
 		return nil, err
 	}
@@ -259,8 +277,9 @@ func (fs *filesystem) mkdir(cmd *pm.Command) (interface{}, error) {
 	return nil, os.MkdirAll(p.Path, 0755)
 }
 
-func (fs *filesystem) remove(cmd *pm.Command) (interface{}, error) {
+func (fs *filesystem) remove(ctx pm.Context) (interface{}, error) {
 	var p FSPathArgs
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &p); err != nil {
 		return nil, err
 	}
@@ -268,8 +287,9 @@ func (fs *filesystem) remove(cmd *pm.Command) (interface{}, error) {
 	return nil, os.RemoveAll(p.Path)
 }
 
-func (fs *filesystem) exists(cmd *pm.Command) (interface{}, error) {
+func (fs *filesystem) exists(ctx pm.Context) (interface{}, error) {
 	var p FSPathArgs
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &p); err != nil {
 		return nil, err
 	}
@@ -278,8 +298,9 @@ func (fs *filesystem) exists(cmd *pm.Command) (interface{}, error) {
 	return !os.IsNotExist(err), nil
 }
 
-func (fs *filesystem) list(cmd *pm.Command) (interface{}, error) {
+func (fs *filesystem) list(ctx pm.Context) (interface{}, error) {
 	var p FSPathArgs
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &p); err != nil {
 		return nil, err
 	}
@@ -304,8 +325,9 @@ func (fs *filesystem) list(cmd *pm.Command) (interface{}, error) {
 	return results, nil
 }
 
-func (fs *filesystem) chmod(cmd *pm.Command) (interface{}, error) {
+func (fs *filesystem) chmod(ctx pm.Context) (interface{}, error) {
 	var p FSChmodArgs
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &p); err != nil {
 		return nil, err
 	}
@@ -327,8 +349,9 @@ func (fs *filesystem) chmod(cmd *pm.Command) (interface{}, error) {
 	return nil, filepath.Walk(p.Path, walk)
 }
 
-func (fs *filesystem) chown(cmd *pm.Command) (interface{}, error) {
+func (fs *filesystem) chown(ctx pm.Context) (interface{}, error) {
 	var args FSChownArgs
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -363,8 +386,9 @@ func (fs *filesystem) chown(cmd *pm.Command) (interface{}, error) {
 	return nil, filepath.Walk(args.Path, walk)
 }
 
-func (fs *filesystem) move(cmd *pm.Command) (interface{}, error) {
+func (fs *filesystem) move(ctx pm.Context) (interface{}, error) {
 	var p FSMoveArgs
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &p); err != nil {
 		return nil, err
 	}
