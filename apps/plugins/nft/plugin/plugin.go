@@ -11,25 +11,23 @@ import (
 func main() {} // silence the error
 
 var (
-	mgr *manager
+	mgr manager
 	_   nft.API = (*manager)(nil)
 
 	Plugin = plugin.Plugin{
 		Name:    "nft",
 		Version: "1.0",
-		Open: func(api plugin.API) (err error) {
-			mgr, err = newManager(api)
-			if err != nil {
-				return
-			}
-
-			return mgr.init()
+		Open: func(api plugin.API) error {
+			return newManager(&mgr, api)
 		},
 		API: func() interface{} {
-			return mgr
+			return &mgr
 		},
 		Actions: map[string]pm.Action{
-			"open_port": nil,
+			"open_port":   mgr.openPort,
+			"drop_port":   mgr.dropPort,
+			"list":        mgr.listPorts,
+			"rule_exists": mgr.ruleExists,
 		},
 	}
 )
@@ -91,11 +89,11 @@ var (
 	}
 )
 
-func newManager(api plugin.API) (*manager, error) {
-	return &manager{
-		api:   api,
-		rules: make(map[string]struct{}),
-	}, nil
+func newManager(mgr *manager, api plugin.API) error {
+	mgr.api = api
+	mgr.rules = make(map[string]struct{})
+
+	return mgr.init()
 }
 
 type manager struct {

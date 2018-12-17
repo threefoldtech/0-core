@@ -1,22 +1,13 @@
 package main
 
-/*
 import (
 	"encoding/json"
 	"fmt"
 	"net"
 
+	"github.com/threefoldtech/0-core/apps/plugins/nft"
 	"github.com/threefoldtech/0-core/base/pm"
 )
-
-
-func init() {
-	pm.RegisterBuiltIn("nft.open_port", b.openPort)
-	pm.RegisterBuiltIn("nft.drop_port", b.dropPort)
-	pm.RegisterBuiltIn("nft.list", b.listPorts)
-	pm.RegisterBuiltIn("nft.rule_exists", b.ruleExists)
-
-}
 
 type Port struct {
 	Port      int    `json:"port"`
@@ -24,8 +15,9 @@ type Port struct {
 	Subnet    string `json:"subnet,omitempty"`
 }
 
-func (b *manager) parsePort(cmd *pm.Command) (string, error) {
+func (b *manager) parsePort(ctx pm.Context) (string, error) {
 	var args Port
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return "", err
 	}
@@ -63,8 +55,8 @@ func (b *manager) register(rule string) error {
 	return nil
 }
 
-func (b *manager) openPort(cmd *pm.Command) (interface{}, error) {
-	rule, err := b.parsePort(cmd)
+func (b *manager) openPort(ctx pm.Context) (interface{}, error) {
+	rule, err := b.parsePort(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +81,7 @@ func (b *manager) openPort(cmd *pm.Command) (interface{}, error) {
 		},
 	}
 
-	if err := nft.Apply(n); err != nil {
+	if err := b.Apply(n); err != nil {
 		delete(b.rules, rule)
 		return nil, err
 	}
@@ -97,8 +89,8 @@ func (b *manager) openPort(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (b *manager) dropPort(cmd *pm.Command) (interface{}, error) {
-	rule, err := b.parsePort(cmd)
+func (b *manager) dropPort(ctx pm.Context) (interface{}, error) {
+	rule, err := b.parsePort(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +116,7 @@ func (b *manager) dropPort(cmd *pm.Command) (interface{}, error) {
 		},
 	}
 
-	if err := nft.DropRules(n); err != nil {
+	if err := b.DropRules(n); err != nil {
 		return nil, err
 	}
 
@@ -132,7 +124,7 @@ func (b *manager) dropPort(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (b *manager) listPorts(cmd *pm.Command) (interface{}, error) {
+func (b *manager) listPorts(ctx pm.Context) (interface{}, error) {
 	b.m.RLock()
 	defer b.m.RUnlock()
 
@@ -143,8 +135,8 @@ func (b *manager) listPorts(cmd *pm.Command) (interface{}, error) {
 	return ports, nil
 }
 
-func (b *manager) ruleExists(cmd *pm.Command) (interface{}, error) {
-	rule, err := b.parsePort(cmd)
+func (b *manager) ruleExists(ctx pm.Context) (interface{}, error) {
+	rule, err := b.parsePort(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -154,4 +146,3 @@ func (b *manager) ruleExists(cmd *pm.Command) (interface{}, error) {
 
 	return b.exists(rule), nil
 }
-*/

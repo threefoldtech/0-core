@@ -25,7 +25,7 @@ const (
 var (
 	log = logging.MustGetLogger("socat")
 
-	mgr *socatManager
+	mgr socatManager
 	_   socat.API = (*socatManager)(nil) //validation
 
 	//Plugin plugin entry point
@@ -33,15 +33,10 @@ var (
 		Name:    "socat",
 		Version: "1.0",
 		Open: func(api plugin.API) (err error) {
-			mgr, err = newSocatManager(api)
-			if err != nil {
-				return
-			}
-
-			return mgr.init()
+			return newSocatManager(&mgr, api)
 		},
 		API: func() interface{} {
-			return mgr
+			return &mgr
 		},
 		Actions: map[string]pm.Action{
 			"list":    mgr.list,
@@ -69,22 +64,22 @@ type socatManager struct {
 	reserved *cache.Cache
 }
 
-func newSocatManager(api plugin.API) (*socatManager, error) {
+func newSocatManager(mgr *socatManager, api plugin.API) error {
 	p, err := api.Plugin("nft")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	nft, ok := p.(nft.API)
 	if !ok {
-		return nil, fmt.Errorf("wrong nft api")
+		return fmt.Errorf("wrong nft api")
 	}
 
-	return &socatManager{
-		api:      api,
-		nft:      nft,
-		rules:    make(map[int]rule),
-		reserved: cache.New(2*time.Minute, 1*time.Minute),
-	}, nil
+	mgr.api = api
+	mgr.nft = nft
+	mgr.rules = make(map[int]rule)
+	mgr.reserved = cache.New(2*time.Minute, 1*time.Minute)
+
+	return mgr.init()
 }
 
 func (s *socatManager) init() error {
