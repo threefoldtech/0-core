@@ -17,7 +17,6 @@ import (
 	"github.com/shirou/gopsutil/net"
 	base "github.com/threefoldtech/0-core/base"
 	"github.com/threefoldtech/0-core/base/pm"
-	"gopkg.in/bufio.v1"
 )
 
 const (
@@ -65,7 +64,9 @@ func getMemInfo(cmd *pm.Command) (interface{}, error) {
 
 type NicInfo struct {
 	net.InterfaceStat
-	Speed int64 `json:"speed"`
+	Speed     int64 `json:"speed"`
+	Carrier   int64 `json:"carrier"`
+	OperState int64 `json:"operstate"`
 }
 
 func getNicInfo(cmd *pm.Command) (interface{}, error) {
@@ -81,13 +82,17 @@ func getNicInfo(cmd *pm.Command) (interface{}, error) {
 		ret[i].HardwareAddr = ifc.HardwareAddr
 		ret[i].Flags = ifc.Flags
 		ret[i].Addrs = ifc.Addrs
-		dat, err := ioutil.ReadFile("/sys/class/net/" + ifc.Name + "/speed")
-		if err != nil {
-			speed = 0
-		} else {
-			speed, _ = strconv.ParseInt(strings.Trim(string(dat), "\n"), 10, 64)
-		}
+		// no need to check for erros here, as the file is necessarily there,
+		// as it's read in just before by net.Interfaces
+		dat, _ := ioutil.ReadFile("/sys/class/net/" + ifc.Name + "/speed")
+		speed, _ = strconv.ParseInt(strings.Trim(string(dat), "\n"), 10, 64)
 		ret[i].Speed = speed
+		dat, _ = ioutil.ReadFile("/sys/class/net/" + ifc.Name + "/carrier")
+		carrier, _ := strconv.ParseInt(strings.Trim(string(dat), "\n"), 10, 64)
+		ret[i].Carrier = carrier
+		dat, _ = ioutil.ReadFile("/sys/class/net/" + ifc.Name + "/operstate")
+		operstate, _:= strconv.ParseInt(strings.Trim(string(dat), "\n"), 10, 64)
+		ret[i].OperState = operstate
 	}
 	return ret, nil
 }
