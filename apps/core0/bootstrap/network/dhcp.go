@@ -1,6 +1,7 @@
 package network
 
 import (
+	"github.com/vishvananda/netlink"
 	"bytes"
 	"fmt"
 	"io/ioutil"
@@ -63,7 +64,14 @@ func (d *dhcpProtocol) Configure(mgr NetworkManager, inf string) error {
 	}
 
 	if _, err := pm.Run(cmd); err != nil {
-		return err
+		// to counter eventual problems with switches and their arp table,
+		// also disable (ip l set $iface down)
+		link, err := netlink.LinkByName(inf)
+		if err != nil {
+			return err
+		}
+
+		if err := netlink.LinkSetDown(link); err != nil { return err }
 	}
 
 	return nil
