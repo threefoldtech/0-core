@@ -80,7 +80,7 @@ func Splash() {
 	screen.Push(&screen.TextSection{})
 	screen.Push(&screen.TextSection{
 		Attributes: screen.Attributes{screen.Green},
-		Text:       fmt.Sprintf("Version: %s", core.Version().Short()),
+		Text:       fmt.Sprintf("Version: %s", base.Version().Short()),
 	})
 
 	screen.Push(&screen.TextSection{
@@ -123,7 +123,7 @@ func startEntropyGenerator() error {
 
 func main() {
 	var options = options.Options
-	fmt.Println(core.Version())
+	fmt.Println(base.Version())
 	if options.Version() {
 		os.Exit(0)
 	}

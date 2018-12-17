@@ -3,9 +3,15 @@ package plugin
 import (
 	"fmt"
 
+	"github.com/threefoldtech/0-core/base"
 	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
 )
+
+//Version return version of base core0
+func (m *Manager) Version() base.Ver {
+	return base.Version()
+}
 
 //Run proxy function for mgr.Run
 func (m *Manager) Run(cmd *pm.Command, hooks ...pm.RunnerHook) (pm.Job, error) {

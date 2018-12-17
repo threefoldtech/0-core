@@ -1,9 +1,13 @@
 package plugin
 
-import "github.com/threefoldtech/0-core/base/pm"
+import (
+	"github.com/threefoldtech/0-core/base"
+	"github.com/threefoldtech/0-core/base/pm"
+)
 
 //API defines api entry point for plugins
 type API interface {
+	Version() base.Ver
 	Run(cmd *pm.Command, hooks ...pm.RunnerHook) (pm.Job, error)
 	System(bin string, args ...string) (*pm.JobResult, error)
 	Internal(cmd string, args pm.M, out interface{}) error

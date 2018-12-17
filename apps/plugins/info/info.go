@@ -16,17 +16,22 @@ import (
 	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
-	base "github.com/threefoldtech/0-core/base"
 	"github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
 	"gopkg.in/bufio.v1"
 )
 
 var (
+	api plugin.API
+
 	//Plugin entry point
 	Plugin = plugin.Plugin{
 		Name:    "info",
 		Version: "1.0",
+		Open: func(a plugin.API) error {
+			api = a
+			return nil
+		},
 		Actions: map[string]pm.Action{
 			"cpu":     getCPUInfo,
 			"mem":     getMemInfo,
@@ -46,8 +51,7 @@ type Version struct {
 }
 
 func getVersionInfo(ctx pm.Context) (interface{}, error) {
-	//TODO: version should return the core version not the version this module build against
-	return Version{Branch: base.Branch, Revision: base.Revision, Dirty: base.Dirty != ""}, nil
+	return api.Version(), nil
 }
 
 func getCPUInfo(ctx pm.Context) (interface{}, error) {
