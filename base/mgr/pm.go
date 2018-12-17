@@ -27,7 +27,7 @@ const (
 
 var (
 	MaxJobs           int = 100
-	UnknownCommandErr     = errors.New("unkonw command")
+	UnknownCommandErr     = errors.New("unknown command")
 	DuplicateIDErr        = errors.New("duplicate job id")
 )
 
@@ -40,14 +40,13 @@ type Tag struct {
 var (
 	log = logging.MustGetLogger("pm")
 
-	n        sync.Once
-	s        sync.Once
+	once     sync.Once
 	jobs     map[string]pm.Job
 	jobsM    sync.RWMutex
 	jobsCond *sync.Cond
-	router   Router
 
 	//needs clean up
+	routers  []Router
 	handlers []Handler
 	queue    Queue
 
@@ -58,16 +57,21 @@ var (
 )
 
 //New initialize singleton process manager
-func New(r Router) {
-	n.Do(func() {
+func New() {
+	once.Do(func() {
 		log.Debugf("initializing manager")
 		jobs = make(map[string]pm.Job)
 		jobsCond = sync.NewCond(&sync.Mutex{})
 		pids = make(map[int]chan syscall.WaitStatus)
-		router = r
-
 		queue.Init()
+
+		go processWait()
+		go loop()
 	})
+}
+
+func AddRouter(router Router) {
+	routers = append(routers, router)
 }
 
 //AddHandle add handler to various process events
@@ -192,12 +196,6 @@ func waitPID(pid int) syscall.WaitStatus {
 }
 
 //Start starts the process manager.
-func Start() {
-	s.Do(func() {
-		go processWait()
-		go loop()
-	})
-}
 
 func processArgs(args map[string]interface{}, values map[string]interface{}) {
 	for _, key := range utils.GetKeys(args) {
@@ -507,7 +505,7 @@ func System(bin string, args ...string) (*pm.JobResult, error) {
 		ID:      uuid.New(),
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(
-			SystemCommandArguments{
+			pm.SystemCommandArguments{
 				Name: bin,
 				Args: args,
 			},

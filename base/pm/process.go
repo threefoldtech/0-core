@@ -1,6 +1,7 @@
 package pm
 
 import (
+	"fmt"
 	"io"
 	"syscall"
 
@@ -11,6 +12,19 @@ const (
 	//CommandSystem is the first and built in `core.system` command
 	CommandSystem = "core.system"
 )
+
+//SystemCommandArguments arguments to system command
+type SystemCommandArguments struct {
+	Name  string            `json:"name"`
+	Dir   string            `json:"dir"`
+	Args  []string          `json:"args"`
+	Env   map[string]string `json:"env"`
+	StdIn string            `json:"stdin"`
+}
+
+func (s *SystemCommandArguments) String() string {
+	return fmt.Sprintf("%v %s %v (%s)", s.Env, s.Name, s.Args, s.Dir)
+}
 
 //ProcessStats holds process cpu and memory usage
 type ProcessStats struct {

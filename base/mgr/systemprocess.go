@@ -14,21 +14,9 @@ import (
 	"github.com/threefoldtech/0-core/base/stream"
 )
 
-type SystemCommandArguments struct {
-	Name  string            `json:"name"`
-	Dir   string            `json:"dir"`
-	Args  []string          `json:"args"`
-	Env   map[string]string `json:"env"`
-	StdIn string            `json:"stdin"`
-}
-
-func (s *SystemCommandArguments) String() string {
-	return fmt.Sprintf("%v %s %v (%s)", s.Env, s.Name, s.Args, s.Dir)
-}
-
 type systemProcessImpl struct {
 	cmd     *pm.Command
-	args    SystemCommandArguments
+	args    pm.SystemCommandArguments
 	pid     int
 	process *psutils.Process
 

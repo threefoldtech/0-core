@@ -11,6 +11,7 @@ import (
 	"github.com/threefoldtech/0-core/apps/core0/bootstrap"
 	"github.com/threefoldtech/0-core/apps/core0/logger"
 	"github.com/threefoldtech/0-core/apps/core0/options"
+	"github.com/threefoldtech/0-core/apps/core0/plugin"
 	"github.com/threefoldtech/0-core/apps/core0/screen"
 	"github.com/threefoldtech/0-core/apps/core0/stats"
 	"github.com/threefoldtech/0-core/apps/core0/subsys/cgroups"
@@ -131,8 +132,6 @@ func main() {
 		log.Fatalf("fail to start entropy generator: %v", err)
 	}
 
-	mgr.New(nil)
-
 	if err := settings.LoadSettings(options.Config()); err != nil {
 		log.Fatal(err)
 	}
@@ -144,6 +143,11 @@ func main() {
 
 		log.Fatalf("\nConfig validation error, please fix and try again.")
 	}
+
+	//start process mgr.
+	log.Infof("Initialize process manager")
+	mgr.New()
+	mgr.RegisterExtension("bash", "sh", "", []string{"-c", "{script}"}, nil)
 
 	if !options.Agent() {
 		//Logging prepration
@@ -162,15 +166,15 @@ func main() {
 
 	logging.SetLevel(level, "")
 
+	log.Infof("Configure process manager")
 	var config = settings.Settings
-
 	mgr.MaxJobs = config.Main.MaxJobs
-
-	//start process mgr.
-	log.Infof("Starting process manager")
-
 	mgr.AddHandle((*console)(nil))
-	mgr.Start()
+	pluginMgr, err := plugin.New(settings.Settings.Main.Modules...)
+	if err != nil {
+		log.Fatalf("failed to initialize plugin manager: %s", err)
+	}
+	mgr.AddRouter(pluginMgr)
 
 	//configure logging handlers from configurations
 	log.Infof("Configure logging")

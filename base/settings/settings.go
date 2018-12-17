@@ -60,6 +60,7 @@ type AppSettings struct {
 	Main struct {
 		MaxJobs  int      `json:"max_jobs"`
 		Include  []string `json:"include"`
+		Modules  []string `json:"modules"`
 		Network  string   `json:"network"`
 		LogLevel string   `json:"log_level"` //deprecated (not used)
 	} `json:"main"`
@@ -87,6 +88,10 @@ var Settings AppSettings
 func (s *AppSettings) Validate() []error {
 	if s.Main.LogLevel == "" {
 		s.Main.LogLevel = "info"
+	}
+
+	if len(s.Main.Modules) == 0 {
+		s.Main.Modules = append(s.Main.Modules, "/usr/modules")
 	}
 
 	return nil

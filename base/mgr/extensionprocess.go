@@ -17,7 +17,7 @@ type extensionProcess struct {
 
 func extensionProcessFactory(exe string, dir string, args []string, env map[string]string) ProcessFactory {
 	constructor := func(table PIDTable, cmd *pm.Command) pm.Process {
-		sysargs := SystemCommandArguments{
+		sysargs := pm.SystemCommandArguments{
 			Name: exe,
 			Dir:  dir,
 			Env:  env,

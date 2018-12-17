@@ -48,7 +48,7 @@ func (d *dhcpProtocol) Configure(_ NetworkManager, inf string) error {
 		ID:      fmt.Sprintf("udhcpc/%s", inf),
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(
-			mgr.SystemCommandArguments{
+			pm.SystemCommandArguments{
 				Name: "udhcpc",
 				Args: []string{
 					"-f", //foreground

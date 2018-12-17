@@ -6,5 +6,5 @@ import (
 
 //Router defines a command router
 type Router interface {
-	Get(name string) (pm.Action, error)
+	Get(name string) (pm.Action, bool)
 }

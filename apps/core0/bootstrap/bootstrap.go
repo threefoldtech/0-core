@@ -67,11 +67,12 @@ func NewBootstrap(agent bool) *Bootstrap {
 }
 
 func (b *Bootstrap) registerExtensions(extensions map[string]settings.Extension) {
-	// for extKey, extCfg := range extensions {
-	// 	if err := mgr.RegisterExtension(extKey, extCfg.Binary, extCfg.Cwd, extCfg.Args, extCfg.Env); err != nil {
-	// 		log.Error(err)
-	// 	}
-	// }
+	for extKey, extCfg := range extensions {
+		log.Infof("registering extension (%s)", extKey)
+		if err := mgr.RegisterExtension(extKey, extCfg.Binary, extCfg.Cwd, extCfg.Args, extCfg.Env); err != nil {
+			log.Error(err)
+		}
+	}
 }
 
 func (b *Bootstrap) startupServices(s, e settings.After) {
@@ -269,7 +270,7 @@ func (b *Bootstrap) syslogd() {
 		ID:      "syslogd",
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(
-			mgr.SystemCommandArguments{
+			pm.SystemCommandArguments{
 				Name: "syslogd",
 				Args: []string{
 					"-n",
@@ -284,7 +285,7 @@ func (b *Bootstrap) syslogd() {
 		ID:      "klogd",
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(
-			mgr.SystemCommandArguments{
+			pm.SystemCommandArguments{
 				Name: "klogd",
 				Args: []string{
 					"-n",
@@ -302,14 +303,6 @@ func (b *Bootstrap) First() {
 		if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &syscall.Rlimit{65536, 65536}); err != nil {
 			log.Errorf("failed to setup max open files limit: %s", err)
 		}
-
-		if err := b.setNFT(); err != nil {
-			log.Criticalf("failed to setup NFT: %s", err)
-		}
-	}
-
-	if err := MonitorIPChangesUpdateSocat(); err != nil {
-		log.Critical("failed to start dnat ip monitoring")
 	}
 
 	//register core extensions

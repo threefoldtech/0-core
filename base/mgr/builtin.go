@@ -1,6 +1,8 @@
 package mgr
 
 import (
+	"fmt"
+
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
@@ -20,14 +22,23 @@ func getFactory(cmd *pm.Command) (ProcessFactory, error) {
 		return factory, nil
 	}
 
-	if router == nil {
-		return nil, UnknownCommandErr
+	for _, router := range routers {
+		action, ok := router.Get(cmd.Command)
+		if ok {
+			return NewInternalProcess(action), nil
+		}
 	}
 
-	action, err := router.Get(cmd.Command)
-	if err != nil {
-		return nil, err
+	return nil, UnknownCommandErr
+}
+
+//RegisterExtension registers a new command (extension) so it can be executed via commands
+func RegisterExtension(cmd string, exe string, workdir string, cmdargs []string, env map[string]string) error {
+	if _, ok := factories[cmd]; ok {
+		return fmt.Errorf("job factory with the same name already registered: %s", cmd)
 	}
 
-	return NewInternalProcess(action), nil
+	factory := extensionProcessFactory(exe, workdir, cmdargs, env)
+	factories[cmd] = factory
+	return nil
 }
