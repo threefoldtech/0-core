@@ -1,24 +1,34 @@
-package builtin
+package process
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/shirou/gopsutil/process"
-	"github.com/threefoldtech/0-core/base/pm"
 	"io/ioutil"
 	"strings"
 	"syscall"
+
+	"github.com/shirou/gopsutil/process"
+	"github.com/threefoldtech/0-core/base/plugin"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
-const (
-	cmdProcessList = "process.list"
-	cmdProcessKill = "process.kill"
-)
+var (
+	api plugin.API
 
-func init() {
-	pm.RegisterBuiltIn(cmdProcessList, processList)
-	pm.RegisterBuiltIn(cmdProcessKill, processKill)
-}
+	//Plugin entry point
+	Plugin = plugin.Plugin{
+		Name:    "process",
+		Version: "1.0",
+		Open: func(a plugin.API) error {
+			api = a
+			return nil
+		},
+		Actions: map[string]pm.Action{
+			"list": list,
+			"kill": kill,
+		},
+	}
+)
 
 type processListArguments struct {
 	PID int32 `json:"pid"`
@@ -109,8 +119,9 @@ func getProcessInfo(ps *process.Process) *Process {
 	return res
 }
 
-func processList(cmd *pm.Command) (interface{}, error) {
+func list(ctx pm.Context) (interface{}, error) {
 	var args processListArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -145,8 +156,9 @@ type processKillArguments struct {
 	Signal int `json:"signal"`
 }
 
-func processKill(cmd *pm.Command) (interface{}, error) {
+func kill(ctx pm.Context) (interface{}, error) {
 	var args processKillArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
