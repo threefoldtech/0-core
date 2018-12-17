@@ -57,6 +57,12 @@ func (m *kvmManager) flistMount(uuid, src, storage string, cfg map[string]string
 		return
 	}
 
+	//make sure that root filesystem has those dirs. mostly required for
+	//the machine to boot. Also the hub deletes the dev directory
+	for _, d := range []string{"dev", "sys", "proc"} {
+		os.MkdirAll(path.Join(target, d), 0755)
+	}
+
 	defer func() {
 		if err != nil {
 			m.flistUnmount(uuid)
