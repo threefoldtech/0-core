@@ -153,6 +153,7 @@ func (b *Bootstrap) setupNetworking() error {
 		go func(inf network.Interface) {
 			if err := inf.Configure(); err != nil {
 				log.Errorf("%s", err)
+				inf.SetUP(false)
 			}
 		}(inf)
 	}
