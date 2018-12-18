@@ -6,8 +6,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ngaut/log"
+	logging "github.com/op/go-logging"
 	"github.com/threefoldtech/0-core/base/stream"
+)
+
+var (
+	log = logging.MustGetLogger("pm")
 )
 
 //RunnerHook is a per process event handler
