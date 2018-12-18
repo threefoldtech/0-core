@@ -49,7 +49,7 @@ func (k KernelOptions) String(keys ...string) string {
 	return strings.Join(s, ", ")
 }
 
-func parseKerenlOptions(content string) KernelOptions {
+func parseKernelOptions(content string) KernelOptions {
 	options := KernelOptions{}
 	cmdline, _ := shlex.Split(strings.TrimSpace(content))
 	for _, option := range cmdline {
@@ -73,5 +73,5 @@ func GetKernelOptions() KernelOptions {
 		return KernelOptions{}
 	}
 
-	return parseKerenlOptions(string(content))
+	return parseKernelOptions(string(content))
 }

@@ -706,6 +706,19 @@ func (d *diskMgr) spindown(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
+func parseHdparm(lines []string) (bool, error) {
+	for _, i := range lines {
+		if strings.Contains(i, "drive state") {
+			d := strings.Split(i, ":")
+			if strings.TrimSpace(d[1]) == "standby" {
+				return true, nil
+			}
+			return false, nil
+		}
+	}
+	return false, fmt.Errorf("hdparm returned unparsable result for isStandby")
+}
+
 func (d *diskMgr) isStandby(cmd *pm.Command) (interface{}, error) {
 	var args struct {
 		Disk string `json:"disk"`
@@ -723,15 +736,11 @@ func (d *diskMgr) isStandby(cmd *pm.Command) (interface{}, error) {
 		return nil, err
 	}
 	lines := strings.Split(bytes.Streams.Stdout(), "\n")
-	for _, i := range lines {
-		d := strings.Split(i, ":")
-		if strings.Contains(d[0], "drive state") {
-			if strings.TrimSpace(d[1]) == "standby" {
-				return true, nil
-			}
-		}
+	ret, err := parseHdparm(lines)
+	if err != nil {
+		return nil, pm.BadRequestError(err)
 	}
-	return false, nil
+	return ret, nil
 }
 
 func (d *diskMgr) seektime(cmd *pm.Command) (interface{}, error) {

@@ -1,8 +1,10 @@
 package builtin
 
 import (
-	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParseMountCmd(t *testing.T) {
@@ -101,4 +103,35 @@ SMART support is: Enabled
 		t.Fatal()
 	}
 
+}
+
+func testParseHdparm(t *testing.T) {
+	inputfalse := `
+/dev/sdc:
+ drive state is:  active/idle
+`
+	inputtrue := `
+/dev/sdc:
+ drive state is:  standby
+`
+	bogus := `
+ljlkj
+jlkjl:jlkjlkj
+/dev/sdc:
+ drive state is:  unknown
+
+`
+
+	t.Logf("testing hdparm")
+	ret, err := parseHdparm(strings.Split(inputfalse, "\n"))
+	assert.True(t, ret, "Should return true")
+
+	ret, err = parseHdparm(strings.Split(inputtrue, "\n"))
+	if ok := assert.False(t, ret); !ok {
+		t.Fatal()
+	}
+	ret, err = parseHdparm(strings.Split(bogus, "\n"))
+	if ok := assert.Error(t, err); !ok {
+		t.Fatal()
+	}
 }
