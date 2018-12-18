@@ -152,7 +152,7 @@ cl = client.Client('%s')
 cont = cl.container.find('zrobot')
 if cont:
     cont_cl = cl.container.client(1)
-    cl.bash("echo $'import time\ntime.sleep(1000000000)' > /mnt/containers/1/.startup.py").get()
+    cl.bash("echo $'import time; time.sleep(1000000000)' > /mnt/containers/1/.startup.py").get()
     out = cont_cl.bash('ps aux | grep server').get().stdout
     cont_cl.bash('kill -9 {}'.format(out.split()[1])).get()
     """ % (vm_zos_ip)
@@ -164,7 +164,7 @@ if cont:
     utils.send_script_to_remote_machine(script_path, options.zos_ip, ubuntu_port)
 
     print('* killing zrobot server')
-    cmd = 'python3 /tmp/zrobot_kill.py'
+    cmd = 'python3 zrobot_kill.py'
     utils.run_cmd_on_remote_machine(cmd, options.zos_ip, ubuntu_port)
 
 
