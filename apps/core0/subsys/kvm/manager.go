@@ -853,7 +853,7 @@ func (m *kvmManager) mkDomain(seq uint16, params *CreateParams) (*Domain, error)
 		domain.Devices.Filesystems = append(domain.Devices.Filesystems, fs)
 	}
 
-	if params.KVM ==true{
+	if params.KVM == true {
 		domain.Qemu.Args = append(domain.Qemu.Args, QemuArg{Value: "-enable-kvm"})
 	}
 
@@ -2053,4 +2053,3 @@ func (m *kvmManager) portforwardRemove(cmd *pm.Command) (interface{}, error) {
 	return nil, err
 
 }
-
