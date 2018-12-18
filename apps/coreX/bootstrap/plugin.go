@@ -1,10 +1,13 @@
 package bootstrap
 
+/*
 import (
 	"fmt"
+	"strings"
+
+	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/utils"
-	"strings"
 )
 
 const (
@@ -35,7 +38,7 @@ func (p *pluginPreProcessor) Pre(cmd *pm.Command) {
 }
 
 func (b *Bootstrap) pluginFactory(plugin *Plugin, fn string) pm.ProcessFactory {
-	return func(table pm.PIDTable, srcCmd *pm.Command) pm.Process {
+	return func(table mgr.PIDTable, srcCmd *pm.Command) pm.Process {
 		cmd := &pm.Command{
 			ID: srcCmd.ID,
 			Arguments: pm.MustArguments(pm.SystemCommandArguments{
@@ -51,7 +54,7 @@ func (b *Bootstrap) pluginFactory(plugin *Plugin, fn string) pm.ProcessFactory {
 			Tags:            srcCmd.Tags,
 		}
 
-		return pm.NewSystemProcess(table, cmd)
+		return mgr.NewSystemProcess(table, cmd)
 	}
 }
 
@@ -59,12 +62,12 @@ func (b *Bootstrap) plugin(domain string, plugin Plugin) {
 	if plugin.Queue {
 		//if plugin requires queuing we make sure when a command is pushed (from a cient)
 		//that we force a domain on it.
-		pm.AddHandle(&pluginPreProcessor{domain})
+		mgr.AddHandle(&pluginPreProcessor{domain})
 	}
 
 	for _, export := range plugin.Exports {
 		cmd := fmt.Sprintf("%s.%s", domain, export)
-		pm.Register(cmd, b.pluginFactory(&plugin, export))
+		mgr.Register(cmd, b.pluginFactory(&plugin, export))
 	}
 }
 
@@ -80,3 +83,4 @@ func (b *Bootstrap) plugins() error {
 
 	return nil
 }
+*/

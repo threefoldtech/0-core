@@ -4,19 +4,23 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"github.com/threefoldtech/0-core/apps/coreX/bootstrap"
 	"github.com/threefoldtech/0-core/apps/coreX/options"
+	"github.com/threefoldtech/0-core/apps/plugins/core"
+	"github.com/threefoldtech/0-core/apps/plugins/fs"
+	"github.com/threefoldtech/0-core/apps/plugins/info"
+	"github.com/threefoldtech/0-core/apps/plugins/ip"
+	"github.com/threefoldtech/0-core/apps/plugins/job"
+	"github.com/threefoldtech/0-core/apps/plugins/process"
 	"github.com/threefoldtech/0-core/base"
+	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
 
 	"os/signal"
 	"syscall"
 
 	"encoding/json"
-
-	_ "github.com/threefoldtech/0-core/apps/coreX/builtin"
-	_ "github.com/threefoldtech/0-core/base/builtin"
 )
 
 const (
@@ -47,7 +51,7 @@ func handleSignal(bs *bootstrap.Bootstrap) {
 
 func main() {
 	var opt = options.Options
-	fmt.Println(core.Version())
+	fmt.Println(base.Version())
 	if opt.Version() {
 		os.Exit(0)
 	}
@@ -60,8 +64,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	pm.MaxJobs = opt.MaxJobs()
-	pm.New()
+	//built in plugins
+	router, err := NewRouter(
+		&core.Plugin,
+		&fs.Plugin,
+		&info.Plugin,
+		&ip.Plugin,
+		&job.Plugin,
+		&process.Plugin,
+	)
+
+	if err != nil {
+		log.Panic("failed to create router")
+	}
+
+	mgr.MaxJobs = opt.MaxJobs()
+	mgr.New()
 
 	input := os.NewFile(3, "|input")
 	output := os.NewFile(4, "|output")
@@ -71,9 +89,8 @@ func main() {
 	//start process mgr.
 	log.Infof("Starting process manager")
 
-	pm.AddHandle(dispatcher)
-	pm.Start()
-
+	mgr.AddHandle(dispatcher)
+	mgr.AddRouter(router)
 	dec := json.NewDecoder(input)
 	//we need to block until we recieve the magic number
 	//from core0 this means that the setup from core0 side is complete
@@ -101,9 +118,9 @@ func main() {
 			log.Errorf("failed to decode command message: %s", err)
 		}
 
-		_, err := pm.Run(&cmd)
+		_, err := mgr.Run(&cmd)
 
-		if err == pm.UnknownCommandErr {
+		if err == mgr.UnknownCommandErr {
 			result := pm.NewJobResult(&cmd)
 			result.State = pm.StateUnknownCmd
 			dispatcher.Result(&cmd, result)

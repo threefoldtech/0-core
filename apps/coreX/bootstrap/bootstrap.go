@@ -6,10 +6,10 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"github.com/shirou/gopsutil/process"
 	"github.com/threefoldtech/0-core/apps/coreX/options"
-	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/settings"
 	"github.com/threefoldtech/0-core/base/utils"
 )
@@ -150,7 +150,7 @@ func (b *Bootstrap) startup() error {
 		return fmt.Errorf("failed to build startup tree: %v", errs)
 	}
 
-	pm.RunSlice(tree.Slice(settings.AfterInit.Weight(), settings.ToTheEnd.Weight()))
+	mgr.RunSlice(tree.Slice(settings.AfterInit.Weight(), settings.ToTheEnd.Weight()))
 
 	return nil
 }
@@ -173,7 +173,7 @@ func (b *Bootstrap) Bootstrap(hostname string) error {
 	}
 
 	if options.Options.Unprivileged() {
-		pm.SetUnprivileged()
+		mgr.SetUnprivileged()
 		if err := b.revokePrivileges(); err != nil {
 			return err
 		}
@@ -181,9 +181,9 @@ func (b *Bootstrap) Bootstrap(hostname string) error {
 
 	log.Debugf("startup services")
 
-	if err := b.plugins(); err != nil {
-		log.Errorf("failed to load plugins: %s", err)
-	}
+	// if err := b.plugins(); err != nil {
+	// 	log.Errorf("failed to load plugins: %s", err)
+	// }
 
 	if err := b.startup(); err != nil {
 		log.Errorf("failed to startup container services: %s", err)

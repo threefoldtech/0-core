@@ -5,8 +5,9 @@ import (
 	"os"
 	"sync"
 
+	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 type MessageType string
@@ -54,7 +55,7 @@ func (d *Dispatcher) Message(cmd *pm.Command, msg *stream.Message) {
 	d.enc.Encode(Message{Type: LogMessage, Command: cmd.ID, Payload: msg})
 }
 
-func (d *Dispatcher) Stats(operation string, key string, value float64, id string, tags ...pm.Tag) {
+func (d *Dispatcher) Stats(operation string, key string, value float64, id string, tags ...mgr.Tag) {
 	d.m.Lock()
 	defer d.m.Unlock()
 
