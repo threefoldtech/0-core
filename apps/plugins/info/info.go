@@ -10,7 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ngaut/log"
+	logging "github.com/op/go-logging"
+
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/host"
@@ -18,10 +19,12 @@ import (
 	"github.com/shirou/gopsutil/net"
 	"github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
-	"gopkg.in/bufio.v1"
+	bufio "gopkg.in/bufio.v1"
 )
 
 var (
+	log = logging.MustGetLogger("info")
+
 	api plugin.API
 
 	//Plugin entry point

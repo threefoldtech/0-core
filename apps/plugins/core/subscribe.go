@@ -1,26 +1,23 @@
-package builtin
+package core
 
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
-func init() {
-	pm.RegisterBuiltInWithCtx("core.subscribe", subscribe)
-}
-
-func subscribe(ctx *pm.Context) (interface{}, error) {
+func subscribe(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		ID string `json:"id"`
 	}
-
-	if err := json.Unmarshal(*ctx.Command.Arguments, &args); err != nil {
+	cmd := ctx.Command()
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
 
-	job, ok := pm.JobOf(args.ID)
+	job, ok := api.JobOf(args.ID)
 
 	if !ok {
 		return nil, fmt.Errorf("job '%s' does not exist", args.ID)
