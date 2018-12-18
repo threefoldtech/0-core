@@ -89,10 +89,10 @@ func getNicInfo(cmd *pm.Command) (interface{}, error) {
 		speed, _ = strconv.ParseInt(strings.Trim(string(dat), "\n"), 10, 64)
 		ret[i].Speed = speed
 		dat, _ = ioutil.ReadFile("/sys/class/net/" + ifc.Name + "/carrier")
-		carrier, _ := strconv.ParseBool(strings.Trim(string(dat), "\n"), 10, 64)
+		carrier, _ := strconv.ParseBool(strings.Trim(string(dat), "\n"))
 		ret[i].Carrier = carrier
 		dat, _ = ioutil.ReadFile("/sys/class/net/" + ifc.Name + "/operstate")
-		operstate, _ := strconv.ParseBool(strings.Trim(string(dat), "\n"), 10, 64)
+		operstate, _ := strconv.ParseBool(strings.Trim(string(dat), "\n"))
 		ret[i].OperState = operstate
 	}
 	return ret, nil
