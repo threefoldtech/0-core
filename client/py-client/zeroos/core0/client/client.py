@@ -2233,6 +2233,7 @@ class KvmManager:
         'flist': typchk.Or(str, typchk.IsNone()),
         'cmdline': typchk.Or(str, typchk.IsNone()),
         'share_cache': bool,
+        'kvm': bool,
         'cpu': int,
         'memory': int,
         'nics': [{
@@ -2312,7 +2313,7 @@ class KvmManager:
 
     def create(self, name, media=None, flist=None, cpu=2, memory=512,
                nics=None, port=None, mount=None, tags=None, config=None, storage=None,
-               cmdline=None, share_cache=False):
+               cmdline=None, share_cache=False, kvm=False):
         """
         :param name: Name of the kvm domain
         :param media: (optional) array of media objects to attach to the machine, where the first object is the boot device
@@ -2351,6 +2352,7 @@ class KvmManager:
         :param share_cache: if set to true, the /var/cache/zerofs directory will be shared to guest machine
                         as 'zoscache' in rw mode. It's equavilint to adding {'source': '/var/cache/zerofs', 'target': 'zoscahe', readonly: False}
                         to the `mount` option.
+        :param kvm: If set to true, '-enable-kvm' is set to libvirt's XML, enabling vm in vm creation
 
         :note: At least one media or an flist must be provided.
         :return: uuid of the virtual machine
@@ -2373,6 +2375,7 @@ class KvmManager:
             'config': config,
             'storage': storage,
             'share_cache': share_cache,
+            'kvm': kvm,
         }
 
         self._create_chk.check(args)
