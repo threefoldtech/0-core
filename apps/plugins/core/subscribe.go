@@ -8,7 +8,7 @@ import (
 	"github.com/threefoldtech/0-core/base/stream"
 )
 
-func subscribe(ctx pm.Context) (interface{}, error) {
+func (mgr *coreManager) subscribe(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		ID string `json:"id"`
 	}
@@ -17,7 +17,7 @@ func subscribe(ctx pm.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	job, ok := api.JobOf(args.ID)
+	job, ok := mgr.api.JobOf(args.ID)
 
 	if !ok {
 		return nil, fmt.Errorf("job '%s' does not exist", args.ID)
