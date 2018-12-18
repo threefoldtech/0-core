@@ -66,8 +66,8 @@ func getMemInfo(cmd *pm.Command) (interface{}, error) {
 type NicInfo struct {
 	net.InterfaceStat
 	Speed     int64 `json:"speed"`
-	Carrier   bool `json:"carrier"`
-	OperState bool `json:"operstate"`
+	Carrier   bool  `json:"carrier"`
+	OperState bool  `json:"operstate"`
 }
 
 func getNicInfo(cmd *pm.Command) (interface{}, error) {
@@ -92,7 +92,14 @@ func getNicInfo(cmd *pm.Command) (interface{}, error) {
 		carrier, _ := strconv.ParseBool(strings.Trim(string(dat), "\n"))
 		ret[i].Carrier = carrier
 		dat, _ = ioutil.ReadFile("/sys/class/net/" + ifc.Name + "/operstate")
-		operstate, _ := strconv.ParseBool(strings.Trim(string(dat), "\n"))
+		op := strings.Trim(string(dat), "\n")
+		var operstate bool
+		switch op {
+		case "up", "1":
+			operstate = true
+		case "down", "0":
+			operstate = false
+		}
 		ret[i].OperState = operstate
 	}
 	return ret, nil
