@@ -8,8 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/op/go-logging"
-	"github.com/patrickmn/go-cache"
+	logging "github.com/op/go-logging"
+	cache "github.com/patrickmn/go-cache"
 	"github.com/threefoldtech/0-core/apps/core0/bootstrap/network"
 	"github.com/threefoldtech/0-core/apps/core0/options"
 	"github.com/threefoldtech/0-core/apps/core0/screen"
@@ -137,8 +137,15 @@ func (b *Bootstrap) setupNetworking() error {
 		return fmt.Errorf("failed to get network interfaces: %s", err)
 	}
 
+	ignore, _ := options.Options.Kernel.Get("noautonic")
+
 	//apply the interfaces settings as configured.
 	for _, inf := range interfaces {
+		if utils.InString(ignore, inf.Name()) {
+			log.Infof("skipping auto config for interface '%s'", inf.Name())
+			continue
+		}
+
 		log.Infof("Setting up interface '%s'", inf.Name())
 
 		inf.Clear()

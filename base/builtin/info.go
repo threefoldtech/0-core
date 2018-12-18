@@ -17,6 +17,7 @@ import (
 	"github.com/shirou/gopsutil/net"
 	base "github.com/threefoldtech/0-core/base"
 	"github.com/threefoldtech/0-core/base/pm"
+	bufio "gopkg.in/bufio.v1"
 )
 
 const (
@@ -91,7 +92,7 @@ func getNicInfo(cmd *pm.Command) (interface{}, error) {
 		carrier, _ := strconv.ParseInt(strings.Trim(string(dat), "\n"), 10, 64)
 		ret[i].Carrier = carrier
 		dat, _ = ioutil.ReadFile("/sys/class/net/" + ifc.Name + "/operstate")
-		operstate, _:= strconv.ParseInt(strings.Trim(string(dat), "\n"), 10, 64)
+		operstate, _ := strconv.ParseInt(strings.Trim(string(dat), "\n"), 10, 64)
 		ret[i].OperState = operstate
 	}
 	return ret, nil
