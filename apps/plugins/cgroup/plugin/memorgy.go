@@ -1,26 +1,28 @@
-package cgroups
+package main
 
 import (
 	"fmt"
 	"io/ioutil"
 	"path"
 	"strings"
+
+	"github.com/threefoldtech/0-core/apps/plugins/cgroup"
 )
 
 type MemoryGroup interface {
-	Group
+	cgroup.Group
 	Limits() (int, int, error)
 	Limit(mem, swap int) error
 }
 
-func mkMemoryGroup(name string, subsys Subsystem) Group {
+func mkMemoryGroup(name string, subsys cgroup.Subsystem) cgroup.Group {
 	return &memoryCGroup{
-		cgroup{name: name, subsys: subsys},
+		Group{name: name, subsys: subsys},
 	}
 }
 
 type memoryCGroup struct {
-	cgroup
+	Group
 }
 
 func (c *memoryCGroup) memFile() string {
@@ -85,9 +87,9 @@ func (c *memoryCGroup) Limit(mem, swap int) error {
 	return nil
 }
 
-func (c *memoryCGroup) Root() Group {
+func (c *memoryCGroup) Root() cgroup.Group {
 	return &memoryCGroup{
-		cgroup: cgroup{subsys: c.subsys},
+		Group: Group{subsys: c.subsys},
 	}
 }
 

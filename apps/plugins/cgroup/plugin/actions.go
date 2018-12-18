@@ -1,50 +1,52 @@
-package cgroups
+package main
 
 import (
 	"encoding/json"
 
+	"github.com/threefoldtech/0-core/apps/plugins/cgroup"
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
+//GroupArg basic cgroup arg
 type GroupArg struct {
-	Subsystem Subsystem `json:"subsystem"`
-	Name      string    `json:"name"`
+	Subsystem cgroup.Subsystem `json:"subsystem"`
+	Name      string           `json:"name"`
 }
 
-func list(cmd *pm.Command) (interface{}, error) {
-	return GetGroups()
+func (m *Manager) list(ctx pm.Context) (interface{}, error) {
+	return m.GetGroups()
 }
 
-func ensure(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) ensure(ctx pm.Context) (interface{}, error) {
 	var args GroupArg
-
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
 
-	_, err := GetGroup(args.Subsystem, args.Name)
+	_, err := m.GetGroup(args.Subsystem, args.Name)
 
 	return nil, err
 }
 
-func remove(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) remove(ctx pm.Context) (interface{}, error) {
 	var args GroupArg
-
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
 
-	return nil, Remove(args.Subsystem, args.Name)
+	return nil, m.Remove(args.Subsystem, args.Name)
 }
 
-func reset(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) reset(ctx pm.Context) (interface{}, error) {
 	var args GroupArg
-
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
 
-	group, err := Get(args.Subsystem, args.Name)
+	group, err := m.Get(args.Subsystem, args.Name)
 	if err != nil {
 		return nil, pm.NotFoundError(err)
 	}
@@ -54,14 +56,14 @@ func reset(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func tasks(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) tasks(ctx pm.Context) (interface{}, error) {
 	var args GroupArg
-
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
 
-	group, err := Get(args.Subsystem, args.Name)
+	group, err := m.Get(args.Subsystem, args.Name)
 	if err != nil {
 		return nil, pm.NotFoundError(err)
 	}
@@ -69,17 +71,17 @@ func tasks(cmd *pm.Command) (interface{}, error) {
 	return group.Tasks()
 }
 
-func taskAdd(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) taskAdd(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		GroupArg
 		PID int `json:"pid"`
 	}
-
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
 
-	group, err := Get(args.Subsystem, args.Name)
+	group, err := m.Get(args.Subsystem, args.Name)
 	if err != nil {
 		return nil, pm.NotFoundError(err)
 	}
@@ -87,17 +89,17 @@ func taskAdd(cmd *pm.Command) (interface{}, error) {
 	return nil, group.Task(args.PID)
 }
 
-func taskRemove(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) taskRemove(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		GroupArg
 		PID int `json:"pid"`
 	}
-
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
 
-	group, err := Get(args.Subsystem, args.Name)
+	group, err := m.Get(args.Subsystem, args.Name)
 	if err != nil {
 		return nil, pm.NotFoundError(err)
 	}
@@ -106,18 +108,18 @@ func taskRemove(cmd *pm.Command) (interface{}, error) {
 	return nil, root.Task(args.PID)
 }
 
-func cpusetSpec(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) cpusetSpec(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Name string `json:"name,omitempty"`
 		Cpus string `json:"cpus"`
 		Mems string `json:"mems"`
 	}
-
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
 
-	group, err := Get(CPUSetSubsystem, args.Name)
+	group, err := m.Get(cgroup.CPUSetSubsystem, args.Name)
 
 	if err != nil {
 		return nil, pm.NotFoundError(err)
@@ -146,18 +148,18 @@ func cpusetSpec(cmd *pm.Command) (interface{}, error) {
 	return nil, pm.InternalError(ErrInvalidType)
 }
 
-func memorySpec(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) memorySpec(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Name string `json:"name,omitempty"`
 		Mem  int    `json:"mem"`
 		Sawp int    `json:"swap"`
 	}
-
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
 
-	group, err := Get(MemorySubsystem, args.Name)
+	group, err := m.Get(cgroup.MemorySubsystem, args.Name)
 
 	if err != nil {
 		return nil, pm.NotFoundError(err)

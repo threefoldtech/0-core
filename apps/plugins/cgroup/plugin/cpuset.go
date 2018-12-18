@@ -1,27 +1,29 @@
-package cgroups
+package main
 
 import (
 	"io/ioutil"
 	"path"
 	"strings"
+
+	"github.com/threefoldtech/0-core/apps/plugins/cgroup"
 )
 
 type CPUSetGroup interface {
-	Group
+	cgroup.Group
 	Cpus(sepc string) error
 	Mems(sepc string) error
 	GetCpus() (string, error)
 	GetMems() (string, error)
 }
 
-func mkCPUSetGroup(name string, subsys Subsystem) Group {
+func mkCPUSetGroup(name string, subsys cgroup.Subsystem) cgroup.Group {
 	return &cpusetCGroup{
-		cgroup{name: name, subsys: subsys},
+		Group{name: name, subsys: subsys},
 	}
 }
 
 type cpusetCGroup struct {
-	cgroup
+	Group
 }
 
 //reset copies the default values from the root group. It sounds like
@@ -65,9 +67,9 @@ func (c *cpusetCGroup) GetMems() (string, error) {
 	return strings.TrimSpace(string(data)), nil
 }
 
-func (c *cpusetCGroup) Root() Group {
+func (c *cpusetCGroup) Root() cgroup.Group {
 	return &cpusetCGroup{
-		cgroup: cgroup{subsys: c.subsys},
+		Group: Group{subsys: c.subsys},
 	}
 }
 

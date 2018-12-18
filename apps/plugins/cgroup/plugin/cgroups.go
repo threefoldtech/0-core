@@ -1,4 +1,4 @@
-package cgroups
+package main
 
 import (
 	"fmt"
@@ -6,46 +6,18 @@ import (
 	"os"
 	"path"
 	"strings"
-	"sync"
-	"syscall"
 
-	logging "github.com/op/go-logging"
+	"github.com/threefoldtech/0-core/apps/plugins/cgroup"
 )
 
-type mkg func(name string, subsys Subsystem) Group
-
-//Group generic cgroup interface
-type Group interface {
-	Name() string
-	Subsystem() Subsystem
-	Task(pid int) error
-	Tasks() ([]int, error)
-	Root() Group
-	Reset()
-}
-
-type Subsystem string
+type mkg func(name string, subsys cgroup.Subsystem) cgroup.Group
 
 const (
-	//DevicesSubsystem device subsystem
-	DevicesSubsystem = Subsystem("devices")
-	//CPUSetSubsystem cpu subsystem
-	CPUSetSubsystem = Subsystem("cpuset")
-	//MemorySubsystem memory subsystem
-	MemorySubsystem = Subsystem("memory")
-
 	//CGroupBase base mount point
 	CGroupBase = "/sys/fs/cgroup"
 )
 
 var (
-	log        = logging.MustGetLogger("cgroups")
-	once       sync.Once
-	subsystems = map[Subsystem]mkg{
-		DevicesSubsystem: mkDevicesGroup,
-		CPUSetSubsystem:  mkCPUSetGroup,
-		MemorySubsystem:  mkMemoryGroup,
-	}
 
 	//ErrDoesNotExist does not exist error
 	ErrDoesNotExist = fmt.Errorf("cgroup does not exist")
@@ -53,44 +25,29 @@ var (
 	ErrInvalidType = fmt.Errorf("cgroup of invalid type")
 )
 
-//Init Initialized the cgroup subsystem
-func Init() (err error) {
-	once.Do(func() {
-		os.MkdirAll(CGroupBase, 0755)
-		err = syscall.Mount("cgroup_root", CGroupBase, "tmpfs", 0, "")
-		if err != nil {
-			return
-		}
+// //Init Initialized the cgroup subsystem
+// func Init() (err error) {
+// 	once.Do(func() {
 
-		for sub := range subsystems {
-			p := path.Join(CGroupBase, string(sub))
-			os.MkdirAll(p, 0755)
+// 		// pm.RegisterBuiltIn("cgroup.list", list)
+// 		// pm.RegisterBuiltIn("cgroup.ensure", ensure)
+// 		// pm.RegisterBuiltIn("cgroup.remove", remove)
 
-			err = syscall.Mount(string(sub), p, "cgroup", 0, string(sub))
-			if err != nil {
-				return
-			}
-		}
+// 		// pm.RegisterBuiltIn("cgroup.tasks", tasks)
+// 		// pm.RegisterBuiltIn("cgroup.task-add", taskAdd)
+// 		// pm.RegisterBuiltIn("cgroup.task-remove", taskRemove)
 
-		// pm.RegisterBuiltIn("cgroup.list", list)
-		// pm.RegisterBuiltIn("cgroup.ensure", ensure)
-		// pm.RegisterBuiltIn("cgroup.remove", remove)
+// 		// pm.RegisterBuiltIn("cgroup.reset", reset)
 
-		// pm.RegisterBuiltIn("cgroup.tasks", tasks)
-		// pm.RegisterBuiltIn("cgroup.task-add", taskAdd)
-		// pm.RegisterBuiltIn("cgroup.task-remove", taskRemove)
+// 		// pm.RegisterBuiltIn("cgroup.cpuset.spec", cpusetSpec)
+// 		// pm.RegisterBuiltIn("cgroup.memory.spec", memorySpec)
+// 	})
 
-		// pm.RegisterBuiltIn("cgroup.reset", reset)
-
-		// pm.RegisterBuiltIn("cgroup.cpuset.spec", cpusetSpec)
-		// pm.RegisterBuiltIn("cgroup.memory.spec", memorySpec)
-	})
-
-	return
-}
+// 	return
+// }
 
 //GetGroup creaes a group if it does not exist
-func GetGroup(subsystem Subsystem, name string) (Group, error) {
+func (m *Manager) GetGroup(subsystem cgroup.Subsystem, name string) (cgroup.Group, error) {
 	mkg, ok := subsystems[subsystem]
 	if !ok {
 		return nil, fmt.Errorf("unknown subsystem '%s'", subsystem)
@@ -105,20 +62,20 @@ func GetGroup(subsystem Subsystem, name string) (Group, error) {
 }
 
 //Get group only if it exists
-func Get(subsystem Subsystem, name string) (Group, error) {
-	if !Exists(subsystem, name) {
+func (m *Manager) Get(subsystem cgroup.Subsystem, name string) (cgroup.Group, error) {
+	if !m.Exists(subsystem, name) {
 		return nil, ErrDoesNotExist
 	}
 
-	return GetGroup(subsystem, name)
+	return m.GetGroup(subsystem, name)
 }
 
 //GetGroups gets all the available groups names grouped by susbsytem
-func GetGroups() (map[Subsystem][]string, error) {
-	result := make(map[Subsystem][]string)
+func (m *Manager) GetGroups() (map[cgroup.Subsystem][]string, error) {
+	result := make(map[cgroup.Subsystem][]string)
 	for sub := range subsystems {
 		// skip devices subsystem (only cpuset and memory)
-		if sub == DevicesSubsystem {
+		if sub == cgroup.DevicesSubsystem {
 			continue
 		}
 		info, err := ioutil.ReadDir(path.Join(CGroupBase, string(sub)))
@@ -137,8 +94,8 @@ func GetGroups() (map[Subsystem][]string, error) {
 }
 
 //Remove removes a cgroup
-func Remove(subsystem Subsystem, name string) error {
-	if !Exists(subsystem, name) {
+func (m *Manager) Remove(subsystem cgroup.Subsystem, name string) error {
+	if !m.Exists(subsystem, name) {
 		return nil
 	}
 
@@ -162,7 +119,7 @@ func Remove(subsystem Subsystem, name string) error {
 }
 
 //Exists Check if a cgroup exists
-func Exists(subsystem Subsystem, name string) bool {
+func (m *Manager) Exists(subsystem cgroup.Subsystem, name string) bool {
 	_, ok := subsystems[subsystem]
 	if !ok {
 		return false
@@ -177,28 +134,28 @@ func Exists(subsystem Subsystem, name string) bool {
 	return info.IsDir()
 }
 
-type cgroup struct {
+type Group struct {
 	name   string
-	subsys Subsystem
+	subsys cgroup.Subsystem
 }
 
-func (g *cgroup) Name() string {
+func (g *Group) Name() string {
 	return g.name
 }
 
-func (g *cgroup) Subsystem() Subsystem {
+func (g *Group) Subsystem() cgroup.Subsystem {
 	return g.subsys
 }
 
-func (g *cgroup) base() string {
+func (g *Group) base() string {
 	return path.Join(CGroupBase, string(g.subsys), g.name)
 }
 
-func (g *cgroup) Task(pid int) error {
+func (g *Group) Task(pid int) error {
 	return ioutil.WriteFile(path.Join(g.base(), "cgroup.procs"), []byte(fmt.Sprint(pid)), 0644)
 }
 
-func (g *cgroup) Tasks() ([]int, error) {
+func (g *Group) Tasks() ([]int, error) {
 	raw, err := ioutil.ReadFile(path.Join(g.base(), "cgroup.procs"))
 	if err != nil {
 		return nil, err

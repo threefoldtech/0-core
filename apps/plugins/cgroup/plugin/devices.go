@@ -1,26 +1,28 @@
-package cgroups
+package main
 
 import (
 	"io/ioutil"
 	"path"
 	"strings"
+
+	"github.com/threefoldtech/0-core/apps/plugins/cgroup"
 )
 
 type DevicesGroup interface {
-	Group
+	cgroup.Group
 	Deny(spec string) error
 	Allow(spec string) error
 	List() ([]string, error)
 }
 
-func mkDevicesGroup(name string, subsys Subsystem) Group {
+func mkDevicesGroup(name string, subsys cgroup.Subsystem) cgroup.Group {
 	return &devicesCGroup{
-		cgroup{name: name, subsys: subsys},
+		Group{name: name, subsys: subsys},
 	}
 }
 
 type devicesCGroup struct {
-	cgroup
+	Group
 }
 
 func (g *devicesCGroup) Deny(spec string) error {
@@ -43,9 +45,9 @@ func (g *devicesCGroup) List() ([]string, error) {
 	return strings.Split(string(data), "\n"), nil
 }
 
-func (g *devicesCGroup) Root() Group {
+func (g *devicesCGroup) Root() cgroup.Group {
 	return &devicesCGroup{
-		cgroup: cgroup{subsys: g.subsys},
+		Group: Group{subsys: g.subsys},
 	}
 }
 
