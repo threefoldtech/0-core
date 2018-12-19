@@ -1,4 +1,4 @@
-package btrfs
+package main
 
 import (
 	"encoding/json"
@@ -17,23 +17,6 @@ var (
 	reBtrfsFilesystemDf = regexp.MustCompile(`(?m:(\w+),\s(\w+):\s+total=(\d+),\s+used=(\d+))`)
 	reBtrfsQgroup       = regexp.MustCompile(`(?m:^(\d+/\d+)\s+(\d+)\s+(\d+)\s+(\d+|none)\s+(\d+|none).*$)`)
 )
-
-type btrfsManager struct{}
-
-func init() {
-	var m btrfsManager
-
-	pm.RegisterBuiltIn("btrfs.list", m.List)
-	pm.RegisterBuiltIn("btrfs.info", m.Info)
-	pm.RegisterBuiltIn("btrfs.create", m.Create)
-	pm.RegisterBuiltIn("btrfs.device_add", m.DeviceAdd)
-	pm.RegisterBuiltIn("btrfs.device_remove", m.DeviceRemove)
-	pm.RegisterBuiltIn("btrfs.subvol_create", m.SubvolCreate)
-	pm.RegisterBuiltIn("btrfs.subvol_delete", m.SubvolDelete)
-	pm.RegisterBuiltIn("btrfs.subvol_quota", m.SubvolQuota)
-	pm.RegisterBuiltIn("btrfs.subvol_list", m.SubvolList)
-	pm.RegisterBuiltIn("btrfs.subvol_snapshot", m.SubvolSnapshot)
-}
 
 type btrfsFS struct {
 	Label        string        `json:"label"`
@@ -132,9 +115,10 @@ func (arg CreateArgument) Validate() error {
 	return nil
 }
 
-func (m *btrfsManager) Create(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) Create(ctx pm.Context) (interface{}, error) {
 	var args CreateArgument
 	var opts []string
+	cmd := ctx.Command()
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
@@ -157,7 +141,7 @@ func (m *btrfsManager) Create(cmd *pm.Command) (interface{}, error) {
 	}
 	opts = append(opts, args.Devices...)
 
-	_, err := pm.System("mkfs.btrfs", opts...)
+	_, err := m.api.System("mkfs.btrfs", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -165,8 +149,9 @@ func (m *btrfsManager) Create(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *btrfsManager) DeviceAdd(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) DeviceAdd(ctx pm.Context) (interface{}, error) {
 	var args DeviceAddArgument
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -182,8 +167,9 @@ func (m *btrfsManager) DeviceAdd(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *btrfsManager) DeviceRemove(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) DeviceRemove(ctx pm.Context) (interface{}, error) {
 	var args DeviceAddArgument
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -199,7 +185,7 @@ func (m *btrfsManager) DeviceRemove(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *btrfsManager) list(cmd *pm.Command, args []string) ([]btrfsFS, error) {
+func (m *Manager) list(cmd *pm.Command, args []string) ([]btrfsFS, error) {
 	defaultargs := []string{"filesystem", "show", "--raw"}
 	defaultargs = append(defaultargs, args...)
 	result, err := m.btrfs(defaultargs...)
@@ -219,13 +205,15 @@ func (m *btrfsManager) list(cmd *pm.Command, args []string) ([]btrfsFS, error) {
 }
 
 // list btrfs FSs
-func (m *btrfsManager) List(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) List(ctx pm.Context) (interface{}, error) {
+	cmd := ctx.Command()
 	return m.list(cmd, []string{})
 }
 
 // get btrfs info
-func (m *btrfsManager) Info(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) Info(ctx pm.Context) (interface{}, error) {
 	var args InfoArgument
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -256,9 +244,10 @@ type SubvolQuotaArgument struct {
 }
 
 // create subvolume under a mount point
-func (m *btrfsManager) SubvolCreate(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) SubvolCreate(ctx pm.Context) (interface{}, error) {
 	var args SubvolArgument
 
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -275,9 +264,10 @@ func (m *btrfsManager) SubvolCreate(cmd *pm.Command) (interface{}, error) {
 }
 
 // delete subvolume under a mount point
-func (m *btrfsManager) SubvolDelete(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) SubvolDelete(ctx pm.Context) (interface{}, error) {
 	var args SubvolArgument
 
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -294,9 +284,10 @@ func (m *btrfsManager) SubvolDelete(cmd *pm.Command) (interface{}, error) {
 }
 
 // create quota for a subvolume
-func (m *btrfsManager) SubvolQuota(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) SubvolQuota(ctx pm.Context) (interface{}, error) {
 	var args SubvolQuotaArgument
 
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -318,7 +309,7 @@ func (m *btrfsManager) SubvolQuota(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *btrfsManager) parseQGroups(s string) map[string]btrfsQGroup {
+func (m *Manager) parseQGroups(s string) map[string]btrfsQGroup {
 	qgroups := make(map[string]btrfsQGroup)
 	for _, line := range reBtrfsQgroup.FindAllStringSubmatch(s, -1) {
 		qgroup := btrfsQGroup{
@@ -341,7 +332,7 @@ func (m *btrfsManager) parseQGroups(s string) map[string]btrfsQGroup {
 	return qgroups
 }
 
-func (m *btrfsManager) getQGroups(path string) (map[string]btrfsQGroup, error) {
+func (m *Manager) getQGroups(path string) (map[string]btrfsQGroup, error) {
 	job, err := m.btrfs("qgroup", "show", "-re", "--raw", path)
 	if job == nil && err != nil {
 		return nil, err
@@ -356,8 +347,9 @@ func (m *btrfsManager) getQGroups(path string) (map[string]btrfsQGroup, error) {
 }
 
 // make a subvol snapshot
-func (m *btrfsManager) SubvolSnapshot(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) SubvolSnapshot(ctx pm.Context) (interface{}, error) {
 	var args SnapshotArgument
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -377,9 +369,10 @@ func (m *btrfsManager) SubvolSnapshot(cmd *pm.Command) (interface{}, error) {
 }
 
 // list subvolume under a mount point
-func (m *btrfsManager) SubvolList(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) SubvolList(ctx pm.Context) (interface{}, error) {
 	var args SubvolArgument
 
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -415,12 +408,12 @@ func (m *btrfsManager) SubvolList(cmd *pm.Command) (interface{}, error) {
 	return volumes, nil
 }
 
-func (m *btrfsManager) btrfs(args ...string) (*pm.JobResult, error) {
+func (m *Manager) btrfs(args ...string) (*pm.JobResult, error) {
 	log.Debugf("btrfs %v", args)
-	return pm.System("btrfs", args...)
+	return m.api.System("btrfs", args...)
 }
 
-func (m *btrfsManager) parseSubvolList(out string) ([]btrfsSubvol, error) {
+func (m *Manager) parseSubvolList(out string) ([]btrfsSubvol, error) {
 	lines := strings.Split(out, "\n")
 	svs := make([]btrfsSubvol, 0, len(lines))
 
@@ -438,7 +431,7 @@ func (m *btrfsManager) parseSubvolList(out string) ([]btrfsSubvol, error) {
 	return svs, nil
 }
 
-func (m *btrfsManager) parseFilesystemDF(output string, fsinfo *btrfsFSInfo) error {
+func (m *Manager) parseFilesystemDF(output string, fsinfo *btrfsFSInfo) error {
 	var err error
 	lines := reBtrfsFilesystemDf.FindAllStringSubmatch(output, -1)
 	for _, line := range lines {
@@ -472,7 +465,7 @@ func (m *btrfsManager) parseFilesystemDF(output string, fsinfo *btrfsFSInfo) err
 }
 
 // parse `btrfs filesystem show` output
-func (m *btrfsManager) parseList(output string) ([]btrfsFS, error) {
+func (m *Manager) parseList(output string) ([]btrfsFS, error) {
 	var fss []btrfsFS
 
 	blocks := strings.Split(output, "\n\n")
@@ -499,7 +492,7 @@ func (m *btrfsManager) parseList(output string) ([]btrfsFS, error) {
 	return fss, nil
 }
 
-func (m *btrfsManager) parseFS(lines []string) (btrfsFS, error) {
+func (m *Manager) parseFS(lines []string) (btrfsFS, error) {
 	// first line should be label && uuid
 	var label, uuid string
 	_, err := fmt.Sscanf(lines[0], `Label: %s uuid: %s`, &label, &uuid)
@@ -541,7 +534,7 @@ func (m *btrfsManager) parseFS(lines []string) (btrfsFS, error) {
 	}, nil
 }
 
-func (m *btrfsManager) parseDevices(lines []string) ([]btrfsDevice, error) {
+func (m *Manager) parseDevices(lines []string) ([]btrfsDevice, error) {
 	var devs []btrfsDevice
 	for _, line := range lines {
 		if line == "" {

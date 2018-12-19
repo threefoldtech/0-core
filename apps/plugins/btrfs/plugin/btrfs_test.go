@@ -1,4 +1,4 @@
-package btrfs
+package main
 
 import (
 	"testing"
@@ -58,7 +58,7 @@ Label: 'dsds'  uuid: 70059ae1-6b5a-4e44-a4e2-13cabc10b8bf
 )
 
 func TestParseFS(t *testing.T) {
-	var m btrfsManager
+	var m Manager
 	fss, err := m.parseList(fsString)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(fss))
@@ -79,7 +79,7 @@ func TestParseFS(t *testing.T) {
 }
 
 func TestParseFS2(t *testing.T) {
-	var m btrfsManager
+	var m Manager
 	fss, err := m.parseList(fsString2)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(fss))
@@ -92,7 +92,7 @@ func TestParseFS2(t *testing.T) {
 }
 
 func TestParseFSWithWarnings(t *testing.T) {
-	var m btrfsManager
+	var m Manager
 	fss, err := m.parseList(fsStringWithWarnings)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(fss))
@@ -114,7 +114,7 @@ func TestParseFSWithWarnings(t *testing.T) {
 }
 
 func TestParseFSWithWarnings2(t *testing.T) {
-	var m btrfsManager
+	var m Manager
 	fss, err := m.parseList(fsStringWithWarnings2)
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(fss))
@@ -154,7 +154,7 @@ GlobalReserve, single: total=16777216, used=0
 )
 
 func TestParseDF(t *testing.T) {
-	var m btrfsManager
+	var m Manager
 	fsinfo := btrfsFSInfo{}
 	m.parseFilesystemDF(dfString, &fsinfo)
 	assert.Equal(t, "single", fsinfo.Data.Profile)
@@ -173,7 +173,7 @@ ID 262 gen 21 top level 5 path cobavol
 )
 
 func TestParseSubvolume(t *testing.T) {
-	var m btrfsManager
+	var m Manager
 	svs, err := m.parseSubvolList(subvolStr)
 
 	assert.Nil(t, err)
@@ -196,7 +196,7 @@ qgroupid         rfer         excl     max_rfer     max_excl
 0/259           16384        16384         none         none
 	`
 
-	var m btrfsManager
+	var m Manager
 
 	groups := m.parseQGroups(s)
 	if ok := assert.Len(t, groups, 4); !ok {
