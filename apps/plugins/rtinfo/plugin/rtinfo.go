@@ -1,20 +1,16 @@
-package builtin
+package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"sync"
+	"syscall"
 
 	"github.com/pborman/uuid"
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
 const cmdbin = "rtinfo-client"
-
-type rtinfoMgr struct {
-	info map[string]*rtinfoParams
-	m    sync.RWMutex
-}
 
 type rtinfoParams struct {
 	Host  string   `json:"host"`
@@ -23,15 +19,9 @@ type rtinfoParams struct {
 	job   string
 }
 
-func init() {
-	rtm := &rtinfoMgr{info: make(map[string]*rtinfoParams)}
-	pm.RegisterBuiltIn("rtinfo.start", rtm.start)
-	pm.RegisterBuiltIn("rtinfo.list", rtm.list)
-	pm.RegisterBuiltIn("rtinfo.stop", rtm.stop)
-}
-
-func (rtm *rtinfoMgr) start(cmd *pm.Command) (interface{}, error) {
+func (rtm *Manager) start(ctx pm.Context) (interface{}, error) {
 	var args rtinfoParams
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -75,7 +65,7 @@ func (rtm *rtinfoMgr) start(cmd *pm.Command) (interface{}, error) {
 		},
 	}
 
-	_, err := pm.Run(rtinfocmd, onExit)
+	_, err := manager.api.Run(rtinfocmd, onExit)
 
 	if err != nil {
 		//the process manager failed to start
@@ -88,16 +78,17 @@ func (rtm *rtinfoMgr) start(cmd *pm.Command) (interface{}, error) {
 	return nil, err
 }
 
-func (rtm *rtinfoMgr) list(cmd *pm.Command) (interface{}, error) {
+func (rtm *Manager) list(ctx pm.Context) (interface{}, error) {
 
 	return rtm.info, nil
 }
 
-func (rtm *rtinfoMgr) stop(cmd *pm.Command) (interface{}, error) {
+func (rtm *Manager) stop(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Host string `json:"host"`
 		Port uint   `json:"port"`
 	}
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -110,6 +101,10 @@ func (rtm *rtinfoMgr) stop(cmd *pm.Command) (interface{}, error) {
 	if !exists {
 		return nil, nil
 	}
+	job, exists := rtm.api.JobOf(info.job)
+	if exists {
+		return job.Signal(syscall.SIGKILL), nil
+	}
 
-	return nil, pm.Kill(info.job)
+	return nil, errors.New("job wasn't running")
 }
