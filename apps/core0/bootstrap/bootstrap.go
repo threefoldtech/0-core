@@ -137,7 +137,10 @@ func (b *Bootstrap) setupNetworking() error {
 		return fmt.Errorf("failed to get network interfaces: %s", err)
 	}
 
-	ignore, _ := options.Options.Kernel.Get("noautonic")
+	ignore, ok := options.Options.Kernel.Get("noautonic")
+	if ok {
+		log.Debugf("Not autostarting :+v",ignore)
+	}
 
 	//apply the interfaces settings as configured.
 	for _, inf := range interfaces {
