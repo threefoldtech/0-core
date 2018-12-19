@@ -33,6 +33,7 @@ var (
 			return initManager(&manager, api)
 		},
 		API: func() interface{} {
+
 			return &manager
 		},
 		Actions: map[string]pm.Action{

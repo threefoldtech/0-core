@@ -1,4 +1,4 @@
-package builtin
+package main
 
 import (
 	"encoding/json"
@@ -26,20 +26,6 @@ var (
 )
 
 const mountsFile = "/proc/mounts"
-
-type diskMgr struct{}
-
-func init() {
-	d := (*diskMgr)(nil)
-	pm.RegisterBuiltIn("disk.getinfo", d.info)
-	pm.RegisterBuiltIn("disk.list", d.list)
-	pm.RegisterBuiltIn("disk.protect", d.protect)
-	pm.RegisterBuiltIn("disk.mounts", d.mounts)
-	pm.RegisterBuiltIn("disk.smartctl-info", d.smartctlInfo)
-	pm.RegisterBuiltIn("disk.smartctl-health", d.smartctlHealth)
-	pm.RegisterBuiltIn("disk.spindown", d.spindown)
-	pm.RegisterBuiltIn("disk.seektime", d.seektime)
-}
 
 type diskInfo struct {
 	Disk string `json:"disk"`
@@ -130,7 +116,7 @@ type BlockDevice struct {
 
 // match only BlockDevice since we don't have this type directly
 // we need to ensure it's a device and not a character device
-func (d *diskMgr) isModeBlockDevice(mode os.FileMode) bool {
+func (d *Manager) isModeBlockDevice(mode os.FileMode) bool {
 	return (mode&os.ModeDevice != 0) && (mode&os.ModeCharDevice == 0)
 }
 
@@ -138,7 +124,7 @@ func (d *diskMgr) isModeBlockDevice(mode os.FileMode) bool {
 // pairs found inside the file.
 // a uevent file is always a KEY=value file
 // you should always provide a valid uevent file
-func (d *diskMgr) blockUEvent(path string) (map[string]string, error) {
+func (d *Manager) blockUEvent(path string) (map[string]string, error) {
 	// read uevent file
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -184,7 +170,7 @@ func (d *diskMgr) blockUEvent(path string) (map[string]string, error) {
 //   /sys/dev/block/[readlink /sys/dev/block/{major}:{minor}]
 //
 // the parent directory of this one, will be the source disk
-func (d *diskMgr) deviceToBlockDevice(dev string) (*BlockDevice, error) {
+func (d *Manager) deviceToBlockDevice(dev string) (*BlockDevice, error) {
 	if dev[0] != '/' {
 		// fallback to previous behavior if relative
 		// path is provided
@@ -232,7 +218,7 @@ func (d *diskMgr) deviceToBlockDevice(dev string) (*BlockDevice, error) {
 
 // same as 'deviceToBlockDevice' except this one
 // only match on disk, reject partition or other type
-func (d *diskMgr) diskBlockDevice(dev string) (*BlockDevice, error) {
+func (d *Manager) diskBlockDevice(dev string) (*BlockDevice, error) {
 	bd, err := d.deviceToBlockDevice(dev)
 	if err != nil {
 		return nil, err
@@ -246,7 +232,7 @@ func (d *diskMgr) diskBlockDevice(dev string) (*BlockDevice, error) {
 	return bd, nil
 }
 
-func (d *diskMgr) readUInt64(p string) (uint64, error) {
+func (d *Manager) readUInt64(p string) (uint64, error) {
 	bytes, err := ioutil.ReadFile(p)
 	if err != nil {
 		return 0, err
@@ -259,8 +245,8 @@ func (d *diskMgr) readUInt64(p string) (uint64, error) {
 	return r, nil
 }
 
-func (d *diskMgr) lsblk(bd *BlockDevice) (*lsblkResult, error) {
-	result, err := pm.System("lsblk", "-O", "-J", bd.Path)
+func (d *Manager) lsblk(bd *BlockDevice) (*lsblkResult, error) {
+	result, err := d.api.System("lsblk", "-O", "-J", bd.Path)
 
 	if err != nil {
 		return nil, err
@@ -282,13 +268,13 @@ func (d *diskMgr) lsblk(bd *BlockDevice) (*lsblkResult, error) {
 	return nil, fmt.Errorf("no device with the name %s", bd.Path)
 
 }
-func (d *diskMgr) blockSize(bd *BlockDevice) (uint64, error) {
+func (d *Manager) blockSize(bd *BlockDevice) (uint64, error) {
 	return d.readUInt64(fmt.Sprintf("/sys/block/%s/queue/logical_block_size", bd.Name))
 }
 
-func (d *diskMgr) getTableInfo(bd *BlockDevice) (string, []DiskFreeBlock, error) {
+func (d *Manager) getTableInfo(bd *BlockDevice) (string, []DiskFreeBlock, error) {
 	blocks := make([]DiskFreeBlock, 0)
-	result, err := pm.System("parted", bd.Path, "unit", "B", "print", "free")
+	result, err := d.api.System("parted", bd.Path, "unit", "B", "print", "free")
 
 	if err != nil {
 		return "", blocks, err
@@ -316,7 +302,7 @@ func (d *diskMgr) getTableInfo(bd *BlockDevice) (string, []DiskFreeBlock, error)
 	return table, blocks, nil
 }
 
-func (d *diskMgr) diskInfo(disk string) (*DiskInfoResult, error) {
+func (d *Manager) diskInfo(disk string) (*DiskInfoResult, error) {
 	var info DiskInfoResult
 
 	bd, err := d.deviceToBlockDevice(disk)
@@ -354,7 +340,7 @@ func (d *diskMgr) diskInfo(disk string) (*DiskInfoResult, error) {
 	return &info, nil
 }
 
-func (d *diskMgr) partInfo(disk, part string) (*DiskInfoResult, error) {
+func (d *Manager) partInfo(disk, part string) (*DiskInfoResult, error) {
 	var info DiskInfoResult
 
 	dbd, err := d.deviceToBlockDevice(disk)
@@ -397,8 +383,9 @@ func (d *diskMgr) partInfo(disk, part string) (*DiskInfoResult, error) {
 	return &info, nil
 }
 
-func (d *diskMgr) info(cmd *pm.Command) (interface{}, error) {
+func (d *Manager) info(ctx pm.Context) (interface{}, error) {
 	var args diskInfo
+	cmd := ctx.Command()
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
@@ -426,16 +413,18 @@ type smartctlInfo struct {
 	SmartSupportEnabled   bool   `json:"smart_support_enabled"`
 }
 
-func (d *diskMgr) smartctlInfo(cmd *pm.Command) (interface{}, error) {
+func (d *Manager) smartctlInfo(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Device string `json:"device"`
 	}
+
+	cmd := ctx.Command()
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
 
-	result, err := pm.System("smartctl", "-i", args.Device)
+	result, err := d.api.System("smartctl", "-i", args.Device)
 	if err != nil {
 		return nil, err
 	}
@@ -496,7 +485,7 @@ func parseSmartctlInfo(input string) (smartctlInfo, error) {
 	return info, nil
 }
 
-func (d *diskMgr) smartctlHealth(cmd *pm.Command) (interface{}, error) {
+func (d *Manager) smartctlHealth(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Device string `json:"device"`
 	}
@@ -505,11 +494,12 @@ func (d *diskMgr) smartctlHealth(cmd *pm.Command) (interface{}, error) {
 		Passed bool `json:"passed"`
 	}
 
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
 
-	result, err := pm.System("smartctl", "-H", args.Device)
+	result, err := d.api.System("smartctl", "-H", args.Device)
 	if err != nil {
 		return nil, err
 	}
@@ -519,8 +509,8 @@ func (d *diskMgr) smartctlHealth(cmd *pm.Command) (interface{}, error) {
 	return health, nil
 }
 
-func (d *diskMgr) list(cmd *pm.Command) (interface{}, error) {
-	result, err := pm.System("lsblk", "--json", "--output-all", "--bytes", "--exclude", "1,2")
+func (d *Manager) list(ctx pm.Context) (interface{}, error) {
+	result, err := d.api.System("lsblk", "--json", "--output-all", "--bytes", "--exclude", "1,2")
 	if err != nil {
 		return nil, err
 	}
@@ -589,7 +579,7 @@ func (d *diskMgr) list(cmd *pm.Command) (interface{}, error) {
 	return ret, nil
 }
 
-func (d *diskMgr) mounts(cmd *pm.Command) (interface{}, error) {
+func (d *Manager) mounts(ctx pm.Context) (interface{}, error) {
 	file, err := ioutil.ReadFile(mountsFile)
 	if err != nil {
 		return nil, err
@@ -637,11 +627,12 @@ func parseMountCmd(mount string) map[string][]diskMount {
 	return mountpoints
 }
 
-func (d *diskMgr) protect(cmd *pm.Command) (interface{}, error) {
+func (d *Manager) protect(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Partuuid string `json:"partuuid"`
 	}
 
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -666,11 +657,11 @@ func (d *diskMgr) protect(cmd *pm.Command) (interface{}, error) {
 				continue
 			}
 			//protect the partition and protect the device
-			if _, err := pm.System("blockdev", "--setro", fmt.Sprintf("/dev/%s", part.Name)); err != nil {
+			if _, err := d.api.System("blockdev", "--setro", fmt.Sprintf("/dev/%s", part.Name)); err != nil {
 				return nil, err
 			}
 
-			if _, err := pm.System("blockdev", "--setro", fmt.Sprintf("/dev/%s", dev.Name)); err != nil {
+			if _, err := d.api.System("blockdev", "--setro", fmt.Sprintf("/dev/%s", dev.Name)); err != nil {
 				return nil, err
 			}
 		}
@@ -679,11 +670,12 @@ func (d *diskMgr) protect(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (d *diskMgr) spindown(cmd *pm.Command) (interface{}, error) {
+func (d *Manager) spindown(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Disk     string `json:"disk"`
 		Spindown uint   `json:"spindown"`
 	}
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -696,7 +688,7 @@ func (d *diskMgr) spindown(cmd *pm.Command) (interface{}, error) {
 		return nil, pm.BadRequestError(fmt.Errorf("spindown %d out of range 1 - 240", args.Spindown))
 
 	}
-	_, err := pm.System("hdparm", "-S", fmt.Sprintf("%d", args.Spindown), args.Disk)
+	_, err := d.api.System("hdparm", "-S", fmt.Sprintf("%d", args.Spindown), args.Disk)
 
 	if err != nil {
 		return nil, err
@@ -705,10 +697,12 @@ func (d *diskMgr) spindown(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (d *diskMgr) seektime(cmd *pm.Command) (interface{}, error) {
+func (d *Manager) seektime(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Disk string `json:"disk"`
 	}
+
+	cmd := ctx.Command()
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
@@ -719,7 +713,7 @@ func (d *diskMgr) seektime(cmd *pm.Command) (interface{}, error) {
 		return nil, err
 	}
 
-	result, err := pm.System("seektime", "-j", device.Path)
+	result, err := d.api.System("seektime", "-j", device.Path)
 	if err != nil {
 		return nil, err
 	}
