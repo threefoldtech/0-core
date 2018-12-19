@@ -1,24 +1,19 @@
-package builtin
+package main
 
 import (
 	"encoding/json"
-	"github.com/threefoldtech/0-core/base/pm"
 	"os"
 	"runtime"
 	"runtime/pprof"
+
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
-func init() {
-	pm.RegisterBuiltIn("pprof.cpu.start", pprofStart)
-	pm.RegisterBuiltIn("pprof.cpu.stop", pprofStop)
-	pm.RegisterBuiltIn("pprof.mem.write", pprofMemWrite)
-	pm.RegisterBuiltIn("pprof.mem.stat", pprofMemStat)
-}
-
-func pprofStart(cmd *pm.Command) (interface{}, error) {
+func (d *Manager) pprofStart(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		File string `json:"file"`
 	}
+	cmd := ctx.Command()
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
@@ -32,15 +27,16 @@ func pprofStart(cmd *pm.Command) (interface{}, error) {
 	return nil, pprof.StartCPUProfile(fd)
 }
 
-func pprofStop(cmd *pm.Command) (interface{}, error) {
+func (d *Manager) pprofStop(ctx pm.Context) (interface{}, error) {
 	pprof.StopCPUProfile()
 	return nil, nil
 }
 
-func pprofMemWrite(cmd *pm.Command) (interface{}, error) {
+func (d *Manager) pprofMemWrite(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		File string `json:"file"`
 	}
+	cmd := ctx.Command()
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
@@ -54,7 +50,7 @@ func pprofMemWrite(cmd *pm.Command) (interface{}, error) {
 	return nil, pprof.WriteHeapProfile(fd)
 }
 
-func pprofMemStat(cmd *pm.Command) (interface{}, error) {
+func (d *Manager) pprofMemStat(ctx pm.Context) (interface{}, error) {
 	var stat runtime.MemStats
 	runtime.ReadMemStats(&stat)
 	return stat, nil
