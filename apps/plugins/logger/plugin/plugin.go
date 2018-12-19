@@ -1,29 +1,35 @@
-package builtin
+package main
 
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/op/go-logging"
-	"github.com/threefoldtech/0-core/base/pm"
 	"os"
 	"syscall"
+
+	"github.com/op/go-logging"
+	"github.com/threefoldtech/0-core/base/plugin"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
-type logMgr struct{}
+var (
+	Plugin = plugin.Plugin{
+		Name:    "logger",
+		Version: "1.0",
 
-func init() {
-	l := (*logMgr)(nil)
-	pm.RegisterBuiltIn("logger.set_level", l.setLevel)
-	pm.RegisterBuiltIn("logger.reopen", l.reopen)
-}
+		Actions: map[string]pm.Action{
+			"set_level": setLevel,
+			"reopen":    reopen,
+		},
+	}
+)
 
 type LogLevel struct {
 	Level string `json:"level"`
 }
 
-func (l *logMgr) setLevel(cmd *pm.Command) (interface{}, error) {
+func setLevel(ctx pm.Context) (interface{}, error) {
 	var args LogLevel
+	cmd := ctx.Command()
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
@@ -40,6 +46,8 @@ func (l *logMgr) setLevel(cmd *pm.Command) (interface{}, error) {
 
 }
 
-func (l *logMgr) reopen(cmd *pm.Command) (interface{}, error) {
+func reopen(ctx pm.Context) (interface{}, error) {
 	return nil, syscall.Kill(os.Getpid(), syscall.SIGUSR1)
 }
+
+func main() {}
