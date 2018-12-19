@@ -43,6 +43,7 @@ var (
 			"os":      getOsInfo,
 			"port":    getPortInfo,
 			"version": getVersionInfo,
+			"dmi":     getDMIInfo,
 		},
 	}
 )
