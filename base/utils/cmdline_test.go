@@ -16,10 +16,29 @@ func validateKeyValue(mapping KernelOptions, key string, value string, t *testin
 
 }
 
+func validateMultiValueForKey(opts KernelOptions, key string, values []string, t *testing.T) {
+	if vals, ok := opts[key]; ok {
+		if len(vals) != len(values) {
+			t.Fatalf("no multiple values for %s", key)
+		}
+		for i, v := range vals {
+			t.Logf("got value %+v", v)
+			if v != values[i] {
+				t.Fatalf("%s index %d is not eq to %s", values[i], i, v)
+			}
+		}
+	}
+	t.Logf("%+v", opts)
+}
+
 func TestCmdParsing(t *testing.T) {
-	cmdline := parseKerenlOptions("zerotier=mynetwork")
+	cmdline := parseKernelOptions("zerotier=mynetwork")
 	validateKeyValue(cmdline, "zerotier", "mynetwork", t)
 
-	cmdline = parseKerenlOptions(`something   zerotier="my network"  rgergerger`)
+	cmdline = parseKernelOptions(`something   zerotier="my network"  rgergerger`)
 	validateKeyValue(cmdline, "zerotier", "my network", t)
+
+	cmdline = parseKernelOptions("noautonic=enp2s0f0 noautonic=enp2s0f1")
+	vals := []string{"enp2s0f0", "enp2s0f1"}
+	validateMultiValueForKey(cmdline, "noautonic", vals, t)
 }
