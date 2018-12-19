@@ -1,4 +1,4 @@
-package builtin
+package main
 
 import (
 	"encoding/json"
@@ -10,15 +10,12 @@ import (
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
-func init() {
-	pm.RegisterBuiltIn("web.download", downloadCmd)
-}
-
-func downloadCmd(cmd *pm.Command) (interface{}, error) {
+func (d *Manager) downloadCmd(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		URL         string `json:"url"`
 		Destination string `json:"destination"`
 	}
+	cmd := ctx.Command()
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
