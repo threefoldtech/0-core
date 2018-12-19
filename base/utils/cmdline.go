@@ -23,7 +23,11 @@ func (k KernelOptions) Get(key string) ([]string, bool) {
 func (k KernelOptions) GetLast() map[string]interface{} {
 	r := make(map[string]interface{})
 	for key, values := range k {
-		r[key] = values[len(values)-1]
+		if len(values) > 0 {
+			r[key] = values[len(values)-1]
+		} else {
+			r[key] = ""
+		}
 	}
 
 	return r
@@ -34,6 +38,11 @@ func (k KernelOptions) String(keys ...string) string {
 	for _, key := range keys {
 		values, ok := k[key]
 		if !ok {
+			continue
+		}
+
+		if len(values) == 0 {
+			s = append(s, key)
 			continue
 		}
 
@@ -49,17 +58,48 @@ func (k KernelOptions) String(keys ...string) string {
 	return strings.Join(s, ", ")
 }
 
+//Cmdline return kerenl arguments cmdline string making sure
+//arguments exists only once on the command line
+func (k KernelOptions) Cmdline() []byte {
+	x := make(map[string]struct{})
+	for k, vs := range k {
+		if len(vs) == 0 {
+			x[k] = struct{}{}
+			continue
+		}
+
+		for _, v := range vs {
+			if strings.ContainsAny(v, " \t") {
+				x[fmt.Sprintf("%s=\"%s\"", k, v)] = struct{}{}
+			} else {
+				x[fmt.Sprintf("%s=%s", k, v)] = struct{}{}
+			}
+		}
+	}
+
+	var buf strings.Builder
+	for o := range x {
+		if buf.Len() > 0 {
+			buf.WriteByte(' ')
+		}
+		buf.WriteString(o)
+	}
+
+	return []byte(buf.String())
+}
+
 func parseKerenlOptions(content string) KernelOptions {
 	options := KernelOptions{}
 	cmdline, _ := shlex.Split(strings.TrimSpace(content))
 	for _, option := range cmdline {
 		kv := strings.SplitN(option, "=", 2)
 		key := kv[0]
-		value := ""
+
 		if len(kv) == 2 {
-			value = kv[1]
+			options[key] = append(options[key], kv[1])
+		} else {
+			options[key] = nil
 		}
-		options[key] = append(options[key], value)
 	}
 
 	return options

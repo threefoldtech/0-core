@@ -99,11 +99,11 @@ func TestJobMessages(t *testing.T) {
 		t.Error()
 	}
 
-	if ok := assert.Equal(t, `stdout message`, result.Streams.Stdout()); !ok {
+	if ok := assert.Equal(t, "stdout message\n", result.Streams.Stdout()); !ok {
 		t.Error()
 	}
 
-	if ok := assert.Equal(t, `stderr message`, result.Streams.Stderr()); !ok {
+	if ok := assert.Equal(t, "stderr message\n", result.Streams.Stderr()); !ok {
 		t.Error()
 	}
 
@@ -115,7 +115,7 @@ func TestJobMessages(t *testing.T) {
 	}
 
 	msg := logs[0] //first message
-	if ok := assert.Equal(t, `debug message`, msg.Message); !ok {
+	if ok := assert.Equal(t, "debug message\n", msg.Message); !ok {
 		t.Error()
 	}
 }

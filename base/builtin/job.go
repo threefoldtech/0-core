@@ -18,7 +18,6 @@ const (
 func init() {
 	pm.RegisterBuiltIn(cmdJobList, jobList)
 	pm.RegisterBuiltIn(cmdJobKill, jobKill)
-	pm.RegisterBuiltIn(cmdJobKillAll, jobKillAll)
 	pm.RegisterBuiltIn(cmdJobUnschedule, jobUnschedule)
 }
 
@@ -131,10 +130,5 @@ func jobUnschedule(cmd *pm.Command) (interface{}, error) {
 
 	job.Unschedule()
 
-	return true, nil
-}
-
-func jobKillAll(cmd *pm.Command) (interface{}, error) {
-	pm.Killall()
 	return true, nil
 }

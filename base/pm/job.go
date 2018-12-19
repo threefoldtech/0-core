@@ -70,7 +70,7 @@ NewRunner creates a new r object that is bind to this PM instance.
         The r is considered running, if it ran with no errors for 2 seconds, or exited before the 2 seconds passes
         with SUCCESS exit code.
 */
-func newJob(command *Command, factory ProcessFactory, hooks ...RunnerHook) Job {
+func newJob(command *Command, factory ProcessFactory, hooks ...RunnerHook) *jobImb {
 	job := &jobImb{
 		command:    command,
 		factory:    factory,
@@ -88,7 +88,7 @@ func newJob(command *Command, factory ProcessFactory, hooks ...RunnerHook) Job {
 }
 
 func newTestJob(command *Command, factory ProcessFactory, hooks ...RunnerHook) Job {
-	job := newJob(command, factory, hooks...).(*jobImb)
+	job := newJob(command, factory, hooks...)
 	var testTable TestingPIDTable
 	job.registerPID = testTable.RegisterPID
 	job.waitPID = testTable.WaitPID
@@ -242,19 +242,20 @@ loop:
 		case message := <-channel:
 			r.backlog.Append(message)
 
+			meta := message.Meta
 			//messages with Exit flags are always the last.
-			if message.Meta.Is(stream.ExitSuccessFlag) {
+			if meta.Is(stream.ExitSuccessFlag) {
 				jobresult.State = StateSuccess
 			}
 
-			if message.Meta.Assert(stream.ResultMessageLevels...) {
+			if meta.Assert(stream.ResultMessageLevels...) {
 				//a result message.
 				result = message
-			} else if message.Meta.Assert(stream.LevelStdout) {
+			} else if meta.Assert(stream.LevelStdout) {
 				stdout.Append(message.Message)
-			} else if message.Meta.Assert(stream.LevelStderr) {
+			} else if meta.Assert(stream.LevelStderr) {
 				stderr.Append(message.Message)
-			} else if message.Meta.Assert(stream.LevelCritical) {
+			} else if meta.Assert(stream.LevelCritical) {
 				critical = message.Message
 			}
 
@@ -264,13 +265,13 @@ loop:
 
 			//FOR BACKWARD compatibility, we drop the code part from the message meta because watchers
 			//like watchdog and such are not expecting a code part in the meta (yet)
-			code := message.Meta.Code()
-			message.Meta = message.Meta.Base()
+			code := meta.Code()
+			message.Meta = meta.Base()
 			//END of BACKWARD compatibility code
 
 			//by default, all messages are forwarded to the manager for further processing.
 			r.callback(message)
-			if message.Meta.Is(stream.ExitSuccessFlag | stream.ExitErrorFlag) {
+			if meta.Is(stream.ExitSuccessFlag | stream.ExitErrorFlag) {
 				jobresult.Code = code
 				break loop
 			}
@@ -392,6 +393,12 @@ func (r *jobImb) Process() Process {
 func (r *jobImb) Wait() *JobResult {
 	r.wg.Wait()
 	return r.result
+}
+
+func (r *jobImb) Terminate(sig syscall.Signal) error {
+	r.Unschedule()
+	r.command.Flags.Protected = false
+	return r.Signal(sig)
 }
 
 //implement PIDTable
