@@ -1,21 +1,22 @@
-package builtin
+package main
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/disk"
-	"github.com/shirou/gopsutil/mem"
-	"github.com/shirou/gopsutil/net"
-	ps "github.com/shirou/gopsutil/process"
-	"github.com/vishvananda/netlink"
-	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/utils"
 	"io/ioutil"
 	"path"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/disk"
+	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/net"
+	ps "github.com/shirou/gopsutil/process"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/utils"
+	"github.com/vishvananda/netlink"
 )
 
 const (
@@ -43,16 +44,11 @@ type Pair [2]string
 
 type monitor struct{}
 
-func init() {
-	m := (*monitor)(nil)
-
-	pm.RegisterBuiltIn("monitor", m.monitor)
-}
-
-func (m *monitor) monitor(cmd *pm.Command) (interface{}, error) {
+func (m *Manager) monitor(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Domain string `json:"domain"`
 	}
+	cmd := ctx.Command()
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
@@ -70,36 +66,34 @@ func (m *monitor) monitor(cmd *pm.Command) (interface{}, error) {
 	default:
 		return nil, fmt.Errorf("invalid monitoring domain: %s", args.Domain)
 	}
-
-	return nil, nil
 }
 
-func (m *monitor) disk() error {
+func (m *Manager) disk() error {
 	counters, err := disk.IOCounters()
 	if err != nil {
 		return err
 	}
 
 	for name, counter := range counters {
-		pm.Aggregate(pm.AggreagteDifference,
+		m.api.Aggregate(pm.AggreagteDifference,
 			"disk.iops.read",
 			float64(counter.ReadCount),
 			name, pm.Tag{"type", "phys"},
 		)
 
-		pm.Aggregate(pm.AggreagteDifference,
+		m.api.Aggregate(pm.AggreagteDifference,
 			"disk.iops.write",
 			float64(counter.WriteCount),
 			name, pm.Tag{"type", "phys"},
 		)
 
-		pm.Aggregate(pm.AggreagteDifference,
+		m.api.Aggregate(pm.AggreagteDifference,
 			"disk.throughput.read",
 			float64(counter.ReadBytes/1024),
 			name, pm.Tag{"type", "phys"},
 		)
 
-		pm.Aggregate(pm.AggreagteDifference,
+		m.api.Aggregate(pm.AggreagteDifference,
 			"disk.throughput.write",
 			float64(counter.WriteBytes/1024),
 			name, pm.Tag{"type", "phys"},
@@ -125,7 +119,7 @@ func (m *monitor) disk() error {
 			continue
 		}
 
-		pm.Aggregate(pm.AggreagteAverage,
+		m.api.Aggregate(pm.AggreagteAverage,
 			"disk.size.total",
 			float64(usage.Total),
 			name,
@@ -133,7 +127,7 @@ func (m *monitor) disk() error {
 			pm.Tag{"fs", usage.Fstype},
 		)
 
-		pm.Aggregate(pm.AggreagteAverage,
+		m.api.Aggregate(pm.AggreagteAverage,
 			"disk.size.free",
 			float64(usage.Free),
 			name,
@@ -145,14 +139,14 @@ func (m *monitor) disk() error {
 	return nil
 }
 
-func (m *monitor) cpu() error {
+func (m *Manager) cpu() error {
 	times, err := cpu.Times(true)
 	if err != nil {
 		return err
 	}
 
 	for nr, t := range times {
-		pm.Aggregate(pm.AggreagteDifference,
+		m.api.Aggregate(pm.AggreagteDifference,
 			"machine.CPU.utilisation",
 			t.System+t.User,
 			fmt.Sprint(nr), pm.Tag{"type", "phys"},
@@ -165,7 +159,7 @@ func (m *monitor) cpu() error {
 	}
 
 	for nr, v := range percent {
-		pm.Aggregate(pm.AggreagteAverage,
+		m.api.Aggregate(pm.AggreagteAverage,
 			"machine.CPU.percent",
 			v,
 			fmt.Sprint(nr), pm.Tag{"type", "phys"},
@@ -188,7 +182,7 @@ func (m *monitor) cpu() error {
 
 	if ctxt, ok := statmap["ctxt"]; ok {
 		v, _ := strconv.ParseFloat(ctxt, 64)
-		pm.Aggregate(pm.AggreagteDifference,
+		m.api.Aggregate(pm.AggreagteDifference,
 			"machine.CPU.contextswitch",
 			v,
 			"", pm.Tag{"type", "phys"},
@@ -197,7 +191,7 @@ func (m *monitor) cpu() error {
 
 	if intr, ok := statmap["intr"]; ok {
 		v, _ := strconv.ParseFloat(intr, 64)
-		pm.Aggregate(pm.AggreagteDifference,
+		m.api.Aggregate(pm.AggreagteDifference,
 			"machine.CPU.interrupts",
 			v,
 			"", pm.Tag{"type", "phys"},
@@ -218,18 +212,18 @@ func (m *monitor) cpu() error {
 		}
 	}
 
-	pm.Aggregate(pm.AggreagteAverage, "machine.process.threads", float64(threads), "", pm.Tag{"type", "phys"})
+	m.api.Aggregate(pm.AggreagteAverage, "machine.process.threads", float64(threads), "", pm.Tag{"type", "phys"})
 
 	return nil
 }
 
-func (m *monitor) memory() error {
+func (m *Manager) memory() error {
 	virt, err := mem.VirtualMemory()
 	if err != nil {
 		return err
 	}
 
-	pm.Aggregate(pm.AggreagteAverage,
+	m.api.Aggregate(pm.AggreagteAverage,
 		"machine.memory.ram.available",
 		float64(virt.Available)/(1024.*1024.),
 		"", pm.Tag{"type", "phys"},
@@ -240,13 +234,13 @@ func (m *monitor) memory() error {
 		return err
 	}
 
-	pm.Aggregate(pm.AggreagteAverage,
+	m.api.Aggregate(pm.AggreagteAverage,
 		"machine.memory.swap.left",
 		float64(swap.Free)/(1024.*1024.),
 		"", pm.Tag{"type", "phys"},
 	)
 
-	pm.Aggregate(pm.AggreagteAverage,
+	m.api.Aggregate(pm.AggreagteAverage,
 		"machine.memory.swap.used",
 		float64(swap.Used)/(1024.*1024.),
 		"", pm.Tag{"type", "phys"},
@@ -255,7 +249,7 @@ func (m *monitor) memory() error {
 	return nil
 }
 
-func (m *monitor) network() error {
+func (m *Manager) network() error {
 	counters, err := net.IOCounters(true)
 	if err != nil {
 		return err
@@ -277,28 +271,28 @@ func (m *monitor) network() error {
 			continue
 		}
 
-		pm.Aggregate(pm.AggreagteDifference,
+		m.api.Aggregate(pm.AggreagteDifference,
 			"network.throughput.outgoing",
 			float64(counter.BytesSent)/(1024.*1024.),
 			counter.Name,
 			pm.Tag{"type", "phys"}, pm.Tag{"kind", link.Type()},
 		)
 
-		pm.Aggregate(pm.AggreagteDifference,
+		m.api.Aggregate(pm.AggreagteDifference,
 			"network.throughput.incoming",
 			float64(counter.BytesRecv)/(1024.*1024.),
 			counter.Name,
 			pm.Tag{"type", "phys"}, pm.Tag{"kind", link.Type()},
 		)
 
-		pm.Aggregate(pm.AggreagteDifference,
+		m.api.Aggregate(pm.AggreagteDifference,
 			"network.packets.tx",
 			float64(counter.PacketsSent),
 			counter.Name,
 			pm.Tag{"type", "phys"}, pm.Tag{"kind", link.Type()},
 		)
 
-		pm.Aggregate(pm.AggreagteDifference,
+		m.api.Aggregate(pm.AggreagteDifference,
 			"network.packets.rx",
 			float64(counter.PacketsRecv),
 			counter.Name,

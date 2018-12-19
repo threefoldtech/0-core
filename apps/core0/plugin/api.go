@@ -49,3 +49,11 @@ func (m *Manager) Plugin(name string) (interface{}, error) {
 
 	return plg.API(), nil
 }
+
+func (m *Manager) Shutdown(except ...string) {
+	mgr.Shutdown(except...)
+}
+
+func (m *Manager) Aggregate(op, key string, value float64, id string, tags ...pm.Tag) {
+	mgr.Aggregate(op, key, value, id, tags...)
+}

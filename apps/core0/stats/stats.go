@@ -5,7 +5,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/threefoldtech/0-core/base/mgr"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 const (
@@ -66,7 +66,7 @@ type State struct {
 	Operation Operation `json:"op"`
 	LastValue float64   `json:"last_value"`
 	LastTime  int64     `json:"last_time"`
-	Tags      []mgr.Tag `json:"tags,omitempty"`
+	Tags      []pm.Tag  `json:"tags,omitempty"`
 	Current   Samples   `json:"current"`
 	History   History   `json:"history"`
 }

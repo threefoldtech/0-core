@@ -22,7 +22,7 @@ type MessageHandler interface {
 
 //StatsHandler receives parsed stats messages
 type StatsHandler interface {
-	Stats(operation string, key string, value float64, id string, tags ...Tag)
+	Stats(operation string, key string, value float64, id string, tags ...pm.Tag)
 }
 
 //PreHandler is called with the commands before exectution

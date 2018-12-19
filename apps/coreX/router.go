@@ -95,3 +95,11 @@ func (m *Router) Plugin(name string) (interface{}, error) {
 
 	return plg.API(), nil
 }
+
+func (m *Router) Aggregate(op, key string, value float64, id string, tags ...pm.Tag) {
+	mgr.Aggregate(op, key, value, id, tags...)
+}
+
+func (m *Router) Shutdown(except ...string) {
+	mgr.Shutdown(except...)
+}

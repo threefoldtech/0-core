@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"github.com/pborman/uuid"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/settings"
@@ -20,21 +20,11 @@ import (
 	"github.com/threefoldtech/0-core/base/utils"
 )
 
-const (
-	AggreagteAverage    = "A"
-	AggreagteDifference = "D"
-)
-
 var (
 	MaxJobs           int = 100
 	UnknownCommandErr     = errors.New("unknown command")
 	DuplicateIDErr        = errors.New("duplicate job id")
 )
-
-type Tag struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
 
 //PM is the main r manager.
 var (
@@ -427,7 +417,7 @@ func Kill(cmdID string) error {
 	return nil
 }
 
-func Aggregate(op, key string, value float64, id string, tags ...Tag) {
+func Aggregate(op, key string, value float64, id string, tags ...pm.Tag) {
 	for _, handler := range handlers {
 		if handler, ok := handler.(StatsHandler); ok {
 			handler.Stats(op, key, value, id, tags...)
@@ -461,8 +451,8 @@ func handleStatsMessage(cmd *pm.Command, msg *stream.Message) {
 		return
 	}
 
-	parse := func(t string) (string, []Tag) {
-		var tags []Tag
+	parse := func(t string) (string, []pm.Tag) {
+		var tags []pm.Tag
 		var id string
 		for _, p := range strings.Split(t, ",") {
 			kv := strings.SplitN(p, "=", 2)
@@ -470,12 +460,12 @@ func handleStatsMessage(cmd *pm.Command, msg *stream.Message) {
 			if len(kv) == 2 {
 				v = kv[1]
 			}
-			//special tag id.
+			//special pm.Tag id.
 			if kv[0] == "id" {
 				id = v
 				continue
 			}
-			tags = append(tags, Tag{
+			tags = append(tags, pm.Tag{
 				Key:   kv[0],
 				Value: v,
 			})

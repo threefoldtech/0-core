@@ -1,4 +1,4 @@
-package builtin
+package main
 
 // #include <sys/syscall.h>
 // #include <linux/kexec.h>
@@ -15,13 +15,10 @@ import (
 	"github.com/threefoldtech/0-core/apps/core0/options"
 
 	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 const (
-	cmdReboot   = "core.reboot"
-	cmdPowerOff = "core.poweroff"
-	cmdUpdate   = "core.update"
 
 	//RedisJobID avoid terminating this process
 	RedisJobID      = "redis"
@@ -33,15 +30,9 @@ const (
 	BaseDownloadLocation = "/var/cache"
 )
 
-func init() {
-	pm.RegisterBuiltInWithCtx(cmdReboot, restart)
-	pm.RegisterBuiltInWithCtx(cmdPowerOff, poweroff)
-	pm.RegisterBuiltInWithCtx(cmdUpdate, update)
-}
-
-func restart(ctx *pm.Context) (interface{}, error) {
+func (m *Manager) restart(ctx pm.Context) (interface{}, error) {
 	log.Info("rebooting")
-	pm.Shutdown(RedisJobID, RedisProxyJobID)
+	m.api.Shutdown(RedisJobID, RedisProxyJobID)
 	syscall.Sync()
 
 	//we send the message to signal client that job finished
@@ -55,9 +46,9 @@ func restart(ctx *pm.Context) (interface{}, error) {
 	return nil, nil
 }
 
-func poweroff(ctx *pm.Context) (interface{}, error) {
+func (m *Manager) poweroff(ctx pm.Context) (interface{}, error) {
 	log.Info("shutting down")
-	pm.Shutdown(RedisJobID, RedisProxyJobID)
+	m.api.Shutdown(RedisJobID, RedisProxyJobID)
 	syscall.Sync()
 
 	//we send the message to signal client that job finished
@@ -71,7 +62,7 @@ func poweroff(ctx *pm.Context) (interface{}, error) {
 	return nil, nil
 }
 
-func wget(ctx *pm.Context, file, url string) error {
+func (m *Manager) wget(ctx pm.Context, file, url string) error {
 	msgs := pm.MessageHook{
 		Action: func(msg *stream.Message) {
 			//drop the flag part so stream reader (client) doesn't think
@@ -84,7 +75,7 @@ func wget(ctx *pm.Context, file, url string) error {
 		},
 	}
 
-	job, err := pm.Run(&pm.Command{
+	job, err := m.api.Run(&pm.Command{
 		ID:      uuid.New(),
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(
@@ -109,12 +100,12 @@ func wget(ctx *pm.Context, file, url string) error {
 	return nil
 }
 
-func update(ctx *pm.Context) (interface{}, error) {
+func (m *Manager) update(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Image string `json:"image"`
 	}
-
-	if err := json.Unmarshal(*ctx.Command.Arguments, &args); err != nil {
+	cmd := ctx.Command()
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
 	img := path.Base(args.Image)
@@ -123,7 +114,7 @@ func update(ctx *pm.Context) (interface{}, error) {
 	ctx.Log(fmt.Sprintf("downloading image: %s", url))
 	file := path.Join(BaseDownloadLocation, img)
 
-	if err := wget(ctx, file, url); err != nil {
+	if err := m.wget(ctx, file, url); err != nil {
 		return nil, err
 	}
 
@@ -155,7 +146,7 @@ func update(ctx *pm.Context) (interface{}, error) {
 
 	ctx.Log("terminating all running process. point of no return...")
 
-	pm.Shutdown(RedisJobID, RedisProxyJobID)
+	m.api.Shutdown(RedisJobID, RedisProxyJobID)
 	syscall.Sync()
 
 	ctx.Message(&stream.Message{
