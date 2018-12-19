@@ -105,7 +105,7 @@ SMART support is: Enabled
 
 }
 
-func testParseHdparm(t *testing.T) {
+func TestParseHdparm(t *testing.T) {
 	inputfalse := `
 /dev/sdc:
  drive state is:  active/idle
@@ -123,15 +123,15 @@ jlkjl:jlkjlkj
 `
 
 	t.Logf("testing hdparm")
-	ret, err := parseHdparm(strings.Split(inputfalse, "\n"))
+	ret, _ := parseHdparm(strings.Split(inputtrue, "\n"))
 	assert.True(t, ret, "Should return true")
 
-	ret, err = parseHdparm(strings.Split(inputtrue, "\n"))
+	ret, _ = parseHdparm(strings.Split(inputfalse, "\n"))
 	if ok := assert.False(t, ret); !ok {
 		t.Fatal()
 	}
-	ret, err = parseHdparm(strings.Split(bogus, "\n"))
-	if ok := assert.Error(t, err); !ok {
+	ret, _ = parseHdparm(strings.Split(bogus, "\n"))
+	if ok := assert.False(t, ret); !ok {
 		t.Fatal()
 	}
 }
