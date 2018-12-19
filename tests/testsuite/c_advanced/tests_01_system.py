@@ -40,7 +40,7 @@ class SystemTests(BaseTest):
         nics = [{'id': 'None', 'type': 'default'}]
         pub_port = randint(4000,5000)
         ports = {pub_port:6379}
-        vm_uuid = self.create_vm(name=vm_name, flist=self.zos_flist
+        vm_uuid = self.create_vm(name=vm_name, flist=self.zos_flist,
                                  ports=ports, nics=nics)
         time.sleep(10)
         vm_cl = client.Client(self.target_ip, port=pub_port)

@@ -37,7 +37,7 @@ class Machinetests(BaseTest):
 
         self.lg('- Create virtual machine {} , should succeed'.format(vm_name))
         time.sleep(4)
-        vm_uuid = self.create_vm(name=vm_name, self.ubuntu_flist)
+        vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist)
 
         self.lg('Create another vm with the same name, should fail')
         with self.assertRaises(RuntimeError):
