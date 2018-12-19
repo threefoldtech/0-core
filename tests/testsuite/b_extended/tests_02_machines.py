@@ -24,6 +24,7 @@ class ExtendedMachines(BaseTest):
         super(ExtendedMachines, self).setUp()
         self.check_zos_connection(ExtendedMachines)
 
+    @unittest.skip('https://github.com/threefoldtech/0-core/issues/96')
     def test001_kvm_add_remove_nics(self):
         """ zos-035
 
@@ -45,7 +46,7 @@ class ExtendedMachines(BaseTest):
 
         self.lg('Create Virtual machine (vm1)')
         vm_name = self.rand_str()
-        vm_uuid = self.create_vm(name=vm_name)
+        vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist)
 
         self.lg('Create vlan (v1) and specific name')
         t1 = randint(1, 4094)
@@ -89,6 +90,7 @@ class ExtendedMachines(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
+    @unittest.skip('https://github.com/threefoldtech/0-core/issues/96')
     def test002_kvm_attach_deattach_disks(self):
         """ zos-036
 
@@ -111,7 +113,7 @@ class ExtendedMachines(BaseTest):
 
         self.lg('Create Virtual machine (vm1)')
         vm_name = self.rand_str()
-        vm_uuid = self.create_vm(name=vm_name)
+        vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist)
 
         self.lg('Create loop device (L1)')
         loop_dev = self.setup_loop_devices(['bd0'], '500M', deattach=True)[0]

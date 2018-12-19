@@ -37,7 +37,7 @@ class Machinetests(BaseTest):
 
         self.lg('- Create virtual machine {} , should succeed'.format(vm_name))
         time.sleep(4)
-        vm_uuid = self.create_vm(name=vm_name)
+        vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist)
 
         self.lg('Create another vm with the same name, should fail')
         with self.assertRaises(RuntimeError):
@@ -149,6 +149,7 @@ class Machinetests(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
+    @unittest.skip('https://github.com/threefoldtech/0-core/issues/96')
     def test004_pause_resume_get_kvm(self):
         """ zos-050
 
@@ -156,7 +157,7 @@ class Machinetests(BaseTest):
 
         **Test Scenario:**
         #. Create virtual machine (VM), should succeed
-        #. Pause the VM and check state from get method, should be paused 
+        #. Pause the VM and check state from get method, should be paused
         #. Resume the VM and check state from get method, should be resumed
         #. Destroy VM1, should succeed
         """
@@ -164,18 +165,18 @@ class Machinetests(BaseTest):
         self.lg('{} STARTED'.format(self._testID))
         vm_name = self.rand_str()
         self.lg('- Create virtual machine {} , should succeed'.format(vm_name))
-        vm_uuid = self.create_vm(name=vm_name)
+        vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist)
         time.sleep(3)
 
         self.lg('Pause the VM and check state from get method ,should be paused')
         self.client.kvm.pause(vm_uuid)
         state_1 = self.client.kvm.get(vm_uuid)['state']
         self.assertEqual(state_1,'paused')
-        
+
         self.lg('Resume the VM and check state from get method, should be resumed')
         self.client.kvm.resume(vm_uuid)
         state_2 = self.client.kvm.get(vm_uuid)['state']
         self.assertEqual(state_2,'running')
-      
+
         self.lg('- Destroy VM {}'.format(vm_name))
         self.client.kvm.destroy(vm_uuid)

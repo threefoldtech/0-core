@@ -227,16 +227,6 @@ func (c *container) cleanup() {
 	}
 }
 
-func (c *container) cleanSandbox() {
-	if c.getFSType(BackendBaseDir) == "btrfs" {
-		pm.System("btrfs", "subvolume", "delete", path.Join(BackendBaseDir, c.name()))
-	} else {
-		os.RemoveAll(path.Join(BackendBaseDir, c.name()))
-	}
-
-	os.RemoveAll(c.root())
-}
-
 func (c *container) namespace() error {
 	sourceNs := fmt.Sprintf("/proc/%d/ns/net", c.PID)
 	os.MkdirAll("/run/netns", 0755)

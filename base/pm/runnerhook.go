@@ -115,18 +115,18 @@ func (h *MatchHook) Message(msg *stream.Message) {
 	}
 }
 
-//StreamHook captures full stdout and stderr of a process.
-type StreamHook struct {
+//BufferHook captures full stdout and stderr of a process.
+type BufferHook struct {
 	NOOPHook
 	Stdout bytes.Buffer
 	Stderr bytes.Buffer
 }
 
-func (h *StreamHook) append(buf *bytes.Buffer, msg *stream.Message) {
+func (h *BufferHook) append(buf *bytes.Buffer, msg *stream.Message) {
 	buf.WriteString(msg.Message)
 }
 
-func (h *StreamHook) Message(msg *stream.Message) {
+func (h *BufferHook) Message(msg *stream.Message) {
 	if msg.Meta.Level() == LevelStdout {
 		h.append(&h.Stdout, msg)
 	} else if msg.Meta.Level() == LevelStderr {
@@ -134,4 +134,13 @@ func (h *StreamHook) Message(msg *stream.Message) {
 	}
 
 	//ignore otherwise.
+}
+
+type MessageHook struct {
+	NOOPHook
+	Action func(msg *stream.Message)
+}
+
+func (h *MessageHook) Message(msg *stream.Message) {
+	h.Action(msg)
 }

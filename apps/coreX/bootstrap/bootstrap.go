@@ -87,7 +87,7 @@ func (o *Bootstrap) populateMinimumDev() error {
 	os.MkdirAll("/dev/shm", 0777)
 	if err := syscall.Mount("shm", "/dev/shm", "tmpfs",
 		syscall.MS_NOSUID|syscall.MS_NODEV|syscall.MS_NOEXEC|syscall.MS_RELATIME,
-		"size=65536k"); err != nil {
+		"size=1G"); err != nil {
 		return fmt.Errorf("failed to mount shm: %s", err)
 	}
 

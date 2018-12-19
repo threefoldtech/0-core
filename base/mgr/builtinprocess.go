@@ -42,7 +42,7 @@ func (c *Context) Log(text string, level ...uint16) {
 	}
 
 	c.Message(&stream.Message{
-		Message: text,
+		Message: text + "\n",
 		Meta:    stream.NewMeta(l),
 	})
 }

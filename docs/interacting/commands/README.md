@@ -59,3 +59,4 @@ Hereby:
 - [Job commands](job.md)
 - [Process commands](process.md)
 - [Filesystem commands](filesystem.md)
+- [Power commands](power.md)

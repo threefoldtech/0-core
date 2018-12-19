@@ -2233,6 +2233,7 @@ class KvmManager:
         'flist': typchk.Or(str, typchk.IsNone()),
         'cmdline': typchk.Or(str, typchk.IsNone()),
         'share_cache': bool,
+        'kvm': bool,
         'cpu': int,
         'memory': int,
         'nics': [{
@@ -2312,7 +2313,7 @@ class KvmManager:
 
     def create(self, name, media=None, flist=None, cpu=2, memory=512,
                nics=None, port=None, mount=None, tags=None, config=None, storage=None,
-               cmdline=None, share_cache=False):
+               cmdline=None, share_cache=False, kvm=False):
         """
         :param name: Name of the kvm domain
         :param media: (optional) array of media objects to attach to the machine, where the first object is the boot device
@@ -2351,6 +2352,7 @@ class KvmManager:
         :param share_cache: if set to true, the /var/cache/zerofs directory will be shared to guest machine
                         as 'zoscache' in rw mode. It's equavilint to adding {'source': '/var/cache/zerofs', 'target': 'zoscahe', readonly: False}
                         to the `mount` option.
+        :param kvm: If set to true, '-enable-kvm' is set to libvirt's XML, enabling vm in vm creation
 
         :note: At least one media or an flist must be provided.
         :return: uuid of the virtual machine
@@ -2373,6 +2375,7 @@ class KvmManager:
             'config': config,
             'storage': storage,
             'share_cache': share_cache,
+            'kvm': kvm,
         }
 
         self._create_chk.check(args)
@@ -3206,6 +3209,7 @@ class ZFSManager():
             'cache': ['local'],
         }
 
+
 class SocatManager():
     def __init__(self, client):
         self._client = client
@@ -3242,6 +3246,43 @@ class SocatManager():
         return self._client.json('socat.reserve', args)
 
 
+class PowerManager():
+    _image_chk = typchk.Checker({
+        'image': str,
+    })
+
+    def __init__(self, client):
+        self._client = client
+
+    def reboot(self):
+        """
+        full reboot of the node
+        """
+        self._client.raw('core.reboot', {}, stream=True).stream()
+
+    def poweroff(self):
+        """
+        full power off of the node
+        """
+        self._client.raw('core.poweroff', {}, stream=True).stream()
+
+    def update(self, image):
+        """
+        update the node with given image, and fast reboot into this image
+        No hardware reboot will ahppend
+
+        :param image: efi image name, the image will be downloaded from https://bootstrap.grid.tf/kernel
+                      example: "zero-os-development.efi"
+        """
+
+        args = {
+            'image': image
+        }
+
+        self._image_chk.check(args)
+        self._client.raw('core.update', args, stream=True).stream()
+
+
 class Client(BaseClient):
     _raw_chk = typchk.Checker({
         'id': str,
@@ -3266,7 +3307,7 @@ class Client(BaseClient):
         if hasattr(socket, 'TCP_KEEPIDLE'):
             socket_keepalive_options[socket.TCP_KEEPIDLE] = 1
         self._redis = redis.Redis(host=host, port=port, password=password, db=db, ssl=ssl,
-                                  socket_timeout=socket_timeout,
+                                  socket_timeout=socket_timeout, ssl_cert_reqs=None,
                                   socket_keepalive=True, socket_keepalive_options=socket_keepalive_options)
         self._container_manager = ContainerManager(self)
         self._bridge_manager = BridgeManager(self)
@@ -3282,17 +3323,21 @@ class Client(BaseClient):
         self._cgroup = CGroupManager(self)
         self._zfs = ZFSManager(self)
         self._socat = SocatManager(self)
-
+        self._power = PowerManager(self)
 
         if testConnectionAttempts:
             for _ in range(testConnectionAttempts):
                 try:
                     self.ping()
-                except:
+                except Exception:
                     pass
                 else:
                     return
             raise ConnectionError("Could not connect to remote host %s" % host)
+
+    @property
+    def power(self):
+        return self._power
 
     @property
     def socat(self):

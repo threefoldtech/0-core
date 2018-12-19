@@ -52,6 +52,7 @@ class Utils(object):
         zdb_name = str(uuid.uuid4())[0:8]
         mount_path = zos_client.zerodbs.prepare()
         zdb = zos_client.primitives.create_zerodb(name=zdb_name, path=mount_path[0],
+                                                  node_port=random.randint(4000, 5000),
                                                   mode='user', sync=False, admin='mypassword')
         zdb.deploy()
         disk = zos_client.primitives.create_disk('mydisk', zdb, size=50)
@@ -108,7 +109,7 @@ dhclient $interface
     vm_zos.memory = 8192
     disk = utils.create_disk(zos_client)
     vm_zos.disks.add(disk)
-    vm_zos.kernel_args.add(name='connect', key='development')
+    vm_zos.kernel_args.add(name='development', key='development')
     vm_zos.deploy()
 
     # create sshkey and provide the public key
@@ -143,6 +144,28 @@ dhclient $interface
     cmd = 'bash setup_env.sh'
     utils.run_cmd_on_remote_machine(cmd, options.zos_ip, ubuntu_port)
     time.sleep(30)
+
+    # Make sure zrobot server is not running
+    zrobot_kill = """
+from zeroos.core0 import client
+cl = client.Client('%s')
+cont = cl.container.find('zrobot')
+if cont:
+    cont_cl = cl.container.client(1)
+    cl.bash("echo $'import time; time.sleep(1000000000)' > /mnt/containers/1/.startup.py").get()
+    out = cont_cl.bash('ps aux | grep server').get().stdout
+    cont_cl.bash('kill -9 {}'.format(out.split()[1])).get()
+    """ % (vm_zos_ip)
+
+    time.sleep(5)
+    script_path = '/tmp/zrobot_kill.py'
+    with open(script_path, "w") as f:
+        f.write(zrobot_kill)
+    utils.send_script_to_remote_machine(script_path, options.zos_ip, ubuntu_port)
+
+    print('* killing zrobot server')
+    cmd = 'python3 zrobot_kill.py'
+    utils.run_cmd_on_remote_machine(cmd, options.zos_ip, ubuntu_port)
 
 
 if __name__ == "__main__":
