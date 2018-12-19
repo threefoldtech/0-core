@@ -1,4 +1,4 @@
-package builtin
+package info
 
 import (
 	"encoding/json"
@@ -135,14 +135,11 @@ var dmiKeywords = map[string]bool{
 var dmiTypeRegex = regexp.MustCompile("DMI type ([0-9]+)")
 var kvRegex = regexp.MustCompile("(.+?):(.*)")
 
-func init() {
-	pm.RegisterBuiltIn("info.dmi", dmidecodeRunAndParse)
-}
-
-func dmidecodeRunAndParse(cmd *pm.Command) (interface{}, error) {
+func getDMIInfo(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Types []interface{} `json:"types"`
 	}
+	cmd := ctx.Command()
 	cmdbin := "dmidecode"
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
@@ -166,7 +163,7 @@ func dmidecodeRunAndParse(cmd *pm.Command) (interface{}, error) {
 		cmdargs = append(cmdargs, "-t", fmt.Sprintf("%v", arg))
 	}
 
-	result, err := pm.System(cmdbin, cmdargs...)
+	result, err := api.System(cmdbin, cmdargs...)
 
 	if err != nil {
 		return nil, err
