@@ -1,6 +1,5 @@
 package builtin
 
-// #include <sys/types.h>
 // #include <sys/syscall.h>
 // #include <linux/kexec.h>
 import "C"
