@@ -2,6 +2,7 @@ package mgr
 
 import (
 	"container/list"
+	"fmt"
 	"sync"
 
 	"github.com/threefoldtech/0-core/base/pm"
@@ -15,8 +16,10 @@ type Queue struct {
 	ch     chan *jobImb
 	lock   sync.Mutex
 	o      sync.Once
+	closed bool
 }
 
+//Init initializes the queue
 func (q *Queue) Init() {
 	q.o.Do(func() {
 		q.queues = make(map[string]*list.List)
@@ -24,18 +27,31 @@ func (q *Queue) Init() {
 	})
 }
 
+//Close the queue. Queue can't be used after close
+func (q *Queue) Close() {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	q.closed = true
+	close(q.ch)
+}
+
+//Channel return job channel
 func (q *Queue) Channel() <-chan *jobImb {
 	return q.ch
 }
 
-func (q *Queue) Push(job *jobImb) {
+//Push a job on queue
+func (q *Queue) Push(job *jobImb) error {
 	q.lock.Lock()
 	defer q.lock.Unlock()
+	if q.closed {
+		return fmt.Errorf("closed queue")
+	}
 
 	name := job.Command().Queue
 	if name == "" {
 		q.ch <- job
-		return
+		return nil
 	}
 
 	queue, ok := q.queues[name]
@@ -49,11 +65,18 @@ func (q *Queue) Push(job *jobImb) {
 		//first job in the queue
 		q.ch <- job
 	}
+
+	return nil
 }
 
+//Notify tell queue that a job execution has completed
 func (q *Queue) Notify(job pm.Job) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
+	if q.closed {
+		return
+	}
+
 	name := job.Command().Queue
 	queue, ok := q.queues[name]
 	if !ok {

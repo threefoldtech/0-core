@@ -2,7 +2,7 @@ matrix:
   include:
     - language: python
       sudo: true
-      dist: trusty
+      dist: xenial
       python: 3.5
       if: type IN (api, cron)
       before_install:
@@ -24,11 +24,11 @@ matrix:
 
     - language: go
       sudo: true
-      dist: trusty
+      dist: xenial
       go: "1.10.x"
       before_install:
         - sudo apt-get -qq update
-        - sudo apt-get install -y libvirt-dev libcap-dev
+        - sudo apt-get install -y libvirt-dev libcap-dev libc6-dev
       install:
         - go get github.com/stretchr/testify
       script:

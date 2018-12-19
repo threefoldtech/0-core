@@ -225,20 +225,20 @@ loop:
 			}
 		case message := <-channel:
 			r.backlog.Append(message)
-
+			meta := message.Meta
 			//messages with Exit flags are always the last.
-			if message.Meta.Is(stream.ExitSuccessFlag) {
+			if meta.Is(stream.ExitSuccessFlag) {
 				jobresult.State = pm.StateSuccess
 			}
 
-			if message.Meta.Assert(pm.ResultMessageLevels...) {
+			if meta.Assert(pm.ResultMessageLevels...) {
 				//a result message.
 				result = message
-			} else if message.Meta.Assert(pm.LevelStdout) {
+			} else if meta.Assert(pm.LevelStdout) {
 				stdout.Append(message.Message)
-			} else if message.Meta.Assert(pm.LevelStderr) {
+			} else if meta.Assert(pm.LevelStderr) {
 				stderr.Append(message.Message)
-			} else if message.Meta.Assert(pm.LevelCritical) {
+			} else if meta.Assert(pm.LevelCritical) {
 				critical = message.Message
 			}
 
@@ -248,8 +248,8 @@ loop:
 
 			//FOR BACKWARD compatibility, we drop the code part from the message meta because watchers
 			//like watchdog and such are not expecting a code part in the meta (yet)
-			code := message.Meta.Code()
-			message.Meta = message.Meta.Base()
+			code := meta.Code()
+			message.Meta = meta.Base()
 			//END of BACKWARD compatibility code
 
 			//by default, all messages are forwarded to the manager for further processing.
@@ -376,6 +376,12 @@ func (r *jobImb) Process() pm.Process {
 func (r *jobImb) Wait() *pm.JobResult {
 	r.wg.Wait()
 	return r.result
+}
+
+func (r *jobImb) Terminate(sig syscall.Signal) error {
+	r.Unschedule()
+	r.command.Flags.Protected = false
+	return r.Signal(sig)
 }
 
 //implement PIDTable

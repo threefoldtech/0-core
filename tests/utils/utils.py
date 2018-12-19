@@ -7,6 +7,7 @@ import configparser
 import requests
 import json
 import os
+import socket
 
 
 class BaseTest(unittest.TestCase):
@@ -21,6 +22,7 @@ class BaseTest(unittest.TestCase):
         self.root_url = 'https://hub.grid.tf/tf-bootable/ubuntu:16.04.flist'
         self.smallsize_img = 'https://hub.grid.tf/tf-official-apps/minio.flist'
         self.ovs_flist = 'https://hub.grid.tf/tf-official-apps/ovs.flist'
+        self.ubuntu_flist = 'https://hub.grid.tf/tf-bootable/ubuntu:lts.flist'
         self.storage = 'zdb://hub.grid.tf:9900'
         self.client.timeout = 80
         super(BaseTest, self).__init__(*args, **kwargs)
@@ -31,7 +33,6 @@ class BaseTest(unittest.TestCase):
         self._logger = logging.LoggerAdapter(logging.getLogger('zos_testsuite'),
                                              {'testid': self.shortDescription() or self._testID})
 
-
     def teardown(self):
         pass
 
@@ -41,7 +42,7 @@ class BaseTest(unittest.TestCase):
     def check_zos_connection(self, classname):
         try:
             self.client.ping()
-        except Exception as e:
+        except:
             self.lg("can't reach zos remote machine")
             print("Can't reach zos remote machine")
             self.skipTest(classname)
@@ -143,8 +144,13 @@ class BaseTest(unittest.TestCase):
         nws = client.zerotier.list()
         for nw in nws:
             if nw['nwid'] == networkId:
-                address = nw['assignedAddresses'][0]
-                return address[:address.find('/')]
+                for address in nw['assignedAddresses']:
+                    try:
+                        ip = address[:address.find('/')]
+                        socket.inet_aton(ip)
+                    except:
+                        continue
+                    return ip
         else:
             self.lg('can\'t find network in zerotier.list()')
 
@@ -177,28 +183,14 @@ class BaseTest(unittest.TestCase):
         container = self.client.container.create(root_url=root_url, storage=storage, host_network=host_network, nics=nics, tags=tags, privileged=privileged)
         return container.get(30)
 
-    def create_vm(self, name, image='Ubuntu.1604.uefi.x64.qcow2', source=None):
-        img_loc = '/var/cache/images'
-        if source:
-            img_dn_path = source
-        else:
-            img_dn_path = 'ftp://pub:pub1234@ftp.aydo.com/Linux/ubuntu/Ubuntu.1604.uefi.x64.qcow2'
-        flag = self.client.filesystem.exists('{}'.format(img_loc))
-        if flag:
-            img = self.client.filesystem.exists('{}/{}'.format(img_loc, image))
-            if not img:
-                rs = self.client.bash('wget {} -P {}'.format(img_dn_path, img_loc))
-                state = rs.get(150).state
-                self.assertEqual(state, 'SUCCESS')
-        else:
-            rs = self.client.bash('mkdir -p {}'.format(img_loc))
-            state = rs.get().state
-            self.assertEqual(state, 'SUCCESS')
-            rs = self.client.bash('wget {} -P {}'.format(img_dn_path, img_loc))
-            state = rs.get(150).state
-            self.assertEqual(state, 'SUCCESS')
-        vm_uuid = self.client.kvm.create(name=name, media=[{'url': '{}/{}'.format(img_loc, image)}])
+    def create_vm(self, name, flist, nics=[], ports={}):
+        cmdline = None
+        if 'zero-os' in flist:
+            cmdline = 'development'
+        vm_uuid = self.client.kvm.create(name=name, flist=flist, ports=ports,
+                                         cmdline=cmdline, nics=nics)
         return vm_uuid
+
 
     def check_nic_exist(self, name):
         nic_lst = [True for nic in self.client.info.nic() if nic['name'] == name]

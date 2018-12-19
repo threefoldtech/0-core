@@ -1,5 +1,6 @@
 from utils.utils import BaseTest
 import unittest
+import time
 
 
 class DisksTests(BaseTest):
@@ -11,15 +12,16 @@ class DisksTests(BaseTest):
     def create_btrfs(self, second_btrfs=False):
         self.lg('Create Btrfs file system (Bfs1), should succeed')
         self.label = self.rand_str()
-        self.loop_dev_list = self.setup_loop_devices(['bd0', 'bd1'], '500M', deattach=True)
+        self.loop_dev_list = self.setup_loop_devices(['bd0', 'bd1'], '300M', deattach=True)
         self.lg('Mount the btrfs filesystem (Bfs1)')
         self.client.btrfs.create(self.label, self.loop_dev_list, overwrite=True)
         self.mount_point = '/mnt/{}'.format(self.rand_str())
         self.client.bash('mkdir -p {}'.format(self.mount_point))
+        time.sleep(5)
         self.client.disk.mount(self.loop_dev_list[0], self.mount_point, [""])
         if second_btrfs:
             self.label2 = self.rand_str()
-            self.loop_dev_list2 = self.setup_loop_devices(['bd2', 'bd3'], '500M', deattach=False)
+            self.loop_dev_list2 = self.setup_loop_devices(['bd2', 'bd3'], '300M', deattach=False)
             self.lg('Mount the btrfs filesystem (Bfs2)')
             self.client.btrfs.create(self.label2, self.loop_dev_list2, overwrite=True)
             self.mount_point2 = '/mnt/{}'.format(self.rand_str())
@@ -505,9 +507,6 @@ class DisksTests(BaseTest):
         """
 
         self.lg('{} STARTED'.format(self._testID))
-
-        self.lg('Create Btrfs file system, should succeed')
-        self.create_btrfs()
 
         self.lg('Create Btrfs file system (Bfs1), should succeed')
         self.lg('Create Btrfs file system (Bfs2), should succeed')
