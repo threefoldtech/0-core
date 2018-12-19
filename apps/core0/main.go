@@ -14,7 +14,8 @@ import (
 	"github.com/threefoldtech/0-core/apps/core0/plugin"
 	"github.com/threefoldtech/0-core/apps/core0/screen"
 	"github.com/threefoldtech/0-core/apps/core0/stats"
-	"github.com/threefoldtech/0-core/apps/core0/subsys/cgroups"
+
+	// "github.com/threefoldtech/0-core/apps/core0/subsys/cgroups"
 	"github.com/threefoldtech/0-core/base"
 	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
@@ -202,9 +203,9 @@ func main() {
 	}
 	screen.Push(row)
 
-	if err := cgroups.Init(); err != nil {
-		log.Fatal("failed to initialize cgroups subsystem")
-	}
+	// if err := cgroups.Init(); err != nil {
+	// 	log.Fatal("failed to initialize cgroups subsystem")
+	// }
 
 	// contMgr, err := containers.ContainerSubsystem(sink, &row.Cells[0])
 	// if err != nil {
