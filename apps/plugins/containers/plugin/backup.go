@@ -1,16 +1,17 @@
-package containers
+package main
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/apps/core0/helper/filesystem"
 	"io/ioutil"
 	"net/url"
 	"os"
 	"path"
 	"regexp"
 	"syscall"
+
+	"github.com/threefoldtech/0-core/apps/core0/helper/filesystem"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 const (
@@ -129,7 +130,7 @@ func (m *containerManager) backup(cmd *pm.Command) (interface{}, error) {
 	syscall.Kill(-cont.PID, syscall.SIGSTOP)
 	defer syscall.Kill(-cont.PID, syscall.SIGCONT)
 
-	job, err := pm.Run(
+	job, err := m.api.Run(
 		&pm.Command{
 			Command: pm.CommandSystem,
 			Arguments: pm.MustArguments(

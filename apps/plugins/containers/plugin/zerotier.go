@@ -1,12 +1,13 @@
-package containers
+package main
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/threefoldtech/0-core/base/pm"
 	"io/ioutil"
 	"path"
 	"strings"
+
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 func (m *containerManager) ztInfo(cmd *pm.Command) (interface{}, error) {
@@ -22,7 +23,7 @@ func (m *containerManager) ztInfo(cmd *pm.Command) (interface{}, error) {
 		return nil, fmt.Errorf("container does not exist")
 	}
 
-	job, err := pm.System(
+	job, err := m.api.System(
 		"ip", "netns", "exec", fmt.Sprintf("%d", args.Container),
 		"zerotier-cli", "-j", fmt.Sprintf("-D%s", cont.zerotierHome()), "info",
 	)
@@ -56,7 +57,7 @@ func (m *containerManager) ztList(cmd *pm.Command) (interface{}, error) {
 		return nil, fmt.Errorf("container does not exist")
 	}
 
-	job, err := pm.System(
+	job, err := m.api.System(
 		"ip", "netns", "exec", fmt.Sprintf("%d", args.Container),
 		"zerotier-cli", "-j", fmt.Sprintf("-D%s", cont.zerotierHome()), "listnetworks",
 	)

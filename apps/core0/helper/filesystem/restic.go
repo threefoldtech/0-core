@@ -41,7 +41,7 @@ func RestoreRepo(repo, target string, include ...string) error {
 		&pm.Command{
 			Command: pm.CommandSystem,
 			Arguments: pm.MustArguments(
-				mgr.SystemCommandArguments{
+				pm.SystemCommandArguments{
 					Name:  "restic",
 					Args:  restic,
 					StdIn: password,

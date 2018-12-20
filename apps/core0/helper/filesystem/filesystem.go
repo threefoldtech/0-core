@@ -219,7 +219,7 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 	cmd := &pm.Command{
 		ID:      path.Join(namespace, target),
 		Command: pm.CommandSystem,
-		Arguments: pm.MustArguments(mgr.SystemCommandArguments{
+		Arguments: pm.MustArguments(pm.SystemCommandArguments{
 			Name: "g8ufs",
 			Args: g8ufs,
 		}),

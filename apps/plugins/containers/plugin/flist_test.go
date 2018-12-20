@@ -1,4 +1,4 @@
-package containers
+package main
 
 import (
 	"archive/tar"

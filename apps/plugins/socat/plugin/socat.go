@@ -87,6 +87,13 @@ func (s *socatManager) init() error {
 	return s.monitorIPChangesUpdateSocat()
 }
 
+//ValidHost checks if the host string is valid
+//Valid hosts is (port, ip:port, or device:port)
+func (m *socatManager) ValidHost(host string) bool {
+	_, err := getSource(host)
+	return err == nil
+}
+
 //SetPortForward create a single port forward from host(port), to ip(addr) and dest(port) in this namespace
 //The namespace is used to group port forward rules so they all can get terminated
 //with one call later.

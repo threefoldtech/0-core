@@ -1,4 +1,4 @@
-package containers
+package main
 
 import (
 	"archive/tar"
@@ -12,7 +12,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
 	"github.com/threefoldtech/0-core/base/pm"
 	"gopkg.in/yaml.v2"
 )
@@ -21,9 +20,9 @@ const (
 	cmdFlistCreate = "corex.flist.create"
 )
 
-func zflist(args ...string) (*pm.JobResult, error) {
+func (m *containerManager) zflist(args ...string) (*pm.JobResult, error) {
 	log.Debugf("zflist %v", args)
-	return pm.System("zflist", args...)
+	return m.api.System("zflist", args...)
 }
 
 func containerPath(container *container, path string) string {
@@ -96,7 +95,7 @@ func (m *containerManager) flistCreate(cmd *pm.Command) (interface{}, error) {
 	srcPath := containerPath(cont, args.Src)
 
 	// create flist
-	storage := socat.Resolve(args.Storage)
+	storage := m.socat.Resolve(args.Storage)
 
 	zflistArgs := []string{"--archive", archivePath, "--create", srcPath, "--backend", storage}
 	if args.Token != "" {
@@ -107,7 +106,7 @@ func (m *containerManager) flistCreate(cmd *pm.Command) (interface{}, error) {
 		}
 	}
 
-	_, err := zflist(zflistArgs...)
+	_, err := m.zflist(zflistArgs...)
 	if err != nil {
 		return nil, err
 	}

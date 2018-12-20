@@ -88,13 +88,6 @@ func getSource(src string) (source, error) {
 	return r, nil
 }
 
-//ValidHost checks if the host string is valid
-//Valid hosts is (port, ip:port, or device:port)
-func ValidHost(host string) bool {
-	_, err := getSource(host)
-	return err == nil
-}
-
 type rule struct {
 	ns     string
 	source source

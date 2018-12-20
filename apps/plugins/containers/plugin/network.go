@@ -1,4 +1,4 @@
-package containers
+package main
 
 import (
 	"context"
@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
-	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/vishvananda/netlink"
 )
@@ -51,7 +50,7 @@ func (c *container) startZerotier() (pm.Job, error) {
 		Action: func(_ int) {
 			for i := 0; i < 10; i++ {
 				log.Debugf("checking for zt availability container %d", c.ID())
-				_, err = pm.System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "info")
+				_, err = c.mgr.api.System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "info")
 				if err == nil {
 					break
 				}
@@ -69,7 +68,7 @@ func (c *container) startZerotier() (pm.Job, error) {
 		},
 	}
 
-	job, runerr := pm.Run(&pm.Command{
+	job, runerr := c.mgr.api.Run(&pm.Command{
 		ID:      c.zerotierID(),
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(
@@ -159,7 +158,7 @@ func (c *container) joinZerotierNetwork(idx int, netID string) error {
 	}
 
 	home := c.zerotierHome()
-	_, err := pm.System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "join", netID)
+	_, err := c.mgr.api.System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "join", netID)
 	return err
 }
 
@@ -169,7 +168,7 @@ func (c *container) leaveZerotierNetwork(idx int, netID string) error {
 	}
 
 	home := c.zerotierHome()
-	_, err := pm.System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "leave", netID)
+	_, err := c.mgr.api.System("ip", "netns", "exec", fmt.Sprint(c.ID()), "zerotier-cli", fmt.Sprintf("-D%s", home), "leave", netID)
 	return err
 }
 
@@ -190,7 +189,7 @@ func (c *container) setupLink(src, target string, index int, n *Nic) error {
 	//	return fmt.Errorf("set link name: %s", err)
 	//}
 
-	_, err = pm.System("ip", "-n", fmt.Sprintf("%v", c.id), "link", "set", src, "name", target)
+	_, err = c.mgr.api.System("ip", "-n", fmt.Sprintf("%v", c.id), "link", "set", src, "name", target)
 	if err != nil {
 		return fmt.Errorf("failed to rename device: %s", err)
 	}
@@ -215,14 +214,14 @@ func (c *container) setupLink(src, target string, index int, n *Nic) error {
 				},
 			),
 		}
-		pm.Run(dhcpc)
+		c.mgr.api.Run(dhcpc)
 	} else if n.Config.CIDR != "" {
 		if _, _, err := net.ParseCIDR(n.Config.CIDR); err != nil {
 			return err
 		}
 
 		//putting the interface up
-		_, err := pm.System("ip", "-n", fmt.Sprintf("%v", c.id),
+		_, err := c.mgr.api.System("ip", "-n", fmt.Sprintf("%v", c.id),
 			"link", "set", "dev", target, "up")
 
 		if err != nil {
@@ -230,7 +229,7 @@ func (c *container) setupLink(src, target string, index int, n *Nic) error {
 		}
 
 		//setting the ip address
-		_, err = pm.System("ip", "-n", fmt.Sprintf("%v", c.id), "address", "add", n.Config.CIDR, "dev", target)
+		_, err = c.mgr.api.System("ip", "-n", fmt.Sprintf("%v", c.id), "address", "add", n.Config.CIDR, "dev", target)
 		if err != nil {
 			return fmt.Errorf("error settings interface ip: %v", err)
 		}
@@ -448,7 +447,7 @@ func (c *container) forwardId() string {
 
 func (c *container) setPortForward(host string, dest int) error {
 	ip := c.getDefaultIP().String()
-	return socat.SetPortForward(c.forwardId(), ip, host, dest)
+	return c.mgr.socat.SetPortForward(c.forwardId(), ip, host, dest)
 }
 
 func (c *container) setPortForwards() error {
@@ -463,7 +462,7 @@ func (c *container) setPortForwards() error {
 
 func (c *container) setGateway(dev string, gw string) error {
 	////setting the ip address
-	_, err := pm.System("ip", "-n", fmt.Sprintf("%v", c.id),
+	_, err := c.mgr.api.System("ip", "-n", fmt.Sprintf("%v", c.id),
 		"route", "add", "metric", "1000", "default", "via", gw, "dev", dev)
 
 	if err != nil {
@@ -634,19 +633,19 @@ func (c *container) postStartNetwork(idx int, network *Nic) (err error) {
 }
 
 func (c *container) setupLO() error {
-	if _, err := pm.System("ip", "-n", fmt.Sprint(c.id),
+	if _, err := c.mgr.api.System("ip", "-n", fmt.Sprint(c.id),
 		"address", "add", "127.0.0.1/8", "dev", "lo",
 	); err != nil {
 		return err
 	}
 
-	if _, err := pm.System("ip", "-n", fmt.Sprint(c.id),
+	if _, err := c.mgr.api.System("ip", "-n", fmt.Sprint(c.id),
 		"address", "add", "::1/128", "dev", "lo",
 	); err != nil {
 		return err
 	}
 
-	if _, err := pm.System("ip", "-n", fmt.Sprint(c.id),
+	if _, err := c.mgr.api.System("ip", "-n", fmt.Sprint(c.id),
 		"link", "set", "lo", "up",
 	); err != nil {
 		return err
@@ -720,7 +719,7 @@ func (c *container) unLink(idx int, n *Nic) error {
 	}
 
 	name := fmt.Sprintf("eth%d", idx)
-	if _, err := pm.System("ip", "-n", fmt.Sprint(c.id), "link", "del", name); err != nil {
+	if _, err := c.mgr.api.System("ip", "-n", fmt.Sprint(c.id), "link", "del", name); err != nil {
 		return err
 	}
 
@@ -808,13 +807,15 @@ func (c *container) destroyNetwork() {
 			if err := c.unBridge(idx, network, nil); err != nil {
 				log.Errorf("failed to destroy network: %v", err)
 			}
-			if err := socat.RemoveAll(c.forwardId()); err != nil {
+			if err := c.mgr.socat.RemoveAll(c.forwardId()); err != nil {
 				log.Errorf("failed to destroy port forwards: %v", err)
 			}
 		}
 	}
 
-	pm.Kill(c.zerotierID())
+	if job, ok := c.mgr.api.JobOf(c.zerotierID()); ok {
+		job.Signal(syscall.SIGTERM)
+	}
 
 	//clean up namespace
 	if c.PID > 0 {

@@ -1,4 +1,4 @@
-package containers
+package main
 
 import (
 	"encoding/json"
@@ -11,11 +11,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/op/go-logging"
+	"github.com/threefoldtech/0-core/apps/plugins/cgroup"
+	"github.com/threefoldtech/0-core/apps/plugins/socat"
+
+	"github.com/threefoldtech/0-core/base/plugin"
+
 	"github.com/pborman/uuid"
-	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
 	"github.com/threefoldtech/0-core/apps/core0/screen"
-	"github.com/threefoldtech/0-core/apps/core0/subsys/cgroups"
 	"github.com/threefoldtech/0-core/apps/core0/transport"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/settings"
@@ -59,11 +61,7 @@ var (
 	BridgeIP          = []byte{172, 18, 0, 1}
 	DefaultBridgeIP   = fmt.Sprintf("%d.%d.%d.%d", BridgeIP[0], BridgeIP[1], BridgeIP[2], BridgeIP[3])
 	DefaultBridgeCIDR = fmt.Sprintf("%s/16", DefaultBridgeIP)
-	DevicesCGroup     = CGroup{string(cgroups.DevicesSubsystem), "corex"}
-)
-
-var (
-	log = logging.MustGetLogger("containers")
+	DevicesCGroup     = CGroup{string(cgroup.DevicesSubsystem), "corex"}
 )
 
 type NetworkConfig struct {
@@ -91,8 +89,8 @@ type Nic struct {
 //CGroup defition
 type CGroup [2]string
 
-func (c CGroup) Subsystem() cgroups.Subsystem {
-	return cgroups.Subsystem(c[0])
+func (c CGroup) Subsystem() cgroup.Subsystem {
+	return cgroup.Subsystem(c[0])
 }
 
 func (c CGroup) Name() string {
@@ -127,7 +125,7 @@ type containerPortForward struct {
 	HostPort      string `json:"host_port"`
 }
 
-func (c *ContainerCreateArguments) Validate() error {
+func (c *ContainerCreateArguments) Validate(m *containerManager) error {
 	if c.Root == "" {
 		return fmt.Errorf("root plist is required")
 	}
@@ -154,7 +152,7 @@ func (c *ContainerCreateArguments) Validate() error {
 	}
 
 	for host, guest := range c.Port {
-		if !socat.ValidHost(host) {
+		if !m.socat.ValidHost(host) {
 			return fmt.Errorf("invalid host port '%s'", host)
 		}
 		if guest < 0 || guest > 65535 {
@@ -232,7 +230,7 @@ func (c *ContainerCreateArguments) Validate() error {
 	}
 
 	for _, cgroup := range c.CGroups {
-		if !cgroups.Exists(cgroup.Subsystem(), cgroup.Name()) {
+		if !m.cgroup.Exists(cgroup.Subsystem(), cgroup.Name()) {
 			return fmt.Errorf("invalid cgroup %v", cgroup)
 		}
 	}
@@ -241,6 +239,10 @@ func (c *ContainerCreateArguments) Validate() error {
 }
 
 type containerManager struct {
+	api    plugin.API
+	cgroup cgroup.API
+	socat  socat.API
+
 	sequence uint16
 	seqM     sync.Mutex
 
@@ -266,60 +268,13 @@ type Container interface {
 	Arguments() ContainerCreateArguments
 }
 
-type ContainerManager interface {
-	Dispatch(id uint16, cmd *pm.Command) (*pm.JobResult, error)
-	GetWithTags(tags ...string) []Container
-	GetOneWithTags(tags ...string) Container
-	Of(id uint16) Container
-}
-
-func ContainerSubsystem(sink *transport.Sink, cell *screen.RowCell) (ContainerManager, error) {
-
-	containerMgr := &containerManager{
-		containers: make(map[uint16]*container),
-		sink:       sink,
-		cell:       cell,
-	}
-
-	cell.Text = "Containers: 0"
-
-	if err := containerMgr.setUpCGroups(); err != nil {
-		return nil, err
-	}
-	if err := containerMgr.setUpDefaultBridge(); err != nil {
-		return nil, err
-	}
-
-	pm.RegisterBuiltIn(cmdContainerCreate, containerMgr.create)
-	pm.RegisterBuiltIn(cmdContainerCreateSync, containerMgr.createSync)
-	pm.RegisterBuiltIn(cmdContainerList, containerMgr.list)
-	pm.RegisterBuiltIn(cmdContainerDispatch, containerMgr.dispatch)
-	pm.RegisterBuiltIn(cmdContainerTerminate, containerMgr.terminate)
-	pm.RegisterBuiltIn(cmdContainerFind, containerMgr.find)
-	pm.RegisterBuiltIn(cmdContainerNicAdd, containerMgr.nicAdd)
-	pm.RegisterBuiltIn(cmdContainerNicRemove, containerMgr.nicRemove)
-	pm.RegisterBuiltIn(cmdContainerPortForwardAdd, containerMgr.portforwardAdd)
-	pm.RegisterBuiltIn(cmdContainerPortForwardRemove, containerMgr.portforwardRemove)
-	pm.RegisterBuiltIn(cmdContainerBackup, containerMgr.backup)
-	pm.RegisterBuiltIn(cmdContainerRestore, containerMgr.restore)
-	pm.RegisterBuiltIn(cmdContainerFListLayer, containerMgr.flistLayer)
-	// flist specific commands
-	pm.RegisterBuiltIn(cmdFlistCreate, containerMgr.flistCreate)
-
-	//container specific info
-	pm.RegisterBuiltIn(cmdContainerZerotierInfo, containerMgr.ztInfo)
-	pm.RegisterBuiltIn(cmdContainerZerotierList, containerMgr.ztList)
-
-	return containerMgr, nil
-}
-
 func (m *containerManager) setUpCGroups() error {
-	devices, err := cgroups.GetGroup(DevicesCGroup.Subsystem(), DevicesCGroup.Name())
+	devices, err := m.cgroup.GetGroup(DevicesCGroup.Subsystem(), DevicesCGroup.Name())
 	if err != nil {
 		return err
 	}
 
-	if devices, ok := devices.(cgroups.DevicesGroup); ok {
+	if devices, ok := devices.(cgroup.DevicesGroup); ok {
 		devices.Deny("a")
 		for _, spec := range []string{
 			"c 1:5 rwm",
@@ -344,33 +299,16 @@ func (m *containerManager) setUpCGroups() error {
 }
 
 func (m *containerManager) setUpDefaultBridge() error {
-	cmd := &pm.Command{
-		ID:      uuid.New(),
-		Command: "bridge.create",
-		Arguments: pm.MustArguments(
-			pm.M{
-				"name": DefaultBridgeName,
-				"network": pm.M{
-					"nat":  true,
-					"mode": "static",
-					"settings": pm.M{
-						"cidr": DefaultBridgeCIDR,
-					},
-				},
+	return m.api.Internal("bridge.create", pm.M{
+		"name": DefaultBridgeName,
+		"network": pm.M{
+			"nat":  true,
+			"mode": "static",
+			"settings": pm.M{
+				"cidr": DefaultBridgeCIDR,
 			},
-		),
-	}
-
-	job, err := pm.Run(cmd)
-	if err != nil {
-		return err
-	}
-	result := job.Wait()
-	if result.State != pm.StateSuccess {
-		return fmt.Errorf("failed to create default container bridge: %s", result.Data)
-	}
-
-	return nil
+		},
+	}, nil)
 }
 
 func (m *containerManager) getNextSequence() uint16 {
@@ -433,7 +371,7 @@ func (m *containerManager) nicAdd(cmd *pm.Command) (interface{}, error) {
 	idx := len(container.Args.Nics)
 	container.Args.Nics = append(container.Args.Nics, &args.Nic)
 
-	if err := container.Args.Validate(); err != nil {
+	if err := container.Args.Validate(m); err != nil {
 		l := container.Args.Nics
 		container.Args.Nics = l[:len(l)-1]
 		return nil, pm.BadRequestError(err)
@@ -499,7 +437,7 @@ func (m *containerManager) nicRemove(cmd *pm.Command) (interface{}, error) {
 }
 
 func (m *containerManager) createContainer(args ContainerCreateArguments) (*container, error) {
-	if err := args.Validate(); err != nil {
+	if err := args.Validate(m); err != nil {
 		return nil, err
 	}
 
@@ -571,7 +509,7 @@ func (m *containerManager) list(cmd *pm.Command) (interface{}, error) {
 	defer m.conM.RUnlock()
 	for id, c := range m.containers {
 		name := fmt.Sprintf("core-%d", id)
-		job, ok := pm.JobOf(name)
+		job, ok := m.api.JobOf(name)
 		if !ok {
 			continue
 		}
@@ -682,7 +620,7 @@ func (m *containerManager) find(cmd *pm.Command) (interface{}, error) {
 	result := make(map[uint16]ContainerInfo)
 	for _, c := range containers {
 		name := fmt.Sprintf("core-%d", c.ID())
-		job, ok := pm.JobOf(name)
+		job, ok := m.api.JobOf(name)
 		if !ok {
 			continue
 		}
@@ -787,7 +725,7 @@ func (m *containerManager) portforwardRemove(cmd *pm.Command) (interface{}, erro
 		return nil, pm.NotFoundError(fmt.Errorf("container does not exist"))
 	}
 
-	if err := socat.RemovePortForward(container.forwardId(), args.HostPort, args.ContainerPort); err != nil {
+	if err := m.socat.RemovePortForward(container.forwardId(), args.HostPort, args.ContainerPort); err != nil {
 		return nil, err
 	}
 	delete(container.Args.Port, args.HostPort)

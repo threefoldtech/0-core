@@ -6,4 +6,5 @@ type API interface {
 	RemoveAll(namespace string) error
 	Resolve(address string) string
 	ResolveURL(raw string) (string, error)
+	ValidHost(host string) bool
 }

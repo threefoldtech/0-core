@@ -1,4 +1,4 @@
-package containers
+package main
 
 import (
 	"fmt"
@@ -141,9 +141,9 @@ func (c *container) sandbox() error {
 	if fstype == "btrfs" {
 		//make sure we delete it if sub volume exists
 		if utils.Exists(path.Join(BackendBaseDir, c.name())) {
-			pm.System("btrfs", "subvolume", "delete", path.Join(BackendBaseDir, c.name()))
+			c.mgr.api.System("btrfs", "subvolume", "delete", path.Join(BackendBaseDir, c.name()))
 		}
-		pm.System("btrfs", "subvolume", "create", path.Join(BackendBaseDir, c.name()))
+		c.mgr.api.System("btrfs", "subvolume", "create", path.Join(BackendBaseDir, c.name()))
 	}
 
 	root := c.root()
@@ -216,7 +216,7 @@ func (c *container) cleanSandbox() {
 	c.unMountAll()
 
 	if c.getFSType(BackendBaseDir) == "btrfs" {
-		pm.System("btrfs", "subvolume", "delete", path.Join(BackendBaseDir, c.name()))
+		c.mgr.api.System("btrfs", "subvolume", "delete", path.Join(BackendBaseDir, c.name()))
 	} else {
 		os.RemoveAll(path.Join(BackendBaseDir, c.name()))
 	}

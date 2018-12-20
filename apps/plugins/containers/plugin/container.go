@@ -1,16 +1,14 @@
-package containers
+package main
 
 import (
 	"fmt"
 	"os"
-	"path"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/threefoldtech/0-core/apps/core0/logger"
-	"github.com/threefoldtech/0-core/apps/core0/subsys/cgroups"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/stream"
 )
@@ -71,7 +69,7 @@ func (c *container) Arguments() ContainerCreateArguments {
 }
 
 func (c *container) Start() (runner pm.Job, err error) {
-	coreID := fmt.Sprintf("core-%d", c.id)
+	//coreID := fmt.Sprintf("core-%d", c.id)
 
 	defer func() {
 		if err != nil {
@@ -106,30 +104,30 @@ func (c *container) Start() (runner pm.Job, err error) {
 		env[key] = value
 	}
 
-	extCmd := &pm.Command{
-		ID: coreID,
-		Arguments: pm.MustArguments(
-			pm.ContainerCommandArguments{
-				Name:        "/coreX",
-				Chroot:      c.root(),
-				Dir:         "/",
-				HostNetwork: c.Args.HostNetwork,
-				Args:        args,
-				Env:         env,
-				Log:         path.Join(BackendBaseDir, c.name(), "container.log"),
-			},
-		),
-	}
+	// extCmd := &pm.Command{
+	// 	ID: coreID,
+	// 	Arguments: pm.MustArguments(
+	// 		pm.ContainerCommandArguments{
+	// 			Name:        "/coreX",
+	// 			Chroot:      c.root(),
+	// 			Dir:         "/",
+	// 			HostNetwork: c.Args.HostNetwork,
+	// 			Args:        args,
+	// 			Env:         env,
+	// 			Log:         path.Join(BackendBaseDir, c.name(), "container.log"),
+	// 		},
+	// 	),
+	// }
 
-	onpid := &pm.PIDHook{
-		Action: c.onStart,
-	}
+	// onpid := &pm.PIDHook{
+	// 	Action: c.onStart,
+	// }
 
-	onexit := &pm.ExitHook{
-		Action: c.onExit,
-	}
+	// onexit := &pm.ExitHook{
+	// 	Action: c.onExit,
+	// }
 
-	runner, err = pm.RunFactory(extCmd, pm.NewContainerProcess, onpid, onexit)
+	// runner, err = pm.RunFactory(extCmd, pm.NewContainerProcess, onpid, onexit)
 	if err != nil {
 		log.Errorf("error in container runner: %s", err)
 		return
@@ -177,7 +175,7 @@ func (c *container) onStart(pid int) {
 	}
 
 	for _, cgroup := range c.Args.CGroups {
-		group, err := cgroups.Get(cgroup.Subsystem(), cgroup.Name())
+		group, err := c.mgr.cgroup.Get(cgroup.Subsystem(), cgroup.Name())
 		if err != nil {
 			log.Errorf("can't find cgroup %s", err)
 			continue
