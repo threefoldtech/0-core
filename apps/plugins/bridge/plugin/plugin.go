@@ -17,8 +17,9 @@ var (
 
 	//Plugin plugin entry point
 	Plugin = plugin.Plugin{
-		Name:    "bridge",
-		Version: "1.0",
+		Name:     "bridge",
+		Version:  "1.0",
+		Requires: []string{"nft"},
 		Open: func(api plugin.API) (err error) {
 			return initManager(&manager, api)
 		},

@@ -30,8 +30,9 @@ var (
 
 	//Plugin plugin entry point
 	Plugin = plugin.Plugin{
-		Name:    "socat",
-		Version: "1.0",
+		Name:     "socat",
+		Version:  "1.0",
+		Requires: []string{"nft"},
 		Open: func(api plugin.API) (err error) {
 			return newSocatManager(&mgr, api)
 		},

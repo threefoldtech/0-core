@@ -5,11 +5,13 @@ import (
 	"io/ioutil"
 	"path"
 	"plugin"
+	"sort"
 	"strings"
 
 	logging "github.com/op/go-logging"
 	plg "github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/utils"
 )
 
 var (
@@ -20,6 +22,40 @@ var (
 type Manager struct {
 	path    []string
 	plugins map[string]*plg.Plugin
+}
+
+type plugins []*plg.Plugin
+
+// Len is the number of elements in the collection.
+func (l plugins) Len() int {
+	return len(l)
+}
+
+// Less reports whether the element with
+// index i should sort before the element with index j.
+func (l plugins) Less(i, j int) bool {
+	pi := l[i]
+	pj := l[j]
+
+	//any one with now requirements should come first
+	if len(pi.Requires) == 0 {
+		return true
+	} else if len(pj.Requires) == 0 {
+		return false
+	}
+
+	//if i is required by j, it should come first
+	if utils.InString(pj.Requires, pi.Name) {
+		return true
+	}
+
+	//other wise, j should come first
+	return false
+}
+
+// Swap swaps the elements with indexes i and j.
+func (l plugins) Swap(i, j int) {
+	l[i], l[j] = l[j], l[i]
 }
 
 //New create a new plugin manager
@@ -52,7 +88,7 @@ func (m *Manager) Get(name string) (pm.Action, bool) {
 	return action, ok
 }
 
-func (m *Manager) open(p string) (*plg.Plugin, error) {
+func (m *Manager) loadPlugin(p string) (*plg.Plugin, error) {
 	log.Infof("loading plugin %s", p)
 	plug, err := plugin.Open(p)
 	if err != nil {
@@ -71,6 +107,17 @@ func (m *Manager) open(p string) (*plg.Plugin, error) {
 	return nil, fmt.Errorf("plugin symbol of wrong type: %T", sym)
 }
 
+func (m *Manager) safeOpen(pl *plg.Plugin) (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("paniced on plugin initialization: %v", e)
+		}
+	}()
+
+	err = pl.Open(m)
+	return
+}
+
 func (m *Manager) load() error {
 	for _, p := range m.path {
 		if err := m.loadPath(p); err != nil {
@@ -78,9 +125,16 @@ func (m *Manager) load() error {
 		}
 	}
 
-	for _, plugin := range m.plugins {
+	l := make(plugins, 0, len(m.plugins))
+
+	for _, p := range m.plugins {
+		l = append(l, p)
+	}
+
+	sort.Sort(l)
+	for _, plugin := range l {
 		if plugin.Open != nil {
-			if err := plugin.Open(m); err != nil {
+			if err := m.safeOpen(plugin); err != nil {
 				log.Errorf("failed to initialize plugin %s: %s", plugin.Name, err)
 				continue
 			}
@@ -107,7 +161,7 @@ func (m *Manager) loadPath(p string) error {
 			continue
 		}
 
-		plugin, err := m.open(path.Join(p, item.Name()))
+		plugin, err := m.loadPlugin(path.Join(p, item.Name()))
 
 		if err != nil {
 			return err
