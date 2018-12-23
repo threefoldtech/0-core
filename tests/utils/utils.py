@@ -155,10 +155,8 @@ class BaseTest(unittest.TestCase):
             self.lg('can\'t find network in zerotier.list()')
 
     def deattach_all_loop_devices(self):
-        self.client.bash('modprobe loop')  # to make /dev/loop* available
         self.client.bash('umount -f /dev/loop*')  # Make sure to free all loop devices first
-        for i in range(8):
-            self.client.bash('losetup -d /dev/loop{}'.format(i))  # deattach all devices
+        self.client.bash('losetup -D') # deattach all devices
 
     def setup_loop_devices(self, files_names, file_size, files_loc='/var/cache', deattach=False):
         """
@@ -167,6 +165,7 @@ class BaseTest(unittest.TestCase):
         :param files_loc: abs path for the files (ex: /)
         :param deattach: if True, deattach all loop devices
         """
+        self.client.bash('modprobe loop')  # to make /dev/loop* available
         if deattach:
             self.deattach_all_loop_devices()
         loop_devs = []

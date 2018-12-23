@@ -246,7 +246,8 @@ class DisksTests(BaseTest):
             disks_names.append(disk['name'])
 
         for disk in disks_names:
-
+            if 'loop' in disk:
+                continue
             self.lg('Get disk {} info  using zos disk info  '.format(disk))
             zos_disk_info = self.client.disk.getinfo(disk)
             keys = zos_disk_info.keys()
