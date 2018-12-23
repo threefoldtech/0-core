@@ -160,7 +160,7 @@ class BaseTest(unittest.TestCase):
         for i in range(8):
             self.client.bash('losetup -d /dev/loop{}'.format(i))  # deattach all devices
 
-    def setup_loop_devices(self, files_names, file_size, files_loc='/', deattach=False):
+    def setup_loop_devices(self, files_names, file_size, files_loc='/var/cache', deattach=False):
         """
         :param files_names: list of files names to be truncated
         :param file_size: the file size (ex: 1G)
@@ -172,22 +172,20 @@ class BaseTest(unittest.TestCase):
         loop_devs = []
         for f in files_names:
             self.client.bash('cd {}; truncate -s {} {}'.format(files_loc, file_size, f))
-            output = self.client.bash('losetup -f')
+            output = self.client.bash('losetup -f --show {}'.format(os.path.join(files_loc, f)))
             free_l_dev = self.stdout(output)
-            self.client.bash('losetup {} {}{}'.format(free_l_dev, files_loc, f))
             loop_devs.append(free_l_dev)
-            self.client.bash('rm -rf {}{}'.format(files_loc, f))
         return loop_devs
 
     def create_container(self, root_url, storage=None, nics=[], host_network=False, tags=None, privileged=False):
         container = self.client.container.create(root_url=root_url, storage=storage, host_network=host_network, nics=nics, tags=tags, privileged=privileged)
         return container.get(30)
 
-    def create_vm(self, name, flist, nics=[], ports={}):
+    def create_vm(self, name, flist, nics=[], port={}):
         cmdline = None
         if 'zero-os' in flist:
             cmdline = 'development'
-        vm_uuid = self.client.kvm.create(name=name, flist=flist, ports=ports,
+        vm_uuid = self.client.kvm.create(name=name, flist=flist, port=port,
                                          cmdline=cmdline, nics=nics)
         return vm_uuid
 
