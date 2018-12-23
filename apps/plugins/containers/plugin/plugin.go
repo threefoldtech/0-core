@@ -19,6 +19,7 @@ var (
 		Version:  "1.0",
 		Requires: []string{"cgroup", "socat", "bridge"},
 		Open: func(api plugin.API) error {
+			log.Debugf("initializing containers manager")
 			return iniManager(&manager, api)
 		},
 	}
@@ -29,7 +30,7 @@ func main() {}
 func iniManager(mgr *containerManager, api plugin.API) error {
 	mgr.api = api
 	var ok bool
-	if api, err := api.Plugin("cgroup"); err != nil {
+	if api, err := api.Plugin("cgroup"); err == nil {
 		if mgr.cgroup, ok = api.(cgroup.API); !ok {
 			return fmt.Errorf("invalid cgroup api")
 		}
@@ -37,7 +38,7 @@ func iniManager(mgr *containerManager, api plugin.API) error {
 		return err
 	}
 
-	if api, err := api.Plugin("socat"); err != nil {
+	if api, err := api.Plugin("socat"); err == nil {
 		if mgr.socat, ok = api.(socat.API); !ok {
 			return fmt.Errorf("invalid socat api")
 		}
@@ -46,11 +47,12 @@ func iniManager(mgr *containerManager, api plugin.API) error {
 	}
 
 	mgr.containers = make(map[uint16]*container)
-
+	log.Debugf("setting up containers cgroups")
 	if err := mgr.setUpCGroups(); err != nil {
 		return err
 	}
 
+	log.Debugf("setting up containers default networking")
 	if err := mgr.setUpDefaultBridge(); err != nil {
 		return err
 	}

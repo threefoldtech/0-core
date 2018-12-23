@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/op/go-logging"
@@ -14,19 +16,11 @@ import (
 	"github.com/threefoldtech/0-core/apps/core0/plugin"
 	"github.com/threefoldtech/0-core/apps/core0/screen"
 	"github.com/threefoldtech/0-core/apps/core0/stats"
-
+	"github.com/threefoldtech/0-core/apps/core0/transport"
 	"github.com/threefoldtech/0-core/base"
 	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/settings"
-
-	"os/signal"
-	"syscall"
-
-	//_ "github.com/threefoldtech/0-core/apps/core0/builtin"
-	//_ "github.com/threefoldtech/0-core/apps/core0/builtin/btrfs"
-	"github.com/threefoldtech/0-core/apps/core0/transport"
-	//_ "github.com/threefoldtech/0-core/base/builtin"
 )
 
 var (
@@ -175,6 +169,9 @@ func main() {
 		log.Fatalf("failed to initialize plugin manager: %s", err)
 	}
 	mgr.AddRouter(pluginMgr)
+	if err := pluginMgr.Load(); err != nil {
+		log.Fatalf("failed to load plugins")
+	}
 
 	//configure logging handlers from configurations
 	log.Infof("Configure logging")

@@ -65,7 +65,7 @@ func New(path ...string) (*Manager, error) {
 		plugins: make(map[string]*plg.Plugin),
 	}
 
-	return m, m.load()
+	return m, nil
 }
 
 //Get action from fqn
@@ -118,7 +118,7 @@ func (m *Manager) safeOpen(pl *plg.Plugin) (err error) {
 	return
 }
 
-func (m *Manager) load() error {
+func (m *Manager) Load() error {
 	for _, p := range m.path {
 		if err := m.loadPath(p); err != nil {
 			return err

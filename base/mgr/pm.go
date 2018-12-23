@@ -560,5 +560,9 @@ func Internal(cmd string, args pm.M, out interface{}) error {
 		return fmt.Errorf("invalid return format expecting json, got %d", job.Level)
 	}
 
+	if out == nil {
+		return nil
+	}
+
 	return json.Unmarshal([]byte(job.Data), out)
 }
