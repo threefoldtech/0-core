@@ -12,21 +12,6 @@ import (
 	"github.com/threefoldtech/0-core/base/stream"
 )
 
-//ContainerCommandArguments arguments for container command
-type ContainerCommandArguments struct {
-	Name        string            `json:"name"`
-	Dir         string            `json:"dir"`
-	Args        []string          `json:"args"`
-	Env         map[string]string `json:"env"`
-	HostNetwork bool              `json:"host_network"`
-	Chroot      string            `json:"chroot"`
-	Log         string            `json:"log"`
-}
-
-func (c *ContainerCommandArguments) String() string {
-	return fmt.Sprintf("%s %v %s", c.Name, c.Args, c.Chroot)
-}
-
 type channel struct {
 	r *os.File
 	w *os.File
@@ -52,7 +37,7 @@ func (c *channel) Write(p []byte) (n int, err error) {
 
 type containerProcessImpl struct {
 	cmd     *pm.Command
-	args    ContainerCommandArguments
+	args    pm.ContainerCommandArguments
 	pid     int
 	process *psutils.Process
 	ch      *channel
@@ -64,7 +49,7 @@ type containerProcessImpl struct {
 //the container subsystem. Clients can't create container process directly they
 //instead has to go throught he container subsystem which does most of the heavy
 //lifting.
-func NewContainerProcess(table PIDTable, cmd *pm.Command) pm.ContainerProcess {
+func newContainerProcess(table PIDTable, cmd *pm.Command) pm.Process {
 	process := &containerProcessImpl{
 		cmd:   cmd,
 		table: table,

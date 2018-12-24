@@ -23,7 +23,7 @@ type systemProcessImpl struct {
 	table PIDTable
 }
 
-func NewSystemProcess(table PIDTable, cmd *pm.Command) pm.Process {
+func newSystemProcess(table PIDTable, cmd *pm.Command) pm.Process {
 	process := &systemProcessImpl{
 		cmd:   cmd,
 		table: table,

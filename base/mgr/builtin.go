@@ -12,7 +12,8 @@ import (
 Global command ProcessConstructor registery
 */
 var factories = map[string]ProcessFactory{
-	pm.CommandSystem: NewSystemProcess,
+	pm.CommandSystem:    newSystemProcess,
+	pm.CommandContainer: newContainerProcess,
 }
 
 //GetProcessFactory gets a process factory from command name

@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"syscall"
 
-	"github.com/threefoldtech/0-core/apps/core0/helper/filesystem"
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
@@ -22,12 +21,13 @@ var (
 	resticSnaphostIdP = regexp.MustCompile(`snapshot ([^\s]+) saved`)
 )
 
-func (m *containerManager) backup(cmd *pm.Command) (interface{}, error) {
+func (m *containerManager) backup(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Container uint16   `json:"container"`
 		URL       string   `json:"url"`
 		Tags      []string `json:"tags"`
 	}
+	cmd := ctx.Command()
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
@@ -161,11 +161,11 @@ func (m *containerManager) backup(cmd *pm.Command) (interface{}, error) {
 	return match[1], nil
 }
 
-func (m *containerManager) restore(cmd *pm.Command) (interface{}, error) {
+func (m *containerManager) restore(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		URL string `json:"url"`
 	}
-
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func (m *containerManager) restore(cmd *pm.Command) (interface{}, error) {
 
 	defer os.RemoveAll(tmp)
 
-	if err := filesystem.RestoreRepo(args.URL, tmp, backupMetaName); err != nil {
+	if err := m.filesystem.RestoreRepo(args.URL, tmp, backupMetaName); err != nil {
 		return nil, err
 	}
 

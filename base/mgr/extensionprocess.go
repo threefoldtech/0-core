@@ -53,7 +53,7 @@ func extensionProcessFactory(exe string, dir string, args []string, env map[stri
 		}
 
 		return &extensionProcess{
-			system: NewSystemProcess(table, extcmd),
+			system: newSystemProcess(table, extcmd),
 			cmd:    cmd,
 		}
 	}

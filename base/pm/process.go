@@ -10,7 +10,8 @@ import (
 
 const (
 	//CommandSystem is the first and built in `core.system` command
-	CommandSystem = "core.system"
+	CommandSystem    = "core.system"
+	CommandContainer = "core.container"
 )
 
 //SystemCommandArguments arguments to system command
@@ -24,6 +25,21 @@ type SystemCommandArguments struct {
 
 func (s *SystemCommandArguments) String() string {
 	return fmt.Sprintf("%v %s %v (%s)", s.Env, s.Name, s.Args, s.Dir)
+}
+
+//ContainerCommandArguments arguments for container command
+type ContainerCommandArguments struct {
+	Name        string            `json:"name"`
+	Dir         string            `json:"dir"`
+	Args        []string          `json:"args"`
+	Env         map[string]string `json:"env"`
+	HostNetwork bool              `json:"host_network"`
+	Chroot      string            `json:"chroot"`
+	Log         string            `json:"log"`
+}
+
+func (c *ContainerCommandArguments) String() string {
+	return fmt.Sprintf("%s %v %s", c.Name, c.Args, c.Chroot)
 }
 
 //ProcessStats holds process cpu and memory usage

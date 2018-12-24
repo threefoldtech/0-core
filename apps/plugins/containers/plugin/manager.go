@@ -13,6 +13,7 @@ import (
 
 	"github.com/threefoldtech/0-core/apps/plugins/cgroup"
 	"github.com/threefoldtech/0-core/apps/plugins/socat"
+	"github.com/threefoldtech/0-core/apps/plugins/zfs"
 
 	"github.com/threefoldtech/0-core/base/plugin"
 
@@ -26,22 +27,6 @@ import (
 )
 
 const (
-	cmdContainerCreate            = "corex.create"
-	cmdContainerCreateSync        = "corex.create-sync"
-	cmdContainerList              = "corex.list"
-	cmdContainerDispatch          = "corex.dispatch"
-	cmdContainerTerminate         = "corex.terminate"
-	cmdContainerFind              = "corex.find"
-	cmdContainerZerotierInfo      = "corex.zerotier.info"
-	cmdContainerZerotierList      = "corex.zerotier.list"
-	cmdContainerNicAdd            = "corex.nic-add"
-	cmdContainerNicRemove         = "corex.nic-remove"
-	cmdContainerBackup            = "corex.backup"
-	cmdContainerRestore           = "corex.restore"
-	cmdContainerPortForwardAdd    = "corex.portforward-add"
-	cmdContainerPortForwardRemove = "corex.portforward-remove"
-	cmdContainerFListLayer        = "corex.flist-layer"
-
 	coreXResponseQueue = "corex:results"
 	coreXBinaryName    = "coreX"
 
@@ -239,17 +224,16 @@ func (c *ContainerCreateArguments) Validate(m *containerManager) error {
 }
 
 type containerManager struct {
-	api    plugin.API
-	cgroup cgroup.API
-	socat  socat.API
+	api        plugin.API
+	cgroup     cgroup.API
+	socat      socat.API
+	filesystem zfs.API
 
 	sequence uint16
 	seqM     sync.Mutex
 
 	containers map[uint16]*container
 	conM       sync.RWMutex
-
-	cell *screen.RowCell
 
 	sink *transport.Sink
 }
@@ -333,7 +317,6 @@ func (m *containerManager) setContainer(id uint16, c *container) {
 	m.conM.Lock()
 	defer m.conM.Unlock()
 	m.containers[id] = c
-	m.cell.Text = fmt.Sprintf("Containers: %d", len(m.containers))
 	screen.Refresh()
 }
 
@@ -342,15 +325,15 @@ func (m *containerManager) unsetContainer(id uint16) {
 	m.conM.Lock()
 	defer m.conM.Unlock()
 	delete(m.containers, id)
-	m.cell.Text = fmt.Sprintf("Containers: %d", len(m.containers))
 	screen.Refresh()
 }
 
-func (m *containerManager) nicAdd(cmd *pm.Command) (interface{}, error) {
+func (m *containerManager) nicAdd(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Container uint16 `json:"container"`
 		Nic       Nic    `json:"nic"`
 	}
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
@@ -388,12 +371,12 @@ func (m *containerManager) nicAdd(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *containerManager) nicRemove(cmd *pm.Command) (interface{}, error) {
+func (m *containerManager) nicRemove(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Container uint16 `json:"container"`
 		Index     int    `json:"index"`
 	}
-
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
@@ -464,8 +447,9 @@ func (m *containerManager) createContainer(args ContainerCreateArguments) (*cont
 	return c, nil
 }
 
-func (m *containerManager) createSync(cmd *pm.Command) (interface{}, error) {
+func (m *containerManager) createSync(ctx pm.Context) (interface{}, error) {
 	var args ContainerCreateArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		log.Errorf("invalid container params: %s", err)
 		return nil, err
@@ -482,8 +466,10 @@ func (m *containerManager) createSync(cmd *pm.Command) (interface{}, error) {
 	return container.runner.Wait(), nil
 }
 
-func (m *containerManager) create(cmd *pm.Command) (interface{}, error) {
+func (m *containerManager) create(ctx pm.Context) (interface{}, error) {
 	var args ContainerCreateArguments
+	cmd := ctx.Command()
+
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
@@ -502,7 +488,7 @@ type ContainerInfo struct {
 	Container Container `json:"container"`
 }
 
-func (m *containerManager) list(cmd *pm.Command) (interface{}, error) {
+func (m *containerManager) list(ctx pm.Context) (interface{}, error) {
 	containers := make(map[uint16]ContainerInfo)
 
 	m.conM.RLock()
@@ -538,8 +524,9 @@ func (m *containerManager) pushToContainer(container *container, cmd *pm.Command
 	return container.dispatch(cmd)
 }
 
-func (m *containerManager) dispatch(cmd *pm.Command) (interface{}, error) {
+func (m *containerManager) dispatch(ctx pm.Context) (interface{}, error) {
 	var args ContainerDispatchArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -590,8 +577,10 @@ type ContainerArguments struct {
 	Container uint16 `json:"container"`
 }
 
-func (m *containerManager) terminate(cmd *pm.Command) (interface{}, error) {
+func (m *containerManager) terminate(ctx pm.Context) (interface{}, error) {
 	var args ContainerArguments
+	cmd := ctx.Command()
+
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -610,8 +599,9 @@ type ContainerFindArguments struct {
 	Tags []string `json:"tags"`
 }
 
-func (m *containerManager) find(cmd *pm.Command) (interface{}, error) {
+func (m *containerManager) find(ctx pm.Context) (interface{}, error) {
 	var args ContainerFindArguments
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
@@ -675,8 +665,9 @@ func (m *containerManager) Of(id uint16) Container {
 	return cont
 }
 
-func (m *containerManager) portforwardAdd(cmd *pm.Command) (interface{}, error) {
+func (m *containerManager) portforwardAdd(ctx pm.Context) (interface{}, error) {
 	var args containerPortForward
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
@@ -711,8 +702,9 @@ func (m *containerManager) portforwardAdd(cmd *pm.Command) (interface{}, error) 
 	return nil, nil
 }
 
-func (m *containerManager) portforwardRemove(cmd *pm.Command) (interface{}, error) {
+func (m *containerManager) portforwardRemove(ctx pm.Context) (interface{}, error) {
 	var args containerPortForward
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
@@ -732,12 +724,12 @@ func (m *containerManager) portforwardRemove(cmd *pm.Command) (interface{}, erro
 	return nil, nil
 }
 
-func (m *containerManager) flistLayer(cmd *pm.Command) (interface{}, error) {
+func (m *containerManager) flistLayer(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Container uint16 `json:"container"`
 		FList     string `json:"flist"`
 	}
-
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}

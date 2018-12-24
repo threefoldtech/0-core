@@ -96,7 +96,8 @@ func (o *Bootstrap) populateMinimumDev() error {
 	return nil
 }
 
-func (o *Bootstrap) setupFS() error {
+func (o *Bootstrap) Start() error {
+	log.Debugf("setting up mounts")
 	os.MkdirAll("/etc", 0755)
 	os.MkdirAll("/var/run", 0755)
 
@@ -157,11 +158,6 @@ func (b *Bootstrap) startup() error {
 
 //Bootstrap registers extensions and startup system services.
 func (b *Bootstrap) Bootstrap(hostname string) error {
-	log.Debugf("setting up mounts")
-	if err := b.setupFS(); err != nil {
-		return err
-	}
-
 	log.Debugf("setting up hostname")
 	if err := updateHostname(hostname); err != nil {
 		return err

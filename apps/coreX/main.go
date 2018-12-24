@@ -63,6 +63,10 @@ func main() {
 
 		os.Exit(1)
 	}
+	bs := bootstrap.NewBootstrap()
+	if err := bs.Start(); err != nil {
+		log.Fatalf("failed to initialize container: %s", err)
+	}
 
 	//built in plugins
 	router, err := NewRouter(
@@ -75,7 +79,7 @@ func main() {
 	)
 
 	if err != nil {
-		log.Panic("failed to create router")
+		log.Fatalf("failed to create router: %s", err)
 	}
 
 	mgr.MaxJobs = opt.MaxJobs()
@@ -97,14 +101,12 @@ func main() {
 	//this include adding the coreX process into the proper cgroups
 	var magic int
 	if err := dec.Decode(&magic); err != nil {
-		log.Fatal("failed to load unlock magic")
+		log.Fatalf("failed to load unlock magic: %s", err)
 	} else if magic != UnlockMagic {
 		log.Fatal("invalid magic number")
 	}
 
 	log.Info("magic recieved .. continue coreX bootstraping")
-
-	bs := bootstrap.NewBootstrap()
 
 	if err := bs.Bootstrap(opt.Hostname()); err != nil {
 		log.Fatalf("Failed to bootstrap corex: %s", err)

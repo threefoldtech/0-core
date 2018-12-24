@@ -11,7 +11,7 @@ import (
 func TestSystemProcess_Run(t *testing.T) {
 	ps := NewSystemProcess(&TestingPIDTable{}, &pm.Command{
 		Arguments: pm.MustArguments(
-			SystemCommandArguments{
+			pm.SystemCommandArguments{
 				Name: "echo",
 				Args: []string{"hello", "world"},
 			},
@@ -44,7 +44,7 @@ func TestSystemProcess_Run(t *testing.T) {
 func TestSystemProcess_RunStderr(t *testing.T) {
 	ps := NewSystemProcess(&TestingPIDTable{}, &pm.Command{
 		Arguments: pm.MustArguments(
-			SystemCommandArguments{
+			pm.SystemCommandArguments{
 				Name: "sh",
 				Args: []string{"-c", "echo 'hello world' 1>&2"},
 			},
@@ -81,7 +81,7 @@ func TestSystemProcess_RunStderr(t *testing.T) {
 func TestSystemProcess_RunStdin(t *testing.T) {
 	ps := NewSystemProcess(&TestingPIDTable{}, &pm.Command{
 		Arguments: pm.MustArguments(
-			SystemCommandArguments{
+			pm.SystemCommandArguments{
 				Name:  "cat",
 				StdIn: "hello world",
 			},

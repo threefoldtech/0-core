@@ -1,14 +1,13 @@
-package filesystem
+package main
 
 import (
 	"fmt"
 	"net/url"
 
-	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
-func RestoreRepo(repo, target string, include ...string) error {
+func (m *Manager) RestoreRepo(repo, target string, include ...string) error {
 	//file://password/path/to/repo
 	u, err := url.Parse(repo)
 	if err != nil {
@@ -37,7 +36,7 @@ func RestoreRepo(repo, target string, include ...string) error {
 
 	restic = append(restic, snapshot)
 
-	job, err := mgr.Run(
+	job, err := m.api.Run(
 		&pm.Command{
 			Command: pm.CommandSystem,
 			Arguments: pm.MustArguments(

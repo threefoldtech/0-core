@@ -1,10 +1,11 @@
-package filesystem
+package main
 
 import (
 	"archive/tar"
 	"compress/bzip2"
 	"compress/gzip"
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -16,7 +17,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/settings"
 	"github.com/threefoldtech/0-core/base/stream"
@@ -29,7 +29,7 @@ const (
 	LocalRouterFile = CacheBaseDir + "/router.yaml"
 )
 
-func Hash(s string) string {
+func getHash(s string) string {
 	m := md5.New()
 	io.WriteString(m, s)
 	return fmt.Sprintf("%x", m.Sum(nil))
@@ -168,13 +168,29 @@ func getMetaDB(location, src string) (string, error) {
 	return db, nil
 }
 
-func MountFList(namespace, storage, src string, target string, hooks ...pm.RunnerHook) error {
+func (m *Manager) mount(ctx pm.Context) (interface{}, error) {
+	var args struct {
+		Namespace string `json:"namespace"`
+		Storage   string `json:"storage"`
+		Source    string `json:"source"`
+		Target    string `json:"target"`
+	}
+
+	cmd := ctx.Command()
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, pm.BadRequestError(err)
+	}
+
+	return nil, m.MountFList(args.Namespace, args.Storage, args.Source, args.Target)
+}
+
+func (m *Manager) MountFList(namespace, storage, src string, target string, hooks ...pm.RunnerHook) error {
 	//check
 	if err := os.MkdirAll(target, 0755); err != nil {
 		return err
 	}
 
-	hash := Hash(src)
+	hash := getHash(src)
 	backend := path.Join(CacheBaseDir, namespace, hash)
 
 	os.RemoveAll(backend)
@@ -189,7 +205,7 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 	}
 
 	if strings.HasPrefix(src, "restic:") {
-		if err := RestoreRepo(
+		if err := m.RestoreRepo(
 			strings.TrimPrefix(src, "restic:"),
 			path.Join(backend, "ro"),
 		); err != nil {
@@ -248,7 +264,7 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 		},
 	})
 
-	j, err = mgr.Run(cmd, hooks...)
+	j, err = m.api.Run(cmd, hooks...)
 	if err != nil {
 		return err
 	}
@@ -264,14 +280,14 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 // fs `layered` file.
 // the namespace, targe, and base are needed to identify the g8ufs process, the flist is the one to layer, where base
 // is the original flist used on the call to MountFlist
-func MergeFList(namespace, target, base, flist string) error {
+func (m *Manager) MergeFList(namespace, target, base, flist string) error {
 	id := path.Join(namespace, target)
-	job, ok := mgr.JobOf(id)
+	job, ok := m.api.JobOf(id)
 	if !ok {
 		return fmt.Errorf("no filesystem running for the provided namespace and target (%s/%s)", namespace, target)
 	}
 
-	backend := path.Join(CacheBaseDir, namespace, Hash(flist))
+	backend := path.Join(CacheBaseDir, namespace, getHash(flist))
 	os.MkdirAll(backend, 0755)
 
 	db, err := getMetaDB(backend, flist)
@@ -280,7 +296,7 @@ func MergeFList(namespace, target, base, flist string) error {
 	}
 
 	//append db to the backend/.layered file
-	baseBackend := path.Join(CacheBaseDir, namespace, Hash(base))
+	baseBackend := path.Join(CacheBaseDir, namespace, getHash(base))
 	if err := ioutil.WriteFile(path.Join(baseBackend, ".layered"), []byte(db), 0644); err != nil {
 		return err
 	}

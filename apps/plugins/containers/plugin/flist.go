@@ -16,10 +16,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-const (
-	cmdFlistCreate = "corex.flist.create"
-)
-
 func (m *containerManager) zflist(args ...string) (*pm.JobResult, error) {
 	log.Debugf("zflist %v", args)
 	return m.api.System("zflist", args...)
@@ -62,8 +58,9 @@ func (c createArgs) Validate() error {
 	return nil
 }
 
-func (m *containerManager) flistCreate(cmd *pm.Command) (interface{}, error) {
+func (m *containerManager) flistCreate(ctx pm.Context) (interface{}, error) {
 	var args createArgs
+	cmd := ctx.Command()
 
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
