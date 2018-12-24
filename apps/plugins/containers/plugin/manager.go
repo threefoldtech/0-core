@@ -19,7 +19,6 @@ import (
 
 	"github.com/pborman/uuid"
 	"github.com/threefoldtech/0-core/apps/core0/screen"
-	"github.com/threefoldtech/0-core/apps/core0/transport"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/settings"
 	"github.com/threefoldtech/0-core/base/utils"
@@ -234,8 +233,6 @@ type containerManager struct {
 
 	containers map[uint16]*container
 	conM       sync.RWMutex
-
-	sink *transport.Sink
 }
 
 /*
@@ -520,7 +517,7 @@ func (m *containerManager) getCoreXQueue(id uint16) string {
 }
 
 func (m *containerManager) pushToContainer(container *container, cmd *pm.Command) error {
-	m.sink.Flag(cmd.ID)
+	//m.sink.Flag(cmd.ID)
 	return container.dispatch(cmd)
 }
 
@@ -570,7 +567,8 @@ func (m *containerManager) Dispatch(id uint16, cmd *pm.Command) (*pm.JobResult, 
 		return nil, err
 	}
 
-	return m.sink.GetResult(cmd.ID, transport.ReturnExpire)
+	return nil, nil
+	//return m.sink.GetResult(cmd.ID, transport.ReturnExpire)
 }
 
 type ContainerArguments struct {

@@ -9,9 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/threefoldtech/0-core/apps/core0/logger"
 	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/stream"
 )
 
 const (
@@ -203,12 +201,12 @@ func (c *container) onExit(state bool) {
 	if len(tags) == 0 {
 		return
 	}
-	logger.Current.LogRecord(&logger.LogRecord{
-		Command: fmt.Sprintf("container.%s", tags),
-		Message: &stream.Message{
-			Meta: stream.NewMeta(0, stream.ExitSuccessFlag),
-		},
-	})
+	// logger.Current.LogRecord(&logger.LogRecord{
+	// 	Command: fmt.Sprintf("container.%s", tags),
+	// 	Message: &stream.Message{
+	// 		Meta: stream.NewMeta(0, stream.ExitSuccessFlag),
+	// 	},
+	// })
 }
 
 func (c *container) cleanup() {

@@ -1,11 +1,15 @@
 package pm
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 )
 
-var _ RunError = &errorImpl{}
+var (
+	UnknownCommandErr          = errors.New("unknown command")
+	_                 RunError = &errorImpl{}
+)
 
 type RunError interface {
 	Code() uint32

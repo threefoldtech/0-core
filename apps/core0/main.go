@@ -8,15 +8,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"github.com/threefoldtech/0-core/apps/core0/assets"
 	"github.com/threefoldtech/0-core/apps/core0/bootstrap"
-	"github.com/threefoldtech/0-core/apps/core0/logger"
 	"github.com/threefoldtech/0-core/apps/core0/options"
 	"github.com/threefoldtech/0-core/apps/core0/plugin"
 	"github.com/threefoldtech/0-core/apps/core0/screen"
-	"github.com/threefoldtech/0-core/apps/core0/stats"
-	"github.com/threefoldtech/0-core/apps/core0/transport"
 	"github.com/threefoldtech/0-core/base"
 	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
@@ -175,13 +172,13 @@ func main() {
 
 	//configure logging handlers from configurations
 	log.Infof("Configure logging")
-	cfg := transport.SinkConfig{Port: 6379}
-	sink, err := transport.NewSink(cfg)
-	if err != nil {
-		log.Errorf("failed to start command sink: %s", err)
-	}
+	// cfg := transport.SinkConfig{Port: 6379}
+	// sink, err := transport.NewSink(cfg)
+	// if err != nil {
+	// 	log.Errorf("failed to start command sink: %s", err)
+	// }
 
-	logger.ConfigureLogging(sink)
+	// logger.ConfigureLogging(sink)
 
 	bs := bootstrap.NewBootstrap(options.Agent())
 	bs.First()
@@ -221,13 +218,13 @@ func main() {
 	//start jobs sinks.
 	log.Infof("Starting Sinks")
 
-	sink.Start()
+	//sink.Start()
 	screen.Refresh()
 
-	if config.Stats.Enabled {
-		aggregator := stats.NewLedisStatsAggregator(sink)
-		mgr.AddHandle(aggregator)
-	}
+	// if config.Stats.Enabled {
+	// 	aggregator := stats.NewLedisStatsAggregator(sink)
+	// 	mgr.AddHandle(aggregator)
+	// }
 
 	select {}
 }

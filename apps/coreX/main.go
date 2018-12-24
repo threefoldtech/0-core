@@ -122,7 +122,7 @@ func main() {
 
 		_, err := mgr.Run(&cmd)
 
-		if err == mgr.UnknownCommandErr {
+		if err == pm.UnknownCommandErr {
 			result := pm.NewJobResult(&cmd)
 			result.State = pm.StateUnknownCmd
 			dispatcher.Result(&cmd, result)

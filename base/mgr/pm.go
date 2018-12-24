@@ -21,9 +21,8 @@ import (
 )
 
 var (
-	MaxJobs           int = 100
-	UnknownCommandErr     = errors.New("unknown command")
-	DuplicateIDErr        = errors.New("duplicate job id")
+	MaxJobs        int = 100
+	DuplicateIDErr     = errors.New("duplicate job id")
 )
 
 //PM is the main r manager.

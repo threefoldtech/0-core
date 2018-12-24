@@ -2,11 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 
-	"github.com/threefoldtech/0-core/apps/core0/logger"
-	"github.com/threefoldtech/0-core/apps/core0/stats"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/stream"
 )
@@ -56,25 +53,25 @@ func (c *container) rewind() {
 				log.Errorf("failed to load container command result: %s", err)
 			}
 			result.Container = uint64(c.id)
-			c.mgr.sink.Forward(&result)
+			//c.mgr.sink.Forward(&result)
 		case "log":
 			var msg stream.Message
 			if err := json.Unmarshal(message.Payload, &msg); err != nil {
 				log.Errorf("failed to load container log message: %s", err)
 			}
 
-			logger.Current.LogRecord(&logger.LogRecord{
-				Core:    c.id,
-				Command: message.Command,
-				Message: &msg,
-			})
+			// logger.Current.LogRecord(&logger.LogRecord{
+			// 	Core:    c.id,
+			// 	Command: message.Command,
+			// 	Message: &msg,
+			// })
 		case "stats":
-			var stat stats.Stats
-			if err := json.Unmarshal(message.Payload, &stat); err != nil {
-				log.Errorf("failed to load container stat message: %s", err)
-			}
-			//push stats to aggregation system
-			c.mgr.api.Aggregate(string(stat.Operation), fmt.Sprintf("core-%d.%s", c.id, stat.Key), stat.Value, "", stat.Tags...)
+			// var stat stats.Stats
+			// if err := json.Unmarshal(message.Payload, &stat); err != nil {
+			// 	log.Errorf("failed to load container stat message: %s", err)
+			// }
+			// //push stats to aggregation system
+			// c.mgr.api.Aggregate(string(stat.Operation), fmt.Sprintf("core-%d.%s", c.id, stat.Key), stat.Value, "", stat.Tags...)
 		default:
 			log.Warningf("got unknown message type from container(%d): %s", c.id, message.Type)
 		}

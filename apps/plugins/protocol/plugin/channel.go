@@ -1,4 +1,4 @@
-package transport
+package main
 
 import (
 	"encoding/json"
@@ -16,7 +16,7 @@ const (
 /*
 ControllerClient represents an active agent controller connection.
 */
-type channel struct {
+type Database struct {
 	pool *redis.Pool
 }
 
@@ -24,20 +24,20 @@ type channel struct {
 NewSinkClient gets a new sink connection with the given identity. Identity is used by the sink client to
 introduce itself to the sink terminal.
 */
-func newChannel(pool *redis.Pool) *channel {
-	ch := &channel{
+func newDatabase(pool *redis.Pool) *Database {
+	ch := &Database{
 		pool: pool,
 	}
 
 	return ch
 }
 
-func (cl *channel) String() string {
+func (cl *Database) String() string {
 	return "redis"
 }
 
 //GetNext gets the next available command
-func (cl *channel) GetNext(queue string, command *pm.Command) error {
+func (cl *Database) GetNext(queue string, command *pm.Command) error {
 	conn := cl.pool.Get()
 	defer conn.Close()
 
@@ -53,7 +53,7 @@ func (cl *channel) GetNext(queue string, command *pm.Command) error {
 	return json.Unmarshal(payload[1], command)
 }
 
-func (cl *channel) Respond(result *pm.JobResult) error {
+func (cl *Database) Respond(result *pm.JobResult) error {
 	if result.ID == "" {
 		return fmt.Errorf("result with no ID, not pushing results back")
 	}
@@ -74,7 +74,7 @@ func (cl *channel) Respond(result *pm.JobResult) error {
 	return nil
 }
 
-func (cl *channel) Push(queue string, payload interface{}) error {
+func (cl *Database) Push(queue string, payload interface{}) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return err
@@ -90,14 +90,14 @@ func (cl *channel) Push(queue string, payload interface{}) error {
 	return nil
 }
 
-func (cl *channel) cycle(queue string, timeout int) ([]byte, error) {
+func (cl *Database) cycle(queue string, timeout int) ([]byte, error) {
 	conn := cl.pool.Get()
 	defer conn.Close()
 
 	return redis.Bytes(conn.Do("BRPOPLPUSH", queue, queue, timeout))
 }
 
-func (cl *channel) GetResponse(id string, timeout int) (*pm.JobResult, error) {
+func (cl *Database) GetResponse(id string, timeout int) (*pm.JobResult, error) {
 	queue := fmt.Sprintf("result:%s", id)
 	payload, err := cl.cycle(queue, timeout)
 	if err != nil {
@@ -112,7 +112,7 @@ func (cl *channel) GetResponse(id string, timeout int) (*pm.JobResult, error) {
 	return &result, nil
 }
 
-func (cl *channel) Flag(id string) error {
+func (cl *Database) Flag(id string) error {
 	conn := cl.pool.Get()
 	defer conn.Close()
 
@@ -121,7 +121,7 @@ func (cl *channel) Flag(id string) error {
 	return err
 }
 
-func (cl *channel) UnFlag(id string) error {
+func (cl *Database) UnFlag(id string) error {
 	conn := cl.pool.Get()
 	defer conn.Close()
 
@@ -130,7 +130,7 @@ func (cl *channel) UnFlag(id string) error {
 	return err
 }
 
-func (cl *channel) Flagged(id string) bool {
+func (cl *Database) Flagged(id string) bool {
 	conn := cl.pool.Get()
 	defer conn.Close()
 
