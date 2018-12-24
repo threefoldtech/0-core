@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/threefoldtech/0-core/base/mgr"
+
 	logging "github.com/op/go-logging"
 	plg "github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
@@ -133,6 +135,13 @@ func (m *Manager) Load() error {
 
 	sort.Sort(l)
 	for _, plugin := range l {
+		for _, req := range plugin.Requires {
+			if _, ok := m.plugins[req]; !ok {
+				log.Warning("plugin %s missing dep (%s) ... ignore", plugin, req)
+				delete(m.plugins, req)
+			}
+		}
+
 		if plugin.Open != nil {
 			if err := m.safeOpen(plugin); err != nil {
 				log.Errorf("failed to initialize plugin %s: %s", plugin.Name, err)
@@ -141,6 +150,23 @@ func (m *Manager) Load() error {
 		}
 
 		log.Infof("plugin %s loaded", plugin.Name)
+
+		if plugin.API != nil {
+			//if the plugin api implement any
+			//of the handler interfaces, register it
+			//as a handler in process manager
+			api := plugin.API()
+			switch api.(type) {
+			case pm.MessageHandler:
+			case pm.ResultHandler:
+			case pm.PreHandler:
+			default:
+				continue
+			}
+
+			log.Infof("register %s as a handler", plugin)
+			mgr.AddHandle(api)
+		}
 	}
 
 	return nil

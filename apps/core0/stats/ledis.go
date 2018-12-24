@@ -11,7 +11,6 @@ import (
 	logging "github.com/op/go-logging"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/threefoldtech/0-core/apps/core0/transport"
-	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
@@ -63,7 +62,7 @@ type redisStatsBuffer struct {
 	cache *cache.Cache
 }
 
-func NewLedisStatsAggregator(sink *transport.Sink) mgr.StatsHandler {
+func NewLedisStatsAggregator(sink *transport.Sink) pm.StatsHandler {
 	redisBuffer := &redisStatsBuffer{
 		db:    sink,
 		cache: cache.New(1*time.Hour, 5*time.Minute),

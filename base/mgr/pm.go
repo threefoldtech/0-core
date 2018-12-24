@@ -37,7 +37,7 @@ var (
 
 	//needs clean up
 	routers  []Router
-	handlers []Handler
+	handlers []pm.Handler
 	queue    Queue
 
 	pids    map[int]chan syscall.WaitStatus
@@ -65,7 +65,7 @@ func AddRouter(router Router) {
 }
 
 //AddHandle add handler to various process events
-func AddHandle(handler Handler) {
+func AddHandle(handler pm.Handler) {
 	handlers = append(handlers, handler)
 }
 
@@ -83,7 +83,7 @@ func RunFactory(cmd *pm.Command, factory ProcessFactory, hooks ...pm.RunnerHook)
 	}
 
 	for _, handler := range handlers {
-		if handler, ok := handler.(PreHandler); ok {
+		if handler, ok := handler.(pm.PreHandler); ok {
 			handler.Pre(cmd)
 		}
 	}
@@ -419,7 +419,7 @@ func Kill(cmdID string) error {
 
 func Aggregate(op, key string, value float64, id string, tags ...pm.Tag) {
 	for _, handler := range handlers {
-		if handler, ok := handler.(StatsHandler); ok {
+		if handler, ok := handler.(pm.StatsHandler); ok {
 			handler.Stats(op, key, value, id, tags...)
 		}
 	}
@@ -491,7 +491,7 @@ func msgCallback(cmd *pm.Command, msg *stream.Message) {
 	}
 
 	for _, handler := range handlers {
-		if handler, ok := handler.(MessageHandler); ok {
+		if handler, ok := handler.(pm.MessageHandler); ok {
 			handler.Message(cmd, msg)
 		}
 	}
@@ -500,7 +500,7 @@ func msgCallback(cmd *pm.Command, msg *stream.Message) {
 func callback(cmd *pm.Command, result *pm.JobResult) {
 	result.Tags = cmd.Tags
 	for _, handler := range handlers {
-		if handler, ok := handler.(ResultHandler); ok {
+		if handler, ok := handler.(pm.ResultHandler); ok {
 			handler.Result(cmd, result)
 		}
 	}

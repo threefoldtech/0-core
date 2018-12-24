@@ -1,7 +1,6 @@
-package mgr
+package pm
 
 import (
-	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/stream"
 )
 
@@ -11,21 +10,21 @@ type Handler interface{}
 
 //ResultHandler receives the command result on exit
 type ResultHandler interface {
-	Result(cmd *pm.Command, result *pm.JobResult)
+	Result(cmd *Command, result *JobResult)
 }
 
 //MessageHandler gets called on the receive of each single message
 //from all commands
 type MessageHandler interface {
-	Message(*pm.Command, *stream.Message)
+	Message(*Command, *stream.Message)
 }
 
 //StatsHandler receives parsed stats messages
 type StatsHandler interface {
-	Stats(operation string, key string, value float64, id string, tags ...pm.Tag)
+	Stats(operation string, key string, value float64, id string, tags ...Tag)
 }
 
 //PreHandler is called with the commands before exectution
 type PreHandler interface {
-	Pre(cmd *pm.Command)
+	Pre(cmd *Command)
 }
