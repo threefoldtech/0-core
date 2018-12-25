@@ -5,6 +5,7 @@ import (
 
 	logging "github.com/op/go-logging"
 	"github.com/threefoldtech/0-core/apps/plugins/cgroup"
+	"github.com/threefoldtech/0-core/apps/plugins/protocol"
 	"github.com/threefoldtech/0-core/apps/plugins/socat"
 	"github.com/threefoldtech/0-core/apps/plugins/zfs"
 	"github.com/threefoldtech/0-core/base/plugin"
@@ -14,37 +15,16 @@ import (
 var (
 	log = logging.MustGetLogger("containers")
 
-	manager containerManager
+	manager Manager
 
 	Plugin = plugin.Plugin{
 		Name:     "corex",
 		Version:  "1.0",
-		Requires: []string{"cgroup", "socat", "bridge", "zfs"},
+		Requires: []string{"cgroup", "socat", "bridge", "zfs", "protocol"},
 		Open: func(api plugin.API) error {
 			log.Debugf("initializing containers manager")
 			return iniManager(&manager, api)
 		},
-		// pm.RegisterBuiltIn(cmdContainerCreate, containerMgr.create)
-		// pm.RegisterBuiltIn(cmdContainerCreateSync, containerMgr.createSync)
-		// pm.RegisterBuiltIn(cmdContainerList, containerMgr.list)
-		// pm.RegisterBuiltIn(cmdContainerDispatch, containerMgr.dispatch)
-		// pm.RegisterBuiltIn(cmdContainerTerminate, containerMgr.terminate)
-		// pm.RegisterBuiltIn(cmdContainerFind, containerMgr.find)
-		// pm.RegisterBuiltIn(cmdContainerNicAdd, containerMgr.nicAdd)
-		// pm.RegisterBuiltIn(cmdContainerNicRemove, containerMgr.nicRemove)
-		// pm.RegisterBuiltIn(cmdContainerPortForwardAdd, containerMgr.portforwardAdd)
-		// pm.RegisterBuiltIn(cmdContainerPortForwardRemove, containerMgr.portforwardRemove)
-		// pm.RegisterBuiltIn(cmdContainerBackup, containerMgr.backup)
-		// pm.RegisterBuiltIn(cmdContainerRestore, containerMgr.restore)
-		// pm.RegisterBuiltIn(cmdContainerFListLayer, containerMgr.flistLayer)
-		// // flist specific commands
-		// pm.RegisterBuiltIn(cmdFlistCreate, containerMgr.flistCreate)
-
-		// //container specific info
-		// pm.RegisterBuiltIn(cmdContainerZerotierInfo, containerMgr.ztInfo)
-		// pm.RegisterBuiltIn(cmdContainerZerotierList, containerMgr.ztList)
-		// cmdContainerDispatch          = "corex.dispatch"
-		// cmdContainerFListLayer        = "corex.flist-layer"
 
 		Actions: map[string]pm.Action{
 			"create":             manager.create,
@@ -52,6 +32,7 @@ var (
 			"terminate":          manager.terminate,
 			"list":               manager.list,
 			"find":               manager.find,
+			"dispatch":           manager.dispatch,
 			"nic-add":            manager.nicAdd,
 			"nic-remove":         manager.nicRemove,
 			"portforward-add":    manager.portforwardAdd,
@@ -68,7 +49,7 @@ var (
 
 func main() {}
 
-func iniManager(mgr *containerManager, api plugin.API) error {
+func iniManager(mgr *Manager, api plugin.API) error {
 	mgr.api = api
 	var ok bool
 	if api, err := api.Plugin("cgroup"); err == nil {
@@ -90,6 +71,14 @@ func iniManager(mgr *containerManager, api plugin.API) error {
 	if api, err := api.Plugin("zfs"); err == nil {
 		if mgr.filesystem, ok = api.(zfs.API); !ok {
 			return fmt.Errorf("invalid zfs api")
+		}
+	} else {
+		return err
+	}
+
+	if api, err := api.Plugin("protocol"); err == nil {
+		if mgr.protocol, ok = api.(protocol.API); !ok {
+			return fmt.Errorf("invalid protocol api")
 		}
 	} else {
 		return err

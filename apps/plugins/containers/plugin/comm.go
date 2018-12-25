@@ -53,7 +53,7 @@ func (c *container) rewind() {
 				log.Errorf("failed to load container command result: %s", err)
 			}
 			result.Container = uint64(c.id)
-			//c.mgr.sink.Forward(&result)
+			c.mgr.protocol.Set(&result)
 		case "log":
 			var msg stream.Message
 			if err := json.Unmarshal(message.Payload, &msg); err != nil {

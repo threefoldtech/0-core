@@ -2,12 +2,14 @@ package main
 
 import (
 	logging "github.com/op/go-logging"
+	"github.com/threefoldtech/0-core/apps/plugins/protocol"
 	"github.com/threefoldtech/0-core/base/plugin"
 )
 
 var (
 	log     = logging.MustGetLogger("transport")
 	manager Manager
+	_       protocol.API = (*Manager)(nil)
 
 	//Plugin entry point
 	Plugin = plugin.Plugin{
@@ -30,7 +32,6 @@ func initManager(mgr *Manager, api plugin.API) error {
 	pool := newPool()
 	mgr.api = api
 	mgr.pool = pool
-	mgr.db = newDatabase(pool)
 
 	go mgr.process()
 

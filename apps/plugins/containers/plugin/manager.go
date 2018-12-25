@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/threefoldtech/0-core/apps/plugins/protocol"
+
 	"github.com/threefoldtech/0-core/apps/plugins/cgroup"
 	"github.com/threefoldtech/0-core/apps/plugins/socat"
 	"github.com/threefoldtech/0-core/apps/plugins/zfs"
@@ -109,7 +111,7 @@ type containerPortForward struct {
 	HostPort      string `json:"host_port"`
 }
 
-func (c *ContainerCreateArguments) Validate(m *containerManager) error {
+func (c *ContainerCreateArguments) Validate(m *Manager) error {
 	if c.Root == "" {
 		return fmt.Errorf("root plist is required")
 	}
@@ -222,11 +224,12 @@ func (c *ContainerCreateArguments) Validate(m *containerManager) error {
 	return nil
 }
 
-type containerManager struct {
+type Manager struct {
 	api        plugin.API
 	cgroup     cgroup.API
 	socat      socat.API
 	filesystem zfs.API
+	protocol   protocol.API
 
 	sequence uint16
 	seqM     sync.Mutex
@@ -249,7 +252,7 @@ type Container interface {
 	Arguments() ContainerCreateArguments
 }
 
-func (m *containerManager) setUpCGroups() error {
+func (m *Manager) setUpCGroups() error {
 	devices, err := m.cgroup.GetGroup(DevicesCGroup.Subsystem(), DevicesCGroup.Name())
 	if err != nil {
 		return err
@@ -279,7 +282,7 @@ func (m *containerManager) setUpCGroups() error {
 	return nil
 }
 
-func (m *containerManager) setUpDefaultBridge() error {
+func (m *Manager) setUpDefaultBridge() error {
 	return m.api.Internal("bridge.create", pm.M{
 		"name": DefaultBridgeName,
 		"network": pm.M{
@@ -292,7 +295,7 @@ func (m *containerManager) setUpDefaultBridge() error {
 	}, nil)
 }
 
-func (m *containerManager) getNextSequence() uint16 {
+func (m *Manager) getNextSequence() uint16 {
 	m.seqM.Lock()
 	defer m.seqM.Unlock()
 	//get a read lock on the container dict as well
@@ -310,7 +313,7 @@ func (m *containerManager) getNextSequence() uint16 {
 	return m.sequence
 }
 
-func (m *containerManager) setContainer(id uint16, c *container) {
+func (m *Manager) setContainer(id uint16, c *container) {
 	m.conM.Lock()
 	defer m.conM.Unlock()
 	m.containers[id] = c
@@ -318,14 +321,14 @@ func (m *containerManager) setContainer(id uint16, c *container) {
 }
 
 //cleanup is called when a container terminates.
-func (m *containerManager) unsetContainer(id uint16) {
+func (m *Manager) unsetContainer(id uint16) {
 	m.conM.Lock()
 	defer m.conM.Unlock()
 	delete(m.containers, id)
 	screen.Refresh()
 }
 
-func (m *containerManager) nicAdd(ctx pm.Context) (interface{}, error) {
+func (m *Manager) nicAdd(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Container uint16 `json:"container"`
 		Nic       Nic    `json:"nic"`
@@ -368,7 +371,7 @@ func (m *containerManager) nicAdd(ctx pm.Context) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *containerManager) nicRemove(ctx pm.Context) (interface{}, error) {
+func (m *Manager) nicRemove(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Container uint16 `json:"container"`
 		Index     int    `json:"index"`
@@ -416,7 +419,7 @@ func (m *containerManager) nicRemove(ctx pm.Context) (interface{}, error) {
 	return nil, container.unBridge(args.Index, nic, ovs)
 }
 
-func (m *containerManager) createContainer(args ContainerCreateArguments) (*container, error) {
+func (m *Manager) createContainer(args ContainerCreateArguments) (*container, error) {
 	if err := args.Validate(m); err != nil {
 		return nil, err
 	}
@@ -444,7 +447,7 @@ func (m *containerManager) createContainer(args ContainerCreateArguments) (*cont
 	return c, nil
 }
 
-func (m *containerManager) createSync(ctx pm.Context) (interface{}, error) {
+func (m *Manager) createSync(ctx pm.Context) (interface{}, error) {
 	var args ContainerCreateArguments
 	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
@@ -463,7 +466,7 @@ func (m *containerManager) createSync(ctx pm.Context) (interface{}, error) {
 	return container.runner.Wait(), nil
 }
 
-func (m *containerManager) create(ctx pm.Context) (interface{}, error) {
+func (m *Manager) create(ctx pm.Context) (interface{}, error) {
 	var args ContainerCreateArguments
 	cmd := ctx.Command()
 
@@ -485,7 +488,7 @@ type ContainerInfo struct {
 	Container Container `json:"container"`
 }
 
-func (m *containerManager) list(ctx pm.Context) (interface{}, error) {
+func (m *Manager) list(ctx pm.Context) (interface{}, error) {
 	containers := make(map[uint16]ContainerInfo)
 
 	m.conM.RLock()
@@ -512,16 +515,16 @@ func (m *containerManager) list(ctx pm.Context) (interface{}, error) {
 	return containers, nil
 }
 
-func (m *containerManager) getCoreXQueue(id uint16) string {
+func (m *Manager) getCoreXQueue(id uint16) string {
 	return fmt.Sprintf("core:%v", id)
 }
 
-func (m *containerManager) pushToContainer(container *container, cmd *pm.Command) error {
-	//m.sink.Flag(cmd.ID)
+func (m *Manager) pushToContainer(container *container, cmd *pm.Command) error {
+	m.protocol.Flag(cmd.ID)
 	return container.dispatch(cmd)
 }
 
-func (m *containerManager) dispatch(ctx pm.Context) (interface{}, error) {
+func (m *Manager) dispatch(ctx pm.Context) (interface{}, error) {
 	var args ContainerDispatchArguments
 	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
@@ -552,7 +555,7 @@ func (m *containerManager) dispatch(ctx pm.Context) (interface{}, error) {
 }
 
 //Dispatch command to container with ID (id)
-func (m *containerManager) Dispatch(id uint16, cmd *pm.Command) (*pm.JobResult, error) {
+func (m *Manager) Dispatch(id uint16, cmd *pm.Command) (*pm.JobResult, error) {
 	cmd.ID = uuid.New()
 
 	m.conM.RLock()
@@ -575,7 +578,7 @@ type ContainerArguments struct {
 	Container uint16 `json:"container"`
 }
 
-func (m *containerManager) terminate(ctx pm.Context) (interface{}, error) {
+func (m *Manager) terminate(ctx pm.Context) (interface{}, error) {
 	var args ContainerArguments
 	cmd := ctx.Command()
 
@@ -597,7 +600,7 @@ type ContainerFindArguments struct {
 	Tags []string `json:"tags"`
 }
 
-func (m *containerManager) find(ctx pm.Context) (interface{}, error) {
+func (m *Manager) find(ctx pm.Context) (interface{}, error) {
 	var args ContainerFindArguments
 	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
@@ -629,7 +632,7 @@ func (m *containerManager) find(ctx pm.Context) (interface{}, error) {
 	return result, nil
 }
 
-func (m *containerManager) GetWithTags(tags ...string) []Container {
+func (m *Manager) GetWithTags(tags ...string) []Container {
 	m.conM.RLock()
 	defer m.conM.RUnlock()
 
@@ -647,7 +650,7 @@ loop:
 	return result
 }
 
-func (m *containerManager) GetOneWithTags(tags ...string) Container {
+func (m *Manager) GetOneWithTags(tags ...string) Container {
 	result := m.GetWithTags(tags...)
 	if len(result) > 0 {
 		return result[0]
@@ -656,14 +659,14 @@ func (m *containerManager) GetOneWithTags(tags ...string) Container {
 	return nil
 }
 
-func (m *containerManager) Of(id uint16) Container {
+func (m *Manager) Of(id uint16) Container {
 	m.conM.RLock()
 	defer m.conM.RUnlock()
 	cont, _ := m.containers[id]
 	return cont
 }
 
-func (m *containerManager) portforwardAdd(ctx pm.Context) (interface{}, error) {
+func (m *Manager) portforwardAdd(ctx pm.Context) (interface{}, error) {
 	var args containerPortForward
 	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
@@ -700,7 +703,7 @@ func (m *containerManager) portforwardAdd(ctx pm.Context) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *containerManager) portforwardRemove(ctx pm.Context) (interface{}, error) {
+func (m *Manager) portforwardRemove(ctx pm.Context) (interface{}, error) {
 	var args containerPortForward
 	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
@@ -722,7 +725,7 @@ func (m *containerManager) portforwardRemove(ctx pm.Context) (interface{}, error
 	return nil, nil
 }
 
-func (m *containerManager) flistLayer(ctx pm.Context) (interface{}, error) {
+func (m *Manager) flistLayer(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Container uint16 `json:"container"`
 		FList     string `json:"flist"`

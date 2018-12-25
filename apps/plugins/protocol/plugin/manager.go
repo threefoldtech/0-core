@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/threefoldtech/0-core/apps/plugins/protocol"
 
 	"github.com/threefoldtech/0-core/base/plugin"
 
@@ -13,87 +16,31 @@ import (
 const (
 	SinkQueue = "core:default"
 	DBIndex   = 0
+
+	//ReturnExpire in 300 seconds (5min)
+	ReturnExpire = 300
 )
 
 type Manager struct {
 	api  plugin.API
-	db   *Database
 	pool *redis.Pool
-}
-
-//RPush pushes values to the right
-func (m *Manager) RPush(key string, args ...[]byte) (int64, error) {
-	conn := m.pool.Get()
-	defer conn.Close()
-	input := make([]interface{}, 0, len(args)+1)
-	input = append(input, key)
-	for _, arg := range args {
-		input = append(input, arg)
-	}
-
-	return redis.Int64(conn.Do("RPUSH", input...))
-}
-
-//LTrim trims a list
-func (m *Manager) LTrim(key string, start, stop int64) error {
-	conn := m.pool.Get()
-	defer conn.Close()
-
-	_, err := conn.Do("LTRIM", key, start, stop)
-	return err
-}
-
-//Get gets value from key
-func (m *Manager) Get(key string) ([]byte, error) {
-	conn := m.pool.Get()
-	defer conn.Close()
-	result, err := redis.Bytes(conn.Do("GET", key))
-	//we do the next, because this is how ledis used
-	//to behave
-	if err == redis.ErrNil {
-		return nil, nil
-	}
-	return result, err
-}
-
-//Set sets a value to a key
-func (m *Manager) Set(key string, value []byte) error {
-	conn := m.pool.Get()
-	defer conn.Close()
-	_, err := conn.Do("SET", key, value)
-	return err
-}
-
-//Del delets keys
-func (m *Manager) Del(keys ...string) (int64, error) {
-	conn := m.pool.Get()
-	defer conn.Close()
-	input := make([]interface{}, 0, len(keys))
-	for _, key := range keys {
-		input = append(input, key)
-	}
-
-	return redis.Int64(conn.Do("DEL", input...))
-}
-
-//LExpire sets TTL on a list
-func (m *Manager) LExpire(key string, duration int64) (int64, error) {
-	conn := m.pool.Get()
-	defer conn.Close()
-	return redis.Int64(conn.Do("EXPIRE", key, duration))
 }
 
 //Result handler implementation
 func (m *Manager) Result(cmd *pm.Command, result *pm.JobResult) {
-	if err := m.Forward(result); err != nil {
+	if err := m.Set(result); err != nil {
 		log.Debugf("failed to forward result: %s", cmd.ID)
 	}
+}
+
+func (m *Manager) Database() protocol.Database {
+	return m
 }
 
 func (m *Manager) process() {
 	for {
 		var command pm.Command
-		err := m.db.GetNext(SinkQueue, &command)
+		err := m.next(SinkQueue, &command)
 		if err == redis.ErrNil {
 			continue
 		} else if err != nil {
@@ -106,12 +53,12 @@ func (m *Manager) process() {
 			log.Warningf("receiving a command with no ID, dropping")
 			continue
 		}
-		if m.db.Flagged(command.ID) {
+		if m.Flagged(command.ID) {
 			log.Errorf("received a command with a duplicate ID(%v), dropping", command.ID)
 			continue
 		}
 
-		m.db.Flag(command.ID)
+		m.Flag(command.ID)
 		log.Debugf("Starting command %s", &command)
 
 		_, err = m.api.Run(&command)
@@ -119,29 +66,127 @@ func (m *Manager) process() {
 		if err == pm.UnknownCommandErr {
 			result := pm.NewJobResult(&command)
 			result.State = pm.StateUnknownCmd
-			m.Forward(result)
+			m.Set(result)
 		} else if err != nil {
 			log.Errorf("Unknown error while processing command (%s): %s", command, err)
 		}
 	}
 }
 
-//Forward forwards job result
-func (m *Manager) Forward(result *pm.JobResult) error {
-	m.db.UnFlag(result.ID)
-	return m.db.Respond(result)
+//Set forwards job result
+func (m *Manager) Set(result *pm.JobResult) error {
+	m.UnFlag(result.ID)
+	return m.setResult(result)
 }
 
-//Flag marks a job ID as running
-func (m *Manager) Flag(id string) error {
-	return m.db.Flag(id)
-}
-
-//GetResult gets a result of a job if it exists
-func (m *Manager) GetResult(job string, timeout int) (*pm.JobResult, error) {
-	if m.db.Flagged(job) {
-		return m.db.GetResponse(job, timeout)
+//Get gets a result of a job if it exists
+func (m *Manager) Get(job string, timeout int) (*pm.JobResult, error) {
+	if m.Flagged(job) {
+		return m.getResult(job, timeout)
 	}
 
 	return nil, fmt.Errorf("unknown job id '%s' (may be it has expired)", job)
+}
+
+//Flag mark job as processing
+func (m *Manager) Flag(id string) error {
+	conn := m.pool.Get()
+	defer conn.Close()
+
+	key := fmt.Sprintf("result:%s:flag", id)
+	_, err := conn.Do("RPUSH", key, "")
+	return err
+}
+
+//UnFlag mark job as done
+func (m *Manager) UnFlag(id string) error {
+	conn := m.pool.Get()
+	defer conn.Close()
+
+	key := fmt.Sprintf("result:%s:flag", id)
+	_, err := conn.Do("EXPIRE", key, ReturnExpire)
+	return err
+}
+
+//Flagged check if job is marked
+func (m *Manager) Flagged(id string) bool {
+	conn := m.pool.Get()
+	defer conn.Close()
+
+	key := fmt.Sprintf("result:%s:flag", id)
+	v, _ := redis.Int(conn.Do("EXISTS", key))
+	return v == 1
+}
+
+//next gets the next available command
+func (m *Manager) next(queue string, command *pm.Command) error {
+	conn := m.pool.Get()
+	defer conn.Close()
+
+	payload, err := redis.ByteSlices(conn.Do("BLPOP", queue, 10))
+	if err != nil {
+		return err
+	}
+
+	if payload == nil || len(payload) < 2 {
+		return redis.ErrNil
+	}
+
+	return json.Unmarshal(payload[1], command)
+}
+
+func (m *Manager) setResult(result *pm.JobResult) error {
+	if result.ID == "" {
+		return fmt.Errorf("result with no ID, not pushing results back")
+	}
+
+	queue := fmt.Sprintf("result:%s", result.ID)
+
+	conn := m.pool.Get()
+	defer conn.Close()
+
+	if err := m.push(conn, queue, result); err != nil {
+		return err
+	}
+
+	if _, err := conn.Do("EXPIRE", queue, ReturnExpire); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Manager) push(conn redis.Conn, queue string, payload interface{}) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	if _, err := conn.Do("RPUSH", queue, data); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Manager) cycle(queue string, timeout int) ([]byte, error) {
+	conn := m.pool.Get()
+	defer conn.Close()
+
+	return redis.Bytes(conn.Do("BRPOPLPUSH", queue, queue, timeout))
+}
+
+func (m *Manager) getResult(id string, timeout int) (*pm.JobResult, error) {
+	queue := fmt.Sprintf("result:%s", id)
+	payload, err := m.cycle(queue, timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	var result pm.JobResult
+	if err := json.Unmarshal(payload, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
 }

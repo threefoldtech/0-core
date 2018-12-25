@@ -25,7 +25,7 @@ var (
 type container struct {
 	id     uint16
 	runner pm.Job
-	mgr    *containerManager
+	mgr    *Manager
 	Args   ContainerCreateArguments `json:"arguments"`
 	Root   string                   `json:"root"`
 	PID    int                      `json:"pid"`
@@ -39,7 +39,7 @@ type container struct {
 	terminating bool
 }
 
-func newContainer(mgr *containerManager, id uint16, args ContainerCreateArguments) *container {
+func newContainer(mgr *Manager, id uint16, args ContainerCreateArguments) *container {
 	c := &container{
 		mgr:         mgr,
 		id:          id,

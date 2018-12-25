@@ -13,10 +13,10 @@ import (
 	"syscall"
 
 	"github.com/threefoldtech/0-core/base/pm"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
-func (m *containerManager) zflist(args ...string) (*pm.JobResult, error) {
+func (m *Manager) zflist(args ...string) (*pm.JobResult, error) {
 	log.Debugf("zflist %v", args)
 	return m.api.System("zflist", args...)
 }
@@ -58,7 +58,7 @@ func (c createArgs) Validate() error {
 	return nil
 }
 
-func (m *containerManager) flistCreate(ctx pm.Context) (interface{}, error) {
+func (m *Manager) flistCreate(ctx pm.Context) (interface{}, error) {
 	var args createArgs
 	cmd := ctx.Command()
 

@@ -10,7 +10,7 @@ import (
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
-func (m *containerManager) ztInfo(ctx pm.Context) (interface{}, error) {
+func (m *Manager) ztInfo(ctx pm.Context) (interface{}, error) {
 	var args ContainerArguments
 	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
@@ -45,7 +45,7 @@ func (m *containerManager) ztInfo(ctx pm.Context) (interface{}, error) {
 	return data, nil
 }
 
-func (m *containerManager) ztList(ctx pm.Context) (interface{}, error) {
+func (m *Manager) ztList(ctx pm.Context) (interface{}, error) {
 	var args ContainerArguments
 	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {

@@ -21,7 +21,7 @@ var (
 	resticSnaphostIdP = regexp.MustCompile(`snapshot ([^\s]+) saved`)
 )
 
-func (m *containerManager) backup(ctx pm.Context) (interface{}, error) {
+func (m *Manager) backup(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Container uint16   `json:"container"`
 		URL       string   `json:"url"`
@@ -161,7 +161,7 @@ func (m *containerManager) backup(ctx pm.Context) (interface{}, error) {
 	return match[1], nil
 }
 
-func (m *containerManager) restore(ctx pm.Context) (interface{}, error) {
+func (m *Manager) restore(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		URL string `json:"url"`
 	}
