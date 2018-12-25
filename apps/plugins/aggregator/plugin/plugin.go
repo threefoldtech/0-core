@@ -29,6 +29,9 @@ var (
 		API: func() interface{} {
 			return &manager
 		},
+		Actions: map[string]pm.Action{
+			"query": manager.query,
+		},
 	}
 )
 

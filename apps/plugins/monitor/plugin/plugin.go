@@ -19,10 +19,7 @@ var (
 		},
 
 		Actions: map[string]pm.Action{
-			"cpu":     manager.monitor,
-			"memory":  manager.monitor,
-			"disk":    manager.monitor,
-			"network": manager.monitor,
+			"": manager.monitor,
 		},
 	}
 )

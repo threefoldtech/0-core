@@ -59,11 +59,13 @@ type Point struct {
 	Tags map[string]string `json:"tags,omitempty"`
 }
 
-func (r *Manager) query(cmd *pm.Command) (interface{}, error) {
+func (r *Manager) query(ctx pm.Context) (interface{}, error) {
 	var filter struct {
 		Key  string            `json:"key"`
 		Tags map[string]string `json:"tags"`
 	}
+
+	cmd := ctx.Command()
 
 	if err := json.Unmarshal(*cmd.Arguments, &filter); err != nil {
 		return nil, err

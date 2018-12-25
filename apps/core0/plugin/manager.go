@@ -164,6 +164,7 @@ all:
 			case pm.MessageHandler:
 			case pm.ResultHandler:
 			case pm.PreHandler:
+			case pm.StatsHandler:
 			default:
 				continue
 			}
