@@ -171,7 +171,7 @@ func main() {
 	}
 
 	//configure logging handlers from configurations
-	log.Infof("Configure logging")
+	//log.Infof("Configure logging")
 	// cfg := transport.SinkConfig{Port: 6379}
 	// sink, err := transport.NewSink(cfg)
 	// if err != nil {

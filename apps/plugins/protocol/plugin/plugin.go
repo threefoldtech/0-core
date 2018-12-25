@@ -4,12 +4,14 @@ import (
 	logging "github.com/op/go-logging"
 	"github.com/threefoldtech/0-core/apps/plugins/protocol"
 	"github.com/threefoldtech/0-core/base/plugin"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 var (
 	log     = logging.MustGetLogger("transport")
 	manager Manager
-	_       protocol.API = (*Manager)(nil)
+	_       protocol.API     = (*Manager)(nil)
+	_       pm.ResultHandler = (*Manager)(nil)
 
 	//Plugin entry point
 	Plugin = plugin.Plugin{
@@ -35,6 +37,5 @@ func initManager(mgr *Manager, api plugin.API) error {
 
 	go mgr.process()
 
-	//mgr.AddHandle(sink)
 	return nil
 }

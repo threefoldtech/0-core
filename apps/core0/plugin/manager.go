@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"path"
 	"plugin"
+	"runtime/debug"
 	"sort"
 	"strings"
 
@@ -112,7 +113,8 @@ func (m *Manager) loadPlugin(p string) (*plg.Plugin, error) {
 func (m *Manager) safeOpen(pl *plg.Plugin) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
-			err = fmt.Errorf("paniced on plugin initialization: %v", e)
+			stack := debug.Stack()
+			err = fmt.Errorf("paniced on plugin initialization: %v\n%s", e, string(stack))
 		}
 	}()
 

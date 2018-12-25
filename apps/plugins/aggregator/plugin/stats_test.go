@@ -1,10 +1,11 @@
-package stats
+package main
 
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"math/rand"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSampleCalculations(t *testing.T) {

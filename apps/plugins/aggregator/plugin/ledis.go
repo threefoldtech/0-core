@@ -1,4 +1,4 @@
-package stats
+package main
 
 import (
 	"crypto/md5"
@@ -6,11 +6,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
-	logging "github.com/op/go-logging"
 	cache "github.com/patrickmn/go-cache"
-	"github.com/threefoldtech/0-core/apps/core0/transport"
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
@@ -22,7 +19,6 @@ const (
 )
 
 var (
-	log     = logging.MustGetLogger("stats")
 	Periods = []int64{300, 3600} //5 min, 1 hour
 )
 
@@ -57,35 +53,13 @@ type Stats struct {
 	Tags      []pm.Tag  `json:"tags"`
 }
 
-type redisStatsBuffer struct {
-	db    *transport.Sink
-	cache *cache.Cache
-}
-
-func NewLedisStatsAggregator(sink *transport.Sink) pm.StatsHandler {
-	redisBuffer := &redisStatsBuffer{
-		db:    sink,
-		cache: cache.New(1*time.Hour, 5*time.Minute),
-	}
-
-	redisBuffer.cache.OnEvicted(func(key string, _ interface{}) {
-		if _, err := sink.Del(key); err != nil {
-			log.Errorf("failed to evict stats key %s", key)
-		}
-	})
-
-	//pm.RegisterBuiltIn("aggregator.query", redisBuffer.query)
-
-	return redisBuffer
-}
-
 type Point struct {
 	*Sample
 	Key  string            `json:"key"`
 	Tags map[string]string `json:"tags,omitempty"`
 }
 
-func (r *redisStatsBuffer) query(cmd *pm.Command) (interface{}, error) {
+func (r *Manager) query(cmd *pm.Command) (interface{}, error) {
 	var filter struct {
 		Key  string            `json:"key"`
 		Tags map[string]string `json:"tags"`
@@ -106,7 +80,7 @@ func (r *redisStatsBuffer) query(cmd *pm.Command) (interface{}, error) {
 			}
 		}
 
-		data, err := r.db.Get(key)
+		data, err := r.protocol.Database().GetKey(key)
 		if err != nil {
 			log.Errorf("failed to get state for metric: %s", key)
 			continue
@@ -150,12 +124,13 @@ func (r *redisStatsBuffer) query(cmd *pm.Command) (interface{}, error) {
 	return result, nil
 }
 
-func (r *redisStatsBuffer) hash(tags []pm.Tag) string {
+func (r *Manager) hash(tags []pm.Tag) string {
 	sort.Sort(Tags(tags))
 	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%v", tags))))
 }
 
-func (r *redisStatsBuffer) Stats(op string, key string, value float64, id string, tags ...pm.Tag) {
+//Stats is a states handler implementation
+func (r *Manager) Stats(op string, key string, value float64, id string, tags ...pm.Tag) {
 	if len(id) != 0 {
 		tags = append(tags, pm.Tag{IDTag, id})
 	}
@@ -166,7 +141,7 @@ func (r *redisStatsBuffer) Stats(op string, key string, value float64, id string
 	//touch key in cache so we know we are tracking this key
 	r.cache.Set(internal, nil, cache.DefaultExpiration)
 
-	data, err := r.db.Get(internal)
+	data, err := r.protocol.Database().GetKey(internal)
 	if err != nil {
 		log.Errorf("failed to get value for %s: %s", key, err)
 		return
@@ -202,7 +177,7 @@ func (r *redisStatsBuffer) Stats(op string, key string, value float64, id string
 		}
 
 		if data, err := json.Marshal(&p); err == nil {
-			r.db.RPush(queue, data)
+			r.protocol.Database().RPush(queue, data)
 		} else {
 			log.Errorf("statistics point marshal error: %s", err)
 		}
@@ -214,7 +189,7 @@ func (r *redisStatsBuffer) Stats(op string, key string, value float64, id string
 		return
 	}
 
-	if err := r.db.Set(internal, data); err != nil {
+	if err := r.protocol.Database().SetKey(internal, data); err != nil {
 		log.Errorf("failed to save state object for %s: %s", key, err)
 	}
 }
