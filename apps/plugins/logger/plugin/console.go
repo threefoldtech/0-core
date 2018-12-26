@@ -1,4 +1,4 @@
-package logger
+package main
 
 import (
 	"github.com/op/go-logging"
@@ -15,11 +15,6 @@ type LogRecord struct {
 	Message *stream.Message `json:"message"`
 }
 
-// Logger interface
-type Logger interface {
-	LogRecord(record *LogRecord)
-}
-
 func IsLoggable(defaults []uint16, msg *stream.Message) bool {
 	if len(defaults) > 0 {
 		return msg.Meta.Assert(defaults...)
@@ -33,8 +28,8 @@ type ConsoleLogger struct {
 	defaults []uint16
 }
 
-// NewConsoleLogger creates a simple console logger that prints Message messages to Console.
-func NewConsoleLogger(defaults []uint16) Logger {
+// newConsoleLogger creates a simple console logger that prints Message messages to Console.
+func newConsoleLogger(defaults []uint16) Logger {
 	return &ConsoleLogger{
 		defaults: defaults,
 	}

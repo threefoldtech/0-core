@@ -51,3 +51,42 @@ func TestRequires(t *testing.T) {
 		t.Error()
 	}
 }
+
+func TestAllRequires(t *testing.T) {
+	p := plugins{
+		&plugin.Plugin{
+			Name:     "require_1",
+			Requires: []string{"nodep", "require_3"},
+		},
+		&plugin.Plugin{
+			Name:     "require_2",
+			Requires: []string{"nodep", "require_3", "require_1"},
+		},
+		&plugin.Plugin{
+			Name:     "require_3",
+			Requires: []string{"nodep"},
+		},
+		&plugin.Plugin{
+			Name:     "require_4",
+			Requires: []string{"nodep"},
+		},
+		&plugin.Plugin{
+			Name: "nodep",
+		},
+	}
+
+	sort.Sort(p)
+
+	if ok := assert.Len(t, p, 5); !ok {
+		t.Fatal()
+	}
+
+	var names []string
+	for _, pl := range p {
+		names = append(names, pl.Name)
+	}
+
+	if ok := assert.Equal(t, []string{"nodep", "require_3", "require_1", "require_2", "require_4"}, names); !ok {
+		t.Error()
+	}
+}

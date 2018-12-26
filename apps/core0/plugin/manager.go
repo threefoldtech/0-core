@@ -41,7 +41,10 @@ func (l plugins) Less(i, j int) bool {
 	pj := l[j]
 
 	//any one with now requirements should come first
-	if len(pi.Requires) == 0 {
+	if len(pi.Requires) == 0 && len(pj.Requires) == 0 {
+		//sort alphabetically
+		return strings.Compare(pi.Name, pj.Name) == -1
+	} else if len(pi.Requires) == 0 {
 		return true
 	} else if len(pj.Requires) == 0 {
 		return false

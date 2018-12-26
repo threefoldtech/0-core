@@ -1,10 +1,11 @@
-package logger
+package main
 
 import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/threefoldtech/0-core/apps/core0/transport"
+	"github.com/threefoldtech/0-core/apps/plugins/protocol"
+
 	"github.com/threefoldtech/0-core/base/stream"
 )
 
@@ -15,20 +16,20 @@ const (
 
 // redisLogger send Message to redis queue
 type streamLogger struct {
-	sink *transport.Sink
+	db   protocol.Database
 	size int64
 
 	ch chan *LogRecord
 }
 
 // NewRedisLogger creates new redis logger handler
-func NewStreamLogger(db *transport.Sink, size int64) Logger {
+func newStreamLogger(db protocol.Database, size int64) Logger {
 	if size == 0 {
 		size = MaxStreamRedisQueueSize
 	}
 
 	rl := &streamLogger{
-		sink: db,
+		db:   db,
 		size: size,
 		ch:   make(chan *LogRecord, MaxStreamRedisQueueSize),
 	}
@@ -63,14 +64,14 @@ func (l *streamLogger) push() error {
 		}
 
 		queue := fmt.Sprintf("stream:%s", record.Command)
-		if _, err := l.sink.RPush(queue, bytes); err != nil {
+		if _, err := l.db.RPush(queue, bytes); err != nil {
 			return err
 		}
 
-		if err := l.sink.LTrim(queue, -1*l.size, -1); err != nil {
+		if err := l.db.LTrim(queue, -1*l.size, -1); err != nil {
 			return err
 		}
 
-		l.sink.LExpire(queue, StreamRedisQueueTTL)
+		l.db.LExpire(queue, StreamRedisQueueTTL)
 	}
 }

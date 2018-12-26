@@ -1,12 +1,13 @@
-package logger
+package main
 
 import (
 	"encoding/json"
 	"fmt"
 	"sync"
 
+	"github.com/threefoldtech/0-core/apps/plugins/protocol"
+
 	"github.com/pborman/uuid"
-	"github.com/threefoldtech/0-core/apps/core0/transport"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/stream"
 )
@@ -19,7 +20,7 @@ type levels map[uint16]struct{}
 
 // redisLogger send Message to redis queue
 type redisLogger struct {
-	sink     *transport.Sink
+	db       protocol.Database
 	defaults []uint16
 	size     int64
 	buffer   *stream.Buffer
@@ -30,13 +31,13 @@ type redisLogger struct {
 }
 
 // NewRedisLogger creates new redis logger handler
-func NewLedisLogger(sink *transport.Sink, defaults []uint16, size int64) Logger {
+func newTrunkLogger(sink protocol.Database, defaults []uint16, size int64) Logger {
 	if size == 0 {
 		size = MaxRedisQueueSize
 	}
 
 	rl := &redisLogger{
-		sink:     sink,
+		db:       sink,
 		defaults: defaults,
 		size:     size,
 		buffer:   stream.NewBuffer(MaxStreamRedisQueueSize),
@@ -150,12 +151,12 @@ func (l *redisLogger) Subscribe(queue string, lvls []uint16) error {
 			continue
 		}
 
-		if _, err := l.sink.RPush(queue, bytes); err != nil {
+		if _, err := l.db.RPush(queue, bytes); err != nil {
 			return err
 		}
 	}
 
-	if err := l.sink.LTrim(queue, -1*l.size, -1); err != nil {
+	if err := l.db.LTrim(queue, -1*l.size, -1); err != nil {
 		return err
 	}
 
@@ -184,11 +185,11 @@ func (l *redisLogger) pushQueues(record *LogRecord) error {
 			}
 		}
 
-		if _, err := l.sink.RPush(queue, bytes); err != nil {
+		if _, err := l.db.RPush(queue, bytes); err != nil {
 			return err
 		}
 
-		if err := l.sink.LTrim(queue, -1*l.size, -1); err != nil {
+		if err := l.db.LTrim(queue, -1*l.size, -1); err != nil {
 			return err
 		}
 	}
