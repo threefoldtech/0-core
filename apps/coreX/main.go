@@ -84,6 +84,7 @@ func main() {
 
 	mgr.MaxJobs = opt.MaxJobs()
 	mgr.New()
+	mgr.RegisterExtension("bash", "sh", "", []string{"-c", "{script}"}, nil)
 
 	input := os.NewFile(3, "|input")
 	output := os.NewFile(4, "|output")

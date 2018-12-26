@@ -45,7 +45,9 @@ type Command struct {
 	//Tags custom user tags to be attached to the job
 	Tags Tags `json:"tags"`
 
-	//For internal use only, flags that can be set from inside the internal API
+	//For internal use only
+	Core uint16 `json:"-"`
+	//Flags that can be set from inside the internal API
 	Flags JobFlags `json:"-"`
 }
 

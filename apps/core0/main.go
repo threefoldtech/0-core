@@ -170,21 +170,10 @@ func main() {
 		log.Fatalf("failed to load plugins")
 	}
 
-	//configure logging handlers from configurations
-	//log.Infof("Configure logging")
-	// cfg := transport.SinkConfig{Port: 6379}
-	// sink, err := transport.NewSink(cfg)
-	// if err != nil {
-	// 	log.Errorf("failed to start command sink: %s", err)
-	// }
-
-	// logger.ConfigureLogging(sink)
-
 	bs := bootstrap.NewBootstrap(options.Agent())
 	bs.First()
 
 	if !options.Agent() {
-		//Only allow splash screen if debug is not set, or if not running in agent mode
 		Splash()
 	}
 
@@ -194,37 +183,10 @@ func main() {
 	row := &screen.RowSection{
 		Cells: make([]screen.RowCell, 2),
 	}
+
 	screen.Push(row)
-
-	// contMgr, err := containers.ContainerSubsystem(sink, &row.Cells[0])
-	// if err != nil {
-	// 	log.Fatal("failed to intialize container subsystem", err)
-	// }
-
 	bs.Second()
-
-	// if err := kvm.KVMSubsystem(contMgr, &row.Cells[1]); err != nil {
-	// 	log.Errorf("failed to initialize kvm subsystem: %s", err)
-	// }
-
-	// log.Infof("Starting local transport")
-	// local, err := NewLocal(contMgr, "/var/run/core.sock")
-	// if err != nil {
-	// 	log.Errorf("Failed to start local transport: %s", err)
-	// } else {
-	// 	local.Start()
-	// }
-
-	//start jobs sinks.
-	log.Infof("Starting Sinks")
-
-	//sink.Start()
 	screen.Refresh()
-
-	// if config.Stats.Enabled {
-	// 	aggregator := stats.NewLedisStatsAggregator(sink)
-	// 	mgr.AddHandle(aggregator)
-	// }
 
 	select {}
 }

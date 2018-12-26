@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 
 	"github.com/threefoldtech/0-core/base/pm"
@@ -60,18 +61,20 @@ func (c *container) rewind() {
 				log.Errorf("failed to load container log message: %s", err)
 			}
 
-			// logger.Current.LogRecord(&logger.LogRecord{
-			// 	Core:    c.id,
-			// 	Command: message.Command,
-			// 	Message: &msg,
-			// })
+			c.mgr.logger.Message(&pm.Command{ID: message.Command, Core: c.id}, &msg)
 		case "stats":
-			// var stat stats.Stats
-			// if err := json.Unmarshal(message.Payload, &stat); err != nil {
-			// 	log.Errorf("failed to load container stat message: %s", err)
-			// }
+			var stat struct {
+				Operation string   `json:"operation"`
+				Key       string   `json:"key"`
+				Value     float64  `json:"value"`
+				Tags      []pm.Tag `json:"tags"`
+			}
+
+			if err := json.Unmarshal(message.Payload, &stat); err != nil {
+				log.Errorf("failed to load container stat message: %s", err)
+			}
 			// //push stats to aggregation system
-			// c.mgr.api.Aggregate(string(stat.Operation), fmt.Sprintf("core-%d.%s", c.id, stat.Key), stat.Value, "", stat.Tags...)
+			c.mgr.api.Aggregate(stat.Operation, fmt.Sprintf("core-%d.%s", c.id, stat.Key), stat.Value, "", stat.Tags...)
 		default:
 			log.Warningf("got unknown message type from container(%d): %s", c.id, message.Type)
 		}

@@ -18,9 +18,16 @@ var (
 	manager Manager
 
 	Plugin = plugin.Plugin{
-		Name:     "corex",
-		Version:  "1.0",
-		Requires: []string{"cgroup", "socat", "bridge", "zfs", "protocol"},
+		Name:    "corex",
+		Version: "1.0",
+		Requires: []string{
+			"cgroup",
+			"socat",
+			"bridge",
+			"zfs",
+			"protocol",
+			"logger",
+		},
 		Open: func(api plugin.API) error {
 			log.Debugf("initializing containers manager")
 			return iniManager(&manager, api)
@@ -79,6 +86,14 @@ func iniManager(mgr *Manager, api plugin.API) error {
 	if api, err := api.Plugin("protocol"); err == nil {
 		if mgr.protocol, ok = api.(protocol.API); !ok {
 			return fmt.Errorf("invalid protocol api")
+		}
+	} else {
+		return err
+	}
+
+	if api, err := api.Plugin("logger"); err == nil {
+		if mgr.logger, ok = api.(pm.MessageHandler); !ok {
+			return fmt.Errorf("invalid logger api")
 		}
 	} else {
 		return err

@@ -230,6 +230,7 @@ type Manager struct {
 	socat      socat.API
 	filesystem zfs.API
 	protocol   protocol.API
+	logger     pm.MessageHandler
 
 	sequence uint16
 	seqM     sync.Mutex

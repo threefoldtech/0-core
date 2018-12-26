@@ -12,6 +12,7 @@ import (
 
 var (
 	manager Manager
+	_       pm.MessageHandler = (*Manager)(nil)
 
 	//Plugin entry point
 	Plugin = plugin.Plugin{
@@ -68,6 +69,7 @@ func initManager(mgr *Manager, api plugin.API) error {
 //Message handler implementation
 func (m *Manager) Message(cmd *pm.Command, msg *stream.Message) {
 	m.logRecord(&LogRecord{
+		Core:    cmd.Core,
 		Command: cmd.ID,
 		Message: msg,
 	})
