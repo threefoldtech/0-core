@@ -1,6 +1,6 @@
 // +build amd64
 
-package kvm
+package main
 
 import (
 	"encoding/json"
@@ -8,10 +8,8 @@ import (
 	"strings"
 
 	"github.com/google/shlex"
-	"github.com/libvirt/libvirt-go"
-	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
+	libvirt "github.com/libvirt/libvirt-go"
 	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/pm/stream"
 )
 
 func (m *kvmManager) deviceRemovedFailedHandler(c *libvirt.Connect, d *libvirt.Domain, event *libvirt.DomainEventDeviceRemovalFailed) {
@@ -38,7 +36,7 @@ func (m *kvmManager) handleStopped(uuid, name string, domain *libvirt.Domain) er
 	m.domainsInfoRWMutex.Lock()
 	delete(m.domainsInfo, uuid)
 	m.domainsInfoRWMutex.Unlock()
-	socat.RemoveAll(m.forwardId(uuid))
+	m.socat.RemoveAll(m.forwardId(uuid))
 	return m.flistUnmount(uuid)
 }
 
@@ -77,12 +75,12 @@ func (m *kvmManager) domaineLifeCycleHandler(conn *libvirt.Connect, domain *libv
 	m.evch <- data
 }
 
-func (m *kvmManager) events(ctx *pm.Context) (interface{}, error) {
+func (m *kvmManager) events(ctx pm.Context) (interface{}, error) {
 	var sequence uint64 = 1
 	for data := range m.evch {
 		data["sequence"] = sequence
 		bytes, _ := json.Marshal(data)
-		ctx.Log(string(bytes), stream.LevelResultJSON)
+		ctx.Log(string(bytes))
 
 		sequence++
 	}

@@ -1,6 +1,6 @@
 // +build amd64
 
-package kvm
+package main
 
 import (
 	"encoding/json"
@@ -14,13 +14,14 @@ import (
 
 	"path"
 
-	"github.com/libvirt/libvirt-go"
-	"github.com/op/go-logging"
+	libvirt "github.com/libvirt/libvirt-go"
+	logging "github.com/op/go-logging"
 	"github.com/pborman/uuid"
-	"github.com/threefoldtech/0-core/apps/core0/helper/filesystem"
-	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
 	"github.com/threefoldtech/0-core/apps/core0/screen"
-	"github.com/threefoldtech/0-core/apps/core0/subsys/containers"
+	"github.com/threefoldtech/0-core/apps/plugins/containers"
+	"github.com/threefoldtech/0-core/apps/plugins/socat"
+	"github.com/threefoldtech/0-core/apps/plugins/zfs"
+	"github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/utils"
 )
@@ -56,7 +57,9 @@ type LibvirtConnection struct {
 }
 
 type kvmManager struct {
-	conmgr        containers.ContainerManager
+	container     containers.API
+	socat         socat.API
+	filesystem    zfs.API
 	sequence      uint16
 	sequenceMutex sync.Mutex
 	libvirt       LibvirtConnection
@@ -67,6 +70,7 @@ type kvmManager struct {
 	domainsInfoRWMutex sync.RWMutex
 
 	devDeleteEvent *Sync
+	api            plugin.API
 }
 
 var (
@@ -108,7 +112,7 @@ const (
 	DefaultBridgeName           = "kvm0"
 )
 
-func KVMSubsystem(conmgr containers.ContainerManager, cell *screen.RowCell) error {
+func KVMSubsystem(conmgr containers.API, cell *screen.RowCell) error {
 	if err := libvirt.EventRegisterDefaultImpl(); err != nil {
 		return err
 	}
@@ -120,7 +124,7 @@ func KVMSubsystem(conmgr containers.ContainerManager, cell *screen.RowCell) erro
 	}()
 
 	mgr := &kvmManager{
-		conmgr:         conmgr,
+		container:      conmgr,
 		cell:           cell,
 		evch:           make(chan map[string]interface{}, 100), //buffer 100 event
 		domainsInfo:    make(map[string]*DomainInfo),
@@ -135,44 +139,15 @@ func KVMSubsystem(conmgr containers.ContainerManager, cell *screen.RowCell) erro
 	if err := mgr.setupDefaultGateway(); err != nil {
 		return err
 	}
-
-	pm.RegisterBuiltIn(kvmCreateCommand, mgr.create)
-	pm.RegisterBuiltIn(kvmDestroyCommand, mgr.destroy)
-	pm.RegisterBuiltIn(kvmShutdownCommand, mgr.shutdown)
-	pm.RegisterBuiltIn(kvmRebootCommand, mgr.reboot)
-	pm.RegisterBuiltIn(kvmResetCommand, mgr.reset)
-	pm.RegisterBuiltIn(kvmPauseCommand, mgr.pause)
-	pm.RegisterBuiltIn(kvmResumeCommand, mgr.resume)
-	pm.RegisterBuiltIn(kvmInfoCommand, mgr.info)
-	pm.RegisterBuiltIn(kvmInfoPSCommand, mgr.infops)
-	pm.RegisterBuiltIn(kvmAttachDiskCommand, mgr.attachDisk)
-	pm.RegisterBuiltIn(kvmDetachDiskCommand, mgr.detachDisk)
-	pm.RegisterBuiltIn(kvmAddNicCommand, mgr.addNic)
-	pm.RegisterBuiltIn(kvmRemoveNicCommand, mgr.removeNic)
-	pm.RegisterBuiltIn(kvmLimitDiskIOCommand, mgr.limitDiskIO)
-	pm.RegisterBuiltIn(kvmMigrateCommand, mgr.migrate)
-	pm.RegisterBuiltIn(kvmListCommand, mgr.list)
-	pm.RegisterBuiltIn(kvmPrepareMigrationTarget, mgr.prepareMigrationTarget)
-	pm.RegisterBuiltIn(kvmCreateImage, mgr.createImage)
-	pm.RegisterBuiltIn(kvmConvertImage, mgr.convertImage)
-	pm.RegisterBuiltIn(kvmGetCommand, mgr.get)
-	pm.RegisterBuiltIn(kvmPortForwardAddCommand, mgr.portforwardAdd)
-	pm.RegisterBuiltIn(kvmPortForwardRemoveCommand, mgr.portforwardRemove)
-
-	//those next 2 commands should never be called by the client, unfortunately we don't have
-	//support for internal commands yet.
-	pm.RegisterBuiltIn(kvmMonitorCommand, mgr.monitor)
-	pm.RegisterBuiltInWithCtx(kvmEventsCommand, mgr.events)
-
 	//start domains monitoring command
-	pm.Run(&pm.Command{
+	mgr.api.Run(&pm.Command{
 		ID:              kvmMonitorCommand,
 		Command:         kvmMonitorCommand,
 		RecurringPeriod: 30,
 	})
 
 	//start events command
-	pm.Run(&pm.Command{
+	mgr.api.Run(&pm.Command{
 		ID:      kvmEventsCommand,
 		Command: kvmEventsCommand,
 	})
@@ -575,7 +550,7 @@ func (m *kvmManager) setupDefaultGateway() error {
 		),
 	}
 
-	job, err := pm.Run(cmd)
+	job, err := m.api.Run(cmd)
 	if err != nil {
 		return err
 	}
@@ -640,7 +615,7 @@ func (m *kvmManager) mkNBDDisk(idx int, u *url.URL) DiskDevice {
 }
 
 func getDiskType(path string) string {
-	result, err := pm.System("qemu-img", "info", "--output=json", path)
+	result, err := manager.api.System("qemu-img", "info", "--output=json", path)
 	if err != nil {
 		return "raw"
 	}
@@ -865,7 +840,7 @@ func (m *kvmManager) setPortForward(uuid string, seq uint16, host string, contai
 	id := m.forwardId(uuid)
 	var err error
 
-	if err = socat.SetPortForward(id, ip, host, container); err != nil {
+	if err = m.socat.SetPortForward(id, ip, host, container); err != nil {
 		return err
 	}
 
@@ -927,7 +902,7 @@ func (m *kvmManager) prepareFlist(params *CreateParams, domain *Domain) error {
 
 	if params.ShareCache {
 		domain.Devices.Filesystems = append(domain.Devices.Filesystems, Filesystem{
-			Source: FilesystemDir{filesystem.CacheZeroFSDir},
+			Source: FilesystemDir{m.filesystem.GetCacheZeroFSDir()},
 			Target: FilesystemDir{"zoscache"}, //the <root> here matches the one in the cmdline root=<root>
 		})
 	}
@@ -935,9 +910,10 @@ func (m *kvmManager) prepareFlist(params *CreateParams, domain *Domain) error {
 	return nil
 }
 
-func (m *kvmManager) create(cmd *pm.Command) (uuid interface{}, err error) {
+func (m *kvmManager) create(ctx pm.Context) (uuid interface{}, err error) {
 	defer m.updateView()
 	var params CreateParams
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
@@ -1009,13 +985,13 @@ func (m *kvmManager) create(cmd *pm.Command) (uuid interface{}, err error) {
 	return domain.UUID, nil
 }
 
-func (m *kvmManager) prepareMigrationTarget(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) prepareMigrationTarget(ctx pm.Context) (interface{}, error) {
 	defer m.updateView()
 	var params struct {
 		NicParams
 		UUID string `json:"uuid"`
 	}
-
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
@@ -1055,8 +1031,10 @@ func (m *kvmManager) destroyDomain(uuid string, domain *libvirt.Domain) error {
 	return domain.Destroy()
 }
 
-func (m *kvmManager) destroy(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) destroy(ctx pm.Context) (interface{}, error) {
 	defer m.updateView()
+
+	cmd := ctx.Command()
 	domain, uuid, err := m.getDomain(cmd)
 	if err != nil {
 		return nil, err
@@ -1064,7 +1042,8 @@ func (m *kvmManager) destroy(cmd *pm.Command) (interface{}, error) {
 	return nil, m.destroyDomain(uuid, domain)
 }
 
-func (m *kvmManager) shutdown(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) shutdown(ctx pm.Context) (interface{}, error) {
+	cmd := ctx.Command()
 	domain, _, err := m.getDomain(cmd)
 	if err != nil {
 		return nil, err
@@ -1076,7 +1055,8 @@ func (m *kvmManager) shutdown(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *kvmManager) reboot(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) reboot(ctx pm.Context) (interface{}, error) {
+	cmd := ctx.Command()
 	domain, _, err := m.getDomain(cmd)
 	if err != nil {
 		return nil, err
@@ -1088,7 +1068,8 @@ func (m *kvmManager) reboot(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *kvmManager) reset(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) reset(ctx pm.Context) (interface{}, error) {
+	cmd := ctx.Command()
 	domain, _, err := m.getDomain(cmd)
 	if err != nil {
 		return nil, err
@@ -1100,7 +1081,8 @@ func (m *kvmManager) reset(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *kvmManager) pause(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) pause(ctx pm.Context) (interface{}, error) {
+	cmd := ctx.Command()
 	domain, _, err := m.getDomain(cmd)
 	if err != nil {
 		return nil, err
@@ -1112,7 +1094,8 @@ func (m *kvmManager) pause(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *kvmManager) resume(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) resume(ctx pm.Context) (interface{}, error) {
+	cmd := ctx.Command()
 	domain, _, err := m.getDomain(cmd)
 	if err != nil {
 		return nil, err
@@ -1124,7 +1107,8 @@ func (m *kvmManager) resume(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *kvmManager) info(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) info(ctx pm.Context) (interface{}, error) {
+	cmd := ctx.Command()
 	domain, _, err := m.getDomain(cmd)
 	if err != nil {
 		return nil, err
@@ -1216,8 +1200,9 @@ func (m *kvmManager) detachDevice(uuid, alias, ifxml string) error {
 	return nil
 }
 
-func (m *kvmManager) attachDisk(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) attachDisk(ctx pm.Context) (interface{}, error) {
 	var params ManDiskParams
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
@@ -1248,11 +1233,12 @@ func (m *kvmManager) attachDisk(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *kvmManager) detachDisk(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) detachDisk(ctx pm.Context) (interface{}, error) {
 	var (
 		params ManDiskParams
 		disk   *DiskDevice
 	)
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
@@ -1385,12 +1371,13 @@ func (m *kvmManager) updateMediaInfo(uuid string) error {
 	return nil
 }
 
-func (m *kvmManager) addNic(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) addNic(ctx pm.Context) (interface{}, error) {
 	var (
 		params ManNicParams
 		inf    *InterfaceDevice
 		err    error
 	)
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
@@ -1488,7 +1475,7 @@ func (m *kvmManager) updateNics(uuid string) error {
 	return nil
 }
 
-func (m *kvmManager) removeNic(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) removeNic(ctx pm.Context) (interface{}, error) {
 	var (
 		params ManNicParams
 		inf    *InterfaceDevice
@@ -1496,6 +1483,7 @@ func (m *kvmManager) removeNic(cmd *pm.Command) (interface{}, error) {
 		source InterfaceDeviceSource
 		err    error
 	)
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
@@ -1557,8 +1545,9 @@ func (m *kvmManager) removeNic(cmd *pm.Command) (interface{}, error) {
 	return nil, m.updateNics(params.UUID)
 }
 
-func (m *kvmManager) limitDiskIO(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) limitDiskIO(ctx pm.Context) (interface{}, error) {
 	var params LimitDiskIOParams
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
@@ -1648,7 +1637,8 @@ func (m *kvmManager) fixXML(xml string) string {
 	})
 }
 
-func (m *kvmManager) migrate(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) migrate(ctx pm.Context) (interface{}, error) {
+	cmd := ctx.Command()
 	domain, _, err := m.getDomain(cmd)
 	if err != nil {
 		return nil, err
@@ -1743,7 +1733,7 @@ func (m *kvmManager) getMachine(domain *libvirt.Domain) (Machine, error) {
 	}, nil
 }
 
-func (m *kvmManager) list(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) list(ctx pm.Context) (interface{}, error) {
 	conn, err := m.libvirt.getConnection()
 	if err != nil {
 		return nil, err
@@ -1767,11 +1757,12 @@ func (m *kvmManager) list(cmd *pm.Command) (interface{}, error) {
 	return machines, nil
 }
 
-func (m *kvmManager) get(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) get(ctx pm.Context) (interface{}, error) {
 	var params struct {
 		Name string `json:"name"`
 		UUID string `json:"uuid"`
 	}
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
@@ -1805,7 +1796,7 @@ func (m *kvmManager) get(cmd *pm.Command) (interface{}, error) {
 	return machine, nil
 }
 
-func (m *kvmManager) monitor(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) monitor(ctx pm.Context) (interface{}, error) {
 	conn, err := m.libvirt.getConnection()
 	if err != nil {
 		return nil, err
@@ -1842,13 +1833,13 @@ func (m *kvmManager) monitor(cmd *pm.Command) (interface{}, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cannot get domain info: %v", err)
 		}
-		pm.Aggregate(
+		m.api.Aggregate(
 			pm.AggreagteAverage,
 			"kvm.memory.max", float64(domInfo.MaxMem)/1000., name, // convert mem from Kib to Mb
 			pm.Tag{"type", "virt"},
 		)
 
-		pm.Aggregate(
+		m.api.Aggregate(
 			pm.AggreagteDifference,
 			"kvm.cpu.time", float64(domInfo.CpuTime)/1000000000., name, // convert time from nano to seconds
 			pm.Tag{"type", "virt"},
@@ -1856,13 +1847,13 @@ func (m *kvmManager) monitor(cmd *pm.Command) (interface{}, error) {
 
 		for i, vcpu := range info.Vcpu {
 			nr := fmt.Sprintf("%d", i)
-			pm.Aggregate(
+			m.api.Aggregate(
 				pm.AggreagteAverage,
 				"kvm.vcpu.state", float64(vcpu.State), name,
 				pm.Tag{"type", "virt"}, pm.Tag{"nr", nr},
 			)
 
-			pm.Aggregate(
+			m.api.Aggregate(
 				pm.AggreagteDifference,
 				"kvm.vcpu.time", float64(vcpu.Time)/1000000000., name,
 				pm.Tag{"type", "virt"}, pm.Tag{"nr", nr},
@@ -1873,25 +1864,25 @@ func (m *kvmManager) monitor(cmd *pm.Command) (interface{}, error) {
 			mac, _ := interfacesMap[net.Name]
 			netStats := fmt.Sprintf("%v.%v", name, mac)
 
-			pm.Aggregate(
+			m.api.Aggregate(
 				pm.AggreagteDifference,
 				"kvm.net.rxbytes", float64(net.RxBytes), netStats,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", net.Name},
 			)
 
-			pm.Aggregate(
+			m.api.Aggregate(
 				pm.AggreagteDifference,
 				"kvm.net.rxpackets", float64(net.RxPkts), netStats,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", net.Name},
 			)
 
-			pm.Aggregate(
+			m.api.Aggregate(
 				pm.AggreagteDifference,
 				"kvm.net.txbytes", float64(net.TxBytes), netStats,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", net.Name},
 			)
 
-			pm.Aggregate(
+			m.api.Aggregate(
 				pm.AggreagteDifference,
 				"kvm.net.txpackets", float64(net.TxPkts), netStats,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", net.Name},
@@ -1900,25 +1891,25 @@ func (m *kvmManager) monitor(cmd *pm.Command) (interface{}, error) {
 
 		for _, block := range info.Block {
 			statsName := fmt.Sprintf("%v.%v", name, block.Name)
-			pm.Aggregate(
+			m.api.Aggregate(
 				pm.AggreagteDifference,
 				"kvm.disk.rdbytes", float64(block.RdBytes), statsName,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", block.Name},
 			)
 
-			pm.Aggregate(
+			m.api.Aggregate(
 				pm.AggreagteDifference,
 				"kvm.disk.iops.read", float64(block.RdReqs), statsName,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", block.Name},
 			)
 
-			pm.Aggregate(
+			m.api.Aggregate(
 				pm.AggreagteDifference,
 				"kvm.disk.wrbytes", float64(block.WrBytes), statsName,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", block.Name},
 			)
 
-			pm.Aggregate(
+			m.api.Aggregate(
 				pm.AggreagteDifference,
 				"kvm.disk.iops.write", float64(block.WrReqs), statsName,
 				pm.Tag{"type", "virt"}, pm.Tag{"name", block.Name},
@@ -1929,13 +1920,14 @@ func (m *kvmManager) monitor(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (m *kvmManager) infops(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) infops(ctx pm.Context) (interface{}, error) {
 	var params DomainUUID
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
 
-	job, err := pm.Run(&pm.Command{
+	job, err := m.api.Run(&pm.Command{
 		ID:      uuid.New(),
 		Command: "aggregator.query",
 		Arguments: pm.MustArguments(pm.M{
@@ -1962,42 +1954,45 @@ func (m *kvmManager) infops(cmd *pm.Command) (interface{}, error) {
 	return data, nil
 }
 
-func (m *kvmManager) createImage(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) createImage(ctx pm.Context) (interface{}, error) {
 	var params struct {
 		FileName string `json:"file_name"`
 		Format   string `json:"format"`
 		Size     string `json:"size"`
 	}
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
 
-	if _, err := pm.System("qemu-img", "create", "-f", params.Format, params.FileName, params.Size); err != nil {
+	if _, err := m.api.System("qemu-img", "create", "-f", params.Format, params.FileName, params.Size); err != nil {
 		return nil, err
 	}
 
 	return nil, nil
 }
 
-func (m *kvmManager) convertImage(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) convertImage(ctx pm.Context) (interface{}, error) {
 	var params struct {
 		InputFile    string `json:"input_file"`
 		OutPutFile   string `json:"output_file"`
 		OutPutFormat string `json:"output_format"`
 	}
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
 
-	if _, err := pm.System("qemu-img", "convert", "-O", params.OutPutFormat, params.InputFile, params.OutPutFile); err != nil {
+	if _, err := m.api.System("qemu-img", "convert", "-O", params.OutPutFormat, params.InputFile, params.OutPutFile); err != nil {
 		return nil, err
 	}
 
 	return nil, nil
 }
 
-func (m *kvmManager) portforwardAdd(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) portforwardAdd(ctx pm.Context) (interface{}, error) {
 	var params kvmPortForward
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
@@ -2027,8 +2022,9 @@ func (m *kvmManager) portforwardAdd(cmd *pm.Command) (interface{}, error) {
 	return nil, m.setPortForward(params.UUID, domainInfo.Sequence, params.HostPort, params.ContainerPort)
 }
 
-func (m *kvmManager) portforwardRemove(cmd *pm.Command) (interface{}, error) {
+func (m *kvmManager) portforwardRemove(ctx pm.Context) (interface{}, error) {
 	var params kvmPortForward
+	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
 		return nil, err
 	}
@@ -2040,7 +2036,7 @@ func (m *kvmManager) portforwardRemove(cmd *pm.Command) (interface{}, error) {
 	if _, err := conn.LookupDomainByUUIDString(params.UUID); err != nil {
 		return nil, fmt.Errorf("couldn't find domain with the uuid %s", params.UUID)
 	}
-	err = socat.RemovePortForward(m.forwardId(params.UUID), params.HostPort, params.ContainerPort)
+	err = m.socat.RemovePortForward(m.forwardId(params.UUID), params.HostPort, params.ContainerPort)
 	if err != nil {
 		return nil, err
 	}

@@ -303,3 +303,7 @@ func (m *Manager) MergeFList(namespace, target, base, flist string) error {
 
 	return job.Signal(syscall.SIGHUP) //signal fs reload
 }
+
+func (m *Manager) GetCacheZeroFSDir() string {
+	return CacheZeroFSDir
+}

@@ -1,10 +1,10 @@
 // +build arm
 // CC=armv6j-hardfloat-linux-gnueabi-gcc CGO_ENABLED=1 CGO_LDFLAGS="-Wl,-rpath -Wl,/lib" GOOS=linux GOARCH=arm GOARM=6 go build
 
-package kvm
+package main
 
 import (
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"github.com/threefoldtech/0-core/apps/core0/screen"
 	"github.com/threefoldtech/0-core/apps/core0/subsys/containers"
 )
@@ -17,4 +17,3 @@ func KVMSubsystem(conmgr containers.ContainerManager, cell *screen.RowCell) erro
 	log.Errorf("kvm disabled on arm")
 	return nil
 }
-

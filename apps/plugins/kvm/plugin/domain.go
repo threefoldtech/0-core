@@ -1,6 +1,6 @@
 // +build amd64
 
-package kvm
+package main
 
 import (
 	"encoding/xml"

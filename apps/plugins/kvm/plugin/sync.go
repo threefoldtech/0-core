@@ -1,4 +1,4 @@
-package kvm
+package main
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package kvm
+package main
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/threefoldtech/0-core/apps/core0/helper/filesystem"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/settings"
 	"github.com/threefoldtech/0-core/base/utils"
@@ -53,7 +52,7 @@ func (m *kvmManager) flistMount(uuid, src, storage string, cfg map[string]string
 		},
 	}
 
-	if err = filesystem.MountFList(namespace, storage, src, target, onExit); err != nil {
+	if err = m.filesystem.MountFList(namespace, storage, src, target, onExit); err != nil {
 		return
 	}
 
