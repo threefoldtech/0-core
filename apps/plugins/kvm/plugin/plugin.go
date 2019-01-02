@@ -14,12 +14,12 @@ var (
 	manager kvmManager
 
 	Plugin = plugin.Plugin{
-		Name:    "corex",
+		Name:    "kvm",
 		Version: "1.0",
 		Requires: []string{
 			"socat",
 			"zfs",
-			"containers",
+			"corex",
 		},
 		Open: func(api plugin.API) error {
 			log.Debugf("initializing containers manager")

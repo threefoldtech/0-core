@@ -144,7 +144,7 @@ all:
 	for _, plugin := range l {
 		for _, req := range plugin.Requires {
 			if _, ok := m.plugins[req]; !ok {
-				log.Warning("plugin %s missing dep (%s) ... ignore", plugin, req)
+				log.Warningf("plugin %s missing dep (%s) ... ignore", plugin, req)
 				delete(m.plugins, req)
 				continue all
 			}
