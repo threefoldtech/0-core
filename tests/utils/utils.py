@@ -156,7 +156,7 @@ class BaseTest(unittest.TestCase):
 
     def deattach_all_loop_devices(self):
         self.client.bash('umount -f /dev/loop*')  # Make sure to free all loop devices first
-        self.client.bash('losetup -D') # deattach all devices
+        self.client.bash('losetup -D') # detach all devices
 
     def setup_loop_devices(self, files_names, file_size, files_loc='/var/cache', deattach=False):
         """

@@ -15,6 +15,7 @@ class DisksTests(BaseTest):
         file_names = [self.rand_str(), self.rand_str()]
         self.loop_dev_list = self.setup_loop_devices(file_names, '300M', deattach=True)
         self.lg('Mount the btrfs filesystem (Bfs1)')
+        time.sleep(1)
         self.client.btrfs.create(self.label, self.loop_dev_list, overwrite=True)
         self.mount_point = '/mnt/{}'.format(self.rand_str())
         self.client.bash('mkdir -p {}'.format(self.mount_point))
@@ -25,6 +26,7 @@ class DisksTests(BaseTest):
             file_names2 = [self.rand_str(), self.rand_str()]
             self.loop_dev_list2 = self.setup_loop_devices(file_names2, '300M', deattach=False)
             self.lg('Mount the btrfs filesystem (Bfs2)')
+            time.sleep(1)
             self.client.btrfs.create(self.label2, self.loop_dev_list2, overwrite=True)
             self.mount_point2 = '/mnt/{}'.format(self.rand_str())
             self.client.bash('mkdir -p {}'.format(self.mount_point2))
@@ -95,6 +97,7 @@ class DisksTests(BaseTest):
         self.lg('Add new loop (LD1) device')
         filename = self.rand_str()
         loop_dev_list2 = self.setup_loop_devices([filename], '500M')
+        time.sleep(1)
         self.client.btrfs.device_add(self.mount_point, loop_dev_list2[0])
         rs = self.client.btrfs.info(self.mount_point)
         self.assertEqual(rs['total_devices'], 3)
@@ -285,13 +288,14 @@ class DisksTests(BaseTest):
         filename = [self.rand_str()]
         label = self.rand_str()
         mount_point = '/mnt/{}'.format(self.rand_str())
-        self.lg('Mount disk using zos disk mount.')
+        self.lg('create loop device and put file system on it')
         loop_dev_list = self.setup_loop_devices(filename, '500M', deattach=True)
-
+        time.sleep(1)
         self.client.btrfs.create(label, loop_dev_list, overwrite=True)
 
         self.lg('Mount disk using zos disk mount')
         self.client.bash('mkdir -p {}'.format(mount_point))
+        time.sleep(1)
         self.client.disk.mount(loop_dev_list[0], mount_point, [""])
 
         self.lg('Get disk info , the mounted disk should be there.')
@@ -381,7 +385,7 @@ class DisksTests(BaseTest):
 
         **Test Scenario:**
 
-        #. Create loop device .
+        #. Create loop device.
         #. Make a partition table with type msdos for this disk, should succeed.
         #. Check disk table type from disk info ,msdos type should be there .
         #. Make primary partition for disk with 50% space of disk.
@@ -428,13 +432,17 @@ class DisksTests(BaseTest):
                 self.assertEqual(len(disk['children']), 2)
 
         self.lg('Mount partition 1 of disk  using zos disk mount with rw option , should succeed')
+        time.sleep(1)
         self.client.btrfs.create(label, ['{}p1'.format(loop_dev_list[0])], overwrite=True)
         self.client.bash('mkdir -p {}'.format(mount_point_part1))
+        time.sleep(1)
         self.client.disk.mount('{}p1'.format(loop_dev_list[0]), mount_point_part1, ["rw"])
 
         self.lg('Mount partition 2 of disk  using zos disk mount with rw option , should succeed')
+        time.sleep(1)
         self.client.btrfs.create(label, ['{}p5'.format(loop_dev_list[0])], overwrite=True)
         self.client.bash('mkdir -p {}'.format(mount_point_part2))
+        time.sleep(1)
         self.client.disk.mount('{}p5'.format(loop_dev_list[0]), mount_point_part2, ["rw"])
 
         self.lg('Get disk info, check the mounted points for two partitions.')
@@ -523,6 +531,7 @@ class DisksTests(BaseTest):
             self.client.btrfs.device_add('/mnt/'.format(self.rand_str()), d1)
 
         self.lg('Add device (D1) to the (Bfs1) mount point, should succeed')
+        time.sleep(1)
         self.client.btrfs.device_add(self.mount_point, d1)
         rs = self.client.bash('btrfs filesystem show | grep -o "loop0"')
         self.assertIn('loop0', rs.get().stdout.strip())
