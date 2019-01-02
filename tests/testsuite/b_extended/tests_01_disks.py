@@ -112,6 +112,7 @@ class DisksTests(BaseTest):
         self.lg("List the btrfs filesystems , Bfs1 shouldn't be there")
         btr_list = self.client.btrfs.list()
         btr = [i for i in btr_list if i['label'] == self.label]
+        time.sleep(1)
         self.assertEqual(btr, [])
         self.client.bash('rm -rf {}'.format(self.mount_point))
 
