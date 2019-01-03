@@ -564,8 +564,7 @@ func (m *Manager) Dispatch(id uint16, cmd *pm.Command) (*pm.JobResult, error) {
 		return nil, err
 	}
 
-	return nil, nil
-	//return m.sink.GetResult(cmd.ID, transport.ReturnExpire)
+	return m.protocol.Get(cmd.ID, 300)
 }
 
 type ContainerArguments struct {
