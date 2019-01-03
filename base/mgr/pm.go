@@ -245,6 +245,20 @@ func processArgs(args map[string]interface{}, values map[string]interface{}) {
 	}
 }
 
+func osEnvironAsMap() map[string]interface{} {
+	r := make(map[string]interface{})
+	var k, v string
+	for _, l := range os.Environ() {
+		parts := strings.SplitN(l, "=", 2)
+		if len(parts) == 2 {
+			k = parts[0]
+			v = parts[1]
+			r[k] = v
+		}
+	}
+	return r
+}
+
 /*
 RunSlice runs a slice of processes honoring dependencies. It won't just
 start in order, but will also make sure a service won't start until it's dependencies are
@@ -284,6 +298,7 @@ func RunSlice(slice settings.StartupSlice) {
 		}
 
 		processArgs(startup.Args, cmdline)
+		processArgs(startup.Args, osEnvironAsMap())
 
 		cmd := &pm.Command{
 			ID:              startup.Key(),
