@@ -245,6 +245,7 @@ func processArgs(args map[string]interface{}, values map[string]interface{}) {
 	}
 }
 
+// convert os Environ slice to map mainly to be used in processArgs for startup files
 func osEnvironAsMap() map[string]interface{} {
 	r := make(map[string]interface{})
 	var k, v string
@@ -297,8 +298,8 @@ func RunSlice(slice settings.StartupSlice) {
 			startup.Args = make(map[string]interface{})
 		}
 
-		processArgs(startup.Args, cmdline)
 		processArgs(startup.Args, osEnvironAsMap())
+		processArgs(startup.Args, cmdline)
 
 		cmd := &pm.Command{
 			ID:              startup.Key(),
