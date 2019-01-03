@@ -7,17 +7,15 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net/url"
+	"path"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
-	"path"
-
 	libvirt "github.com/libvirt/libvirt-go"
 	logging "github.com/op/go-logging"
 	"github.com/pborman/uuid"
-	"github.com/threefoldtech/0-core/apps/core0/screen"
 	"github.com/threefoldtech/0-core/apps/plugins/containers"
 	"github.com/threefoldtech/0-core/apps/plugins/socat"
 	"github.com/threefoldtech/0-core/apps/plugins/zfs"
@@ -63,7 +61,6 @@ type kvmManager struct {
 	sequence      uint16
 	sequenceMutex sync.Mutex
 	libvirt       LibvirtConnection
-	cell          *screen.RowCell
 	evch          chan map[string]interface{}
 
 	domainsInfo        map[string]*DomainInfo
@@ -85,75 +82,32 @@ var (
 )
 
 const (
-	kvmCreateCommand            = "kvm.create"
-	kvmPrepareMigrationTarget   = "kvm.prepare_migration_target"
-	kvmDestroyCommand           = "kvm.destroy"
-	kvmShutdownCommand          = "kvm.shutdown"
-	kvmRebootCommand            = "kvm.reboot"
-	kvmResetCommand             = "kvm.reset"
-	kvmPauseCommand             = "kvm.pause"
-	kvmResumeCommand            = "kvm.resume"
-	kvmInfoCommand              = "kvm.info"
-	kvmInfoPSCommand            = "kvm.infops"
-	kvmAttachDiskCommand        = "kvm.attach_disk"
-	kvmDetachDiskCommand        = "kvm.detach_disk"
-	kvmAddNicCommand            = "kvm.add_nic"
-	kvmRemoveNicCommand         = "kvm.remove_nic"
-	kvmLimitDiskIOCommand       = "kvm.limit_disk_io"
-	kvmMigrateCommand           = "kvm.migrate"
-	kvmListCommand              = "kvm.list"
-	kvmMonitorCommand           = "kvm.monitor"
-	kvmEventsCommand            = "kvm.events"
-	kvmCreateImage              = "kvm.create-image"
-	kvmConvertImage             = "kvm.convert-image"
-	kvmGetCommand               = "kvm.get"
-	kvmPortForwardAddCommand    = "kvm.portforward-add"
-	kvmPortForwardRemoveCommand = "kvm.portforward-remove"
+	kvmCreateCommand            = "create"
+	kvmPrepareMigrationTarget   = "prepare_migration_target"
+	kvmDestroyCommand           = "destroy"
+	kvmShutdownCommand          = "shutdown"
+	kvmRebootCommand            = "reboot"
+	kvmResetCommand             = "reset"
+	kvmPauseCommand             = "pause"
+	kvmResumeCommand            = "resume"
+	kvmInfoCommand              = "info"
+	kvmInfoPSCommand            = "infops"
+	kvmAttachDiskCommand        = "attach_disk"
+	kvmDetachDiskCommand        = "detach_disk"
+	kvmAddNicCommand            = "add_nic"
+	kvmRemoveNicCommand         = "remove_nic"
+	kvmLimitDiskIOCommand       = "limit_disk_io"
+	kvmMigrateCommand           = "migrate"
+	kvmListCommand              = "list"
+	kvmMonitorCommand           = "monitor"
+	kvmEventsCommand            = "events"
+	kvmCreateImage              = "create-image"
+	kvmConvertImage             = "convert-image"
+	kvmGetCommand               = "get"
+	kvmPortForwardAddCommand    = "portforward-add"
+	kvmPortForwardRemoveCommand = "portforward-remove"
 	DefaultBridgeName           = "kvm0"
 )
-
-func KVMSubsystem(conmgr containers.API, cell *screen.RowCell) error {
-	if err := libvirt.EventRegisterDefaultImpl(); err != nil {
-		return err
-	}
-
-	go func() {
-		for {
-			libvirt.EventRunDefaultImpl()
-		}
-	}()
-
-	mgr := &kvmManager{
-		container:      conmgr,
-		cell:           cell,
-		evch:           make(chan map[string]interface{}, 100), //buffer 100 event
-		domainsInfo:    make(map[string]*DomainInfo),
-		devDeleteEvent: NewSync(),
-	}
-
-	mgr.libvirt.lifeCycleHandler = mgr.domaineLifeCycleHandler
-	mgr.libvirt.deviceRemovedHandler = mgr.deviceRemovedHandler
-	mgr.libvirt.deviceRemovedFailedHandler = mgr.deviceRemovedFailedHandler
-
-	cell.Text = "Virtual Machines: 0"
-	if err := mgr.setupDefaultGateway(); err != nil {
-		return err
-	}
-	//start domains monitoring command
-	mgr.api.Run(&pm.Command{
-		ID:              kvmMonitorCommand,
-		Command:         kvmMonitorCommand,
-		RecurringPeriod: 30,
-	})
-
-	//start events command
-	mgr.api.Run(&pm.Command{
-		ID:      kvmEventsCommand,
-		Command: kvmEventsCommand,
-	})
-
-	return nil
-}
 
 type Media struct {
 	URL    string         `json:"url"`
@@ -531,35 +485,18 @@ func (m *kvmManager) getDomainInfo(uuid string) (*DomainInfo, error) {
 }
 
 func (m *kvmManager) setupDefaultGateway() error {
-	cmd := &pm.Command{
-		ID:      uuid.New(),
-		Command: "bridge.create",
-		Arguments: pm.MustArguments(
-			pm.M{
-				"name": DefaultBridgeName,
-				"network": pm.M{
-					"nat":  true,
-					"mode": "dnsmasq",
-					"settings": pm.M{
-						"cidr":  DefaultBridgeCIDR,
-						"start": IPRangeStart,
-						"end":   IPRangeEnd,
-					},
-				},
+	return m.api.Internal("bridge.create", pm.M{
+		"name": DefaultBridgeName,
+		"network": pm.M{
+			"nat":  true,
+			"mode": "dnsmasq",
+			"settings": pm.M{
+				"cidr":  DefaultBridgeCIDR,
+				"start": IPRangeStart,
+				"end":   IPRangeEnd,
 			},
-		),
-	}
-
-	job, err := m.api.Run(cmd)
-	if err != nil {
-		return err
-	}
-	result := job.Wait()
-	if result.State != pm.StateSuccess {
-		return fmt.Errorf("failed to create default container bridge: %s", result.Data)
-	}
-
-	return nil
+		},
+	}, nil)
 }
 
 func (m *kvmManager) mkNBDDisk(idx int, u *url.URL) DiskDevice {
@@ -861,20 +798,6 @@ func (m *kvmManager) setPortForwards(uuid string, seq uint16, port map[string]in
 	return nil
 }
 
-func (m *kvmManager) updateView() {
-	conn, err := m.libvirt.getConnection()
-	if err != nil {
-		return
-	}
-	domains, err := conn.ListAllDomains(libvirt.CONNECT_LIST_DOMAINS_ACTIVE | libvirt.CONNECT_LIST_DOMAINS_INACTIVE)
-	if err != nil {
-		return
-	}
-
-	m.cell.Text = fmt.Sprintf("Virtual Machines: %d", len(domains))
-	screen.Refresh()
-}
-
 func (m *kvmManager) prepareFlist(params *CreateParams, domain *Domain) error {
 	config, err := m.flistMount(domain.UUID, params.FList, params.Storage, params.Config)
 	if err != nil {
@@ -911,7 +834,6 @@ func (m *kvmManager) prepareFlist(params *CreateParams, domain *Domain) error {
 }
 
 func (m *kvmManager) create(ctx pm.Context) (uuid interface{}, err error) {
-	defer m.updateView()
 	var params CreateParams
 	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &params); err != nil {
@@ -986,7 +908,6 @@ func (m *kvmManager) create(ctx pm.Context) (uuid interface{}, err error) {
 }
 
 func (m *kvmManager) prepareMigrationTarget(ctx pm.Context) (interface{}, error) {
-	defer m.updateView()
 	var params struct {
 		NicParams
 		UUID string `json:"uuid"`
@@ -1032,7 +953,6 @@ func (m *kvmManager) destroyDomain(uuid string, domain *libvirt.Domain) error {
 }
 
 func (m *kvmManager) destroy(ctx pm.Context) (interface{}, error) {
-	defer m.updateView()
 
 	cmd := ctx.Command()
 	domain, uuid, err := m.getDomain(cmd)

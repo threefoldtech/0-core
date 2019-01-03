@@ -6,7 +6,6 @@ import (
 	"path"
 	"plugin"
 	"runtime/debug"
-	"sort"
 	"strings"
 
 	"github.com/threefoldtech/0-core/base/mgr"
@@ -14,61 +13,29 @@ import (
 	logging "github.com/op/go-logging"
 	plg "github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/utils"
 )
 
 var (
-	log = logging.MustGetLogger("pm")
+	log = logging.MustGetLogger("plugin")
 )
+
+//Plugin wrapper
+type Plugin struct {
+	*plg.Plugin
+	IsOpen bool
+}
 
 //Manager a plugin manager
 type Manager struct {
 	path    []string
-	plugins map[string]*plg.Plugin
-}
-
-type plugins []*plg.Plugin
-
-// Len is the number of elements in the collection.
-func (l plugins) Len() int {
-	return len(l)
-}
-
-// Less reports whether the element with
-// index i should sort before the element with index j.
-func (l plugins) Less(i, j int) bool {
-	pi := l[i]
-	pj := l[j]
-
-	//any one with now requirements should come first
-	if len(pi.Requires) == 0 && len(pj.Requires) == 0 {
-		//sort alphabetically
-		return strings.Compare(pi.Name, pj.Name) == -1
-	} else if len(pi.Requires) == 0 {
-		return true
-	} else if len(pj.Requires) == 0 {
-		return false
-	}
-
-	//if i is required by j, it should come first
-	if utils.InString(pj.Requires, pi.Name) {
-		return true
-	}
-
-	//other wise, j should come first
-	return false
-}
-
-// Swap swaps the elements with indexes i and j.
-func (l plugins) Swap(i, j int) {
-	l[i], l[j] = l[j], l[i]
+	plugins map[string]*Plugin
 }
 
 //New create a new plugin manager
 func New(path ...string) (*Manager, error) {
 	m := &Manager{
 		path:    path,
-		plugins: make(map[string]*plg.Plugin),
+		plugins: make(map[string]*Plugin),
 	}
 
 	return m, nil
@@ -113,7 +80,7 @@ func (m *Manager) loadPlugin(p string) (*plg.Plugin, error) {
 	return nil, fmt.Errorf("plugin symbol of wrong type: %T", sym)
 }
 
-func (m *Manager) safeOpen(pl *plg.Plugin) (err error) {
+func (m *Manager) safeOpen(pl *Plugin) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			debug.PrintStack()
@@ -126,6 +93,33 @@ func (m *Manager) safeOpen(pl *plg.Plugin) (err error) {
 	return
 }
 
+func (m *Manager) openRecursive(pl *Plugin) error {
+	if pl.IsOpen {
+		return nil
+	}
+
+	for _, req := range pl.Requires {
+		if _, ok := m.plugins[req]; !ok {
+			return fmt.Errorf("plugin %s missing dep (%s)")
+		}
+
+		if err := m.openRecursive(m.plugins[req]); err != nil {
+			return err
+		}
+	}
+
+	if pl.Open != nil {
+		if err := m.safeOpen(pl); err != nil {
+			return err
+		}
+	}
+
+	pl.IsOpen = true
+	log.Infof("plugin %s loaded", pl.Name)
+
+	return nil
+}
+
 func (m *Manager) Load() error {
 	for _, p := range m.path {
 		if err := m.loadPath(p); err != nil {
@@ -133,31 +127,14 @@ func (m *Manager) Load() error {
 		}
 	}
 
-	l := make(plugins, 0, len(m.plugins))
+	var errored []string
 
-	for _, p := range m.plugins {
-		l = append(l, p)
-	}
-
-	sort.Sort(l)
-all:
-	for _, plugin := range l {
-		for _, req := range plugin.Requires {
-			if _, ok := m.plugins[req]; !ok {
-				log.Warningf("plugin %s missing dep (%s) ... ignore", plugin, req)
-				delete(m.plugins, req)
-				continue all
-			}
+	for _, plugin := range m.plugins {
+		if err := m.openRecursive(plugin); err != nil {
+			log.Errorf("failed to initialize plugin %s: %s", plugin.Name, err)
+			errored = append(errored, plugin.Name)
+			continue
 		}
-
-		if plugin.Open != nil {
-			if err := m.safeOpen(plugin); err != nil {
-				log.Errorf("failed to initialize plugin %s: %s", plugin.Name, err)
-				continue
-			}
-		}
-
-		log.Infof("plugin %s loaded", plugin.Name)
 
 		if plugin.API != nil {
 			//if the plugin api implement any
@@ -176,6 +153,10 @@ all:
 			log.Infof("register %s as a handler", plugin)
 			mgr.AddHandle(api)
 		}
+	}
+
+	for _, bad := range errored {
+		delete(m.plugins, bad)
 	}
 
 	return nil
@@ -202,7 +183,7 @@ func (m *Manager) loadPath(p string) error {
 			return err
 		}
 
-		m.plugins[plugin.Name] = plugin
+		m.plugins[plugin.Name] = &Plugin{Plugin: plugin}
 	}
 
 	return nil

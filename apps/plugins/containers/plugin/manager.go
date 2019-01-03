@@ -11,16 +11,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/threefoldtech/0-core/apps/plugins/protocol"
-
-	"github.com/threefoldtech/0-core/apps/plugins/cgroup"
-	"github.com/threefoldtech/0-core/apps/plugins/socat"
-	"github.com/threefoldtech/0-core/apps/plugins/zfs"
-
-	"github.com/threefoldtech/0-core/base/plugin"
-
 	"github.com/pborman/uuid"
 	"github.com/threefoldtech/0-core/apps/core0/screen"
+	"github.com/threefoldtech/0-core/apps/plugins/cgroup"
+	"github.com/threefoldtech/0-core/apps/plugins/containers"
+	"github.com/threefoldtech/0-core/apps/plugins/protocol"
+	"github.com/threefoldtech/0-core/apps/plugins/socat"
+	"github.com/threefoldtech/0-core/apps/plugins/zfs"
+	"github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/settings"
 	"github.com/threefoldtech/0-core/base/utils"
@@ -248,11 +246,6 @@ TODO:
 	to run it.
 */
 
-type Container interface {
-	ID() uint16
-	Arguments() ContainerCreateArguments
-}
-
 func (m *Manager) setUpCGroups() error {
 	devices, err := m.cgroup.GetGroup(DevicesCGroup.Subsystem(), DevicesCGroup.Name())
 	if err != nil {
@@ -412,7 +405,7 @@ func (m *Manager) nicRemove(ctx pm.Context) (interface{}, error) {
 		return nil, container.unLink(args.Index, nic)
 	}
 
-	var ovs Container
+	var ovs containers.Container
 	if nic.Type == "vlan" || nic.Type == "vxlan" {
 		ovs = m.GetOneWithTags("ovs")
 	}
@@ -486,7 +479,7 @@ func (m *Manager) create(ctx pm.Context) (interface{}, error) {
 
 type ContainerInfo struct {
 	pm.ProcessStats
-	Container Container `json:"container"`
+	Container containers.Container `json:"container"`
 }
 
 func (m *Manager) list(ctx pm.Context) (interface{}, error) {
@@ -633,11 +626,11 @@ func (m *Manager) find(ctx pm.Context) (interface{}, error) {
 	return result, nil
 }
 
-func (m *Manager) GetWithTags(tags ...string) []Container {
+func (m *Manager) GetWithTags(tags ...string) []containers.Container {
 	m.conM.RLock()
 	defer m.conM.RUnlock()
 
-	var result []Container
+	var result []containers.Container
 loop:
 	for _, c := range m.containers {
 		for _, tag := range tags {
@@ -651,7 +644,7 @@ loop:
 	return result
 }
 
-func (m *Manager) GetOneWithTags(tags ...string) Container {
+func (m *Manager) GetOneWithTags(tags ...string) containers.Container {
 	result := m.GetWithTags(tags...)
 	if len(result) > 0 {
 		return result[0]
@@ -660,7 +653,7 @@ func (m *Manager) GetOneWithTags(tags ...string) Container {
 	return nil
 }
 
-func (m *Manager) Of(id uint16) Container {
+func (m *Manager) Of(id uint16) containers.Container {
 	m.conM.RLock()
 	defer m.conM.RUnlock()
 	cont, _ := m.containers[id]

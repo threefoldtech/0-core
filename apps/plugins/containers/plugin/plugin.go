@@ -5,6 +5,7 @@ import (
 
 	logging "github.com/op/go-logging"
 	"github.com/threefoldtech/0-core/apps/plugins/cgroup"
+	"github.com/threefoldtech/0-core/apps/plugins/containers"
 	"github.com/threefoldtech/0-core/apps/plugins/protocol"
 	"github.com/threefoldtech/0-core/apps/plugins/socat"
 	"github.com/threefoldtech/0-core/apps/plugins/zfs"
@@ -16,6 +17,7 @@ var (
 	log = logging.MustGetLogger("containers")
 
 	manager Manager
+	_       containers.API = (*Manager)(nil)
 
 	Plugin = plugin.Plugin{
 		Name:    "corex",
@@ -27,6 +29,9 @@ var (
 			"zfs",
 			"protocol",
 			"logger",
+		},
+		API: func() interface{} {
+			return &manager
 		},
 		Open: func(api plugin.API) error {
 			log.Debugf("initializing containers manager")

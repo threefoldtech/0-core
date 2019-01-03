@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"time"
 
+	libvirt "github.com/libvirt/libvirt-go"
 	"github.com/threefoldtech/0-core/apps/plugins/containers"
 	"github.com/threefoldtech/0-core/apps/plugins/socat"
 	"github.com/threefoldtech/0-core/apps/plugins/zfs"
@@ -17,6 +19,7 @@ var (
 		Name:    "kvm",
 		Version: "1.0",
 		Requires: []string{
+			"bridge",
 			"socat",
 			"zfs",
 			"corex",
@@ -61,6 +64,10 @@ func main() {}
 
 func iniManager(mgr *kvmManager, api plugin.API) error {
 	mgr.api = api
+	mgr.evch = make(chan map[string]interface{}, 100)
+	mgr.domainsInfo = make(map[string]*DomainInfo)
+	mgr.devDeleteEvent = NewSync()
+
 	var ok bool
 	if api, err := api.Plugin("socat"); err == nil {
 		if mgr.socat, ok = api.(socat.API); !ok {
@@ -78,20 +85,46 @@ func iniManager(mgr *kvmManager, api plugin.API) error {
 		return err
 	}
 
-	// if api, err := api.Plugin("logger"); err == nil {
-	// 	if mgr.logger, ok = api.(pm.MessageHandler); !ok {
-	// 		return fmt.Errorf("invalid logger api")
-	// 	}
-	// } else {
-	// 	return err
-	// }
-
-	if api, err := api.Plugin("containers"); err == nil {
+	if api, err := api.Plugin("corex"); err == nil {
 		if mgr.container, ok = api.(containers.API); !ok {
 			return fmt.Errorf("invalid containers api")
 		}
 	} else {
 		return err
 	}
+
+	if err := libvirt.EventRegisterDefaultImpl(); err != nil {
+		return err
+	}
+
+	go func() {
+		for {
+			if err := libvirt.EventRunDefaultImpl(); err != nil {
+				log.Warningf("failed to register to kvm events, trying again ...")
+				<-time.After(2 * time.Second)
+			}
+		}
+	}()
+
+	mgr.libvirt.lifeCycleHandler = mgr.domaineLifeCycleHandler
+	mgr.libvirt.deviceRemovedHandler = mgr.deviceRemovedHandler
+	mgr.libvirt.deviceRemovedFailedHandler = mgr.deviceRemovedFailedHandler
+
+	if err := mgr.setupDefaultGateway(); err != nil {
+		return err
+	}
+	//start domains monitoring command
+	mgr.api.Run(&pm.Command{
+		ID:              "kvm.monitor",
+		Command:         "kvm.monitor",
+		RecurringPeriod: 30,
+	})
+
+	//start events command
+	mgr.api.Run(&pm.Command{
+		ID:      "kvm.events",
+		Command: "kvm.events",
+	})
+
 	return nil
 }

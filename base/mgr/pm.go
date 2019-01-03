@@ -27,7 +27,7 @@ var (
 
 //PM is the main r manager.
 var (
-	log = logging.MustGetLogger("pm")
+	log = logging.MustGetLogger("manager")
 
 	once     sync.Once
 	jobs     map[string]*jobImb

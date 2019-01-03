@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
+	"github.com/threefoldtech/0-core/apps/plugins/containers"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/vishvananda/netlink"
 )
@@ -273,7 +274,7 @@ func (c *container) postLink(dev string, index int, n *Nic) error {
 	return c.setupLink(name, dev, index, n)
 }
 
-func (c *container) preBridge(index int, bridge string, n *Nic, ovs Container) error {
+func (c *container) preBridge(index int, bridge string, n *Nic, ovs containers.Container) error {
 	link, err := netlink.LinkByName(bridge)
 	if err != nil {
 		return pm.NotFoundError(fmt.Errorf("bridge '%s' not found: %s", bridge, err))
@@ -727,7 +728,7 @@ func (c *container) unLink(idx int, n *Nic) error {
 	return nil
 }
 
-func (c *container) unBridge(idx int, n *Nic, ovs Container) error {
+func (c *container) unBridge(idx int, n *Nic, ovs containers.Container) error {
 	var name string
 	if n.Monitor {
 		name = fmt.Sprintf(containerMonitoredLinkNameFmt, c.id, idx)

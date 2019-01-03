@@ -86,9 +86,9 @@ func (process *internalProcess) Run() (<-chan *stream.Message, error) {
 	go func(channel chan *stream.Message) {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Errorf("panic: %v", err)
-				debug.PrintStack()
-				m, _ := json.Marshal(fmt.Sprintf("%v", err))
+				stack := debug.Stack()
+				log.Errorf("panic: %v\n%v", err, string(stack))
+				m, _ := json.Marshal(fmt.Sprintf("%v\n%s", err, string(stack)))
 				channel <- &stream.Message{
 					Meta:    stream.NewMetaWithCode(http.StatusInternalServerError, pm.LevelResultJSON, stream.ExitErrorFlag),
 					Message: string(m),

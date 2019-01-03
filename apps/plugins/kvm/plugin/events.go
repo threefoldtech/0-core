@@ -32,7 +32,6 @@ func (m *kvmManager) handleStopped(uuid, name string, domain *libvirt.Domain) er
 		an flist or not. One approach is to keep in memory description of the machine that needs
 		clean up. Or simply try to unmount the expected target by default, and hide unmount errors
 	*/
-	defer m.updateView()
 	m.domainsInfoRWMutex.Lock()
 	delete(m.domainsInfo, uuid)
 	m.domainsInfoRWMutex.Unlock()
