@@ -248,13 +248,10 @@ func processArgs(args map[string]interface{}, values map[string]interface{}) {
 // convert os Environ slice to map mainly to be used in processArgs for startup files
 func osEnvironAsMap() map[string]interface{} {
 	r := make(map[string]interface{})
-	var k, v string
 	for _, l := range os.Environ() {
 		parts := strings.SplitN(l, "=", 2)
 		if len(parts) == 2 {
-			k = parts[0]
-			v = parts[1]
-			r[k] = v
+			r[parts[0]] = parts[1]
 		}
 	}
 	return r
