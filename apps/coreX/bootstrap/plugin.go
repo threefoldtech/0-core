@@ -1,6 +1,5 @@
 package bootstrap
 
-/*
 import (
 	"fmt"
 	"strings"
@@ -37,27 +36,6 @@ func (p *pluginPreProcessor) Pre(cmd *pm.Command) {
 	}
 }
 
-func (b *Bootstrap) pluginFactory(plugin *Plugin, fn string) pm.ProcessFactory {
-	return func(table mgr.PIDTable, srcCmd *pm.Command) pm.Process {
-		cmd := &pm.Command{
-			ID: srcCmd.ID,
-			Arguments: pm.MustArguments(pm.SystemCommandArguments{
-				Name: plugin.Path,
-				Args: []string{fn, string(*srcCmd.Arguments)},
-			}),
-			Queue:           srcCmd.Queue,
-			StatsInterval:   srcCmd.StatsInterval,
-			MaxTime:         srcCmd.MaxTime,
-			MaxRestart:      srcCmd.MaxRestart,
-			RecurringPeriod: srcCmd.RecurringPeriod,
-			LogLevels:       srcCmd.LogLevels,
-			Tags:            srcCmd.Tags,
-		}
-
-		return mgr.NewSystemProcess(table, cmd)
-	}
-}
-
 func (b *Bootstrap) plugin(domain string, plugin Plugin) {
 	if plugin.Queue {
 		//if plugin requires queuing we make sure when a command is pushed (from a cient)
@@ -67,7 +45,7 @@ func (b *Bootstrap) plugin(domain string, plugin Plugin) {
 
 	for _, export := range plugin.Exports {
 		cmd := fmt.Sprintf("%s.%s", domain, export)
-		mgr.Register(cmd, b.pluginFactory(&plugin, export))
+		mgr.RegisterExtension(cmd, plugin.Path, "", []string{export, "{}"}, nil)
 	}
 }
 
@@ -83,4 +61,3 @@ func (b *Bootstrap) plugins() error {
 
 	return nil
 }
-*/

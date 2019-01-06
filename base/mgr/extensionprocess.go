@@ -42,7 +42,12 @@ func extensionProcessFactory(exe string, dir string, args []string, env map[stri
 		}
 
 		for _, arg := range args {
-			sysargs.Args = append(sysargs.Args, utils.Format(arg, input))
+			if arg == "{}" {
+				//global replace for the entire arguments string as is
+				sysargs.Args = append(sysargs.Args, string(*cmd.Arguments))
+			} else {
+				sysargs.Args = append(sysargs.Args, utils.Format(arg, input))
+			}
 		}
 
 		extcmd := &pm.Command{

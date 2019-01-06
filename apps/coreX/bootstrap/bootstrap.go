@@ -177,9 +177,9 @@ func (b *Bootstrap) Bootstrap(hostname string) error {
 
 	log.Debugf("startup services")
 
-	// if err := b.plugins(); err != nil {
-	// 	log.Errorf("failed to load plugins: %s", err)
-	// }
+	if err := b.plugins(); err != nil {
+		log.Errorf("failed to load plugins: %s", err)
+	}
 
 	if err := b.startup(); err != nil {
 		log.Errorf("failed to startup container services: %s", err)
