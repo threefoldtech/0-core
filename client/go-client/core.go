@@ -56,7 +56,7 @@ type CoreManager interface {
 	System(cmd string, env map[string]string, cwd string, stdin string, opt ...Option) (JobId, error)
 	SystemArgs(cmd string, args []string, env map[string]string, cwd string, stdin string, opt ...Option) (JobId, error)
 	Bash(bash string, stdin string, opt ...Option) (JobId, error)
-	Ping() error
+	Ping() (string, error)
 	Jobs() ([]Job, error)
 	Job(job JobId) (*Job, error)
 	KillJob(job JobId, signal syscall.Signal) error
@@ -110,9 +110,18 @@ func (s *coreMgr) Bash(bash, stdin string, opt ...Option) (JobId, error) {
 	}, opt...)
 }
 
-func (s *coreMgr) Ping() error {
-	_, err := sync(s.cl, "core.ping", A{})
-	return err
+func (s *coreMgr) Ping() (string, error) {
+	res, err := sync(s.cl, "core.ping", A{})
+	if err != nil {
+		return "", err
+	}
+
+	var out string
+	if err := res.Json(&out); err != nil {
+		return "", err
+	}
+
+	return out, err
 }
 
 func (s *coreMgr) Jobs() ([]Job, error) {

@@ -1,16 +1,16 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/codegangsta/cli"
-	"github.com/olekukonko/tablewriter"
-	"github.com/threefoldtech/0-core/base/pm"
-	"gopkg.in/yaml.v2"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/codegangsta/cli"
+	"github.com/olekukonko/tablewriter"
+	client "github.com/threefoldtech/0-core/client/go-client"
+	"gopkg.in/yaml.v2"
 )
 
 type containerData struct {
@@ -25,30 +25,18 @@ type containerData struct {
 	} `json:"container"`
 }
 
-func containers(t Transport, c *cli.Context) {
+func containers(t client.Client, c *cli.Context) {
 	var tags []string
 	if c.Args().Present() {
 		tags = append(tags, c.Args().First())
 		tags = append(tags, c.Args().Tail()...)
 	}
 
-	response, err := t.Run(Command{
-		Sync: true,
-		Content: pm.Command{
-			Command: "corex.find",
-			Arguments: pm.MustArguments(M{
-				"tags": tags,
-			}),
-		},
-	})
+	cont := client.Container(t)
+
+	containers, err := cont.List(tags...)
 
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	response.ValidateResultOrExit()
-	var containers map[string]containerData
-	if err := json.Unmarshal([]byte(response.Data), &containers); err != nil {
 		log.Fatal(err)
 	}
 
@@ -58,16 +46,14 @@ func containers(t Transport, c *cli.Context) {
 	table.SetHeader([]string{"ID", "FLIST", "HOSTNAME", "TAGS"})
 	ids := make([]int, 0, len(containers))
 	for id := range containers {
-		iid, _ := strconv.ParseInt(id, 10, 32)
-		ids = append(ids, int(iid))
+		ids = append(ids, int(id))
 	}
 	sort.Ints(ids)
 
 	for _, id := range ids {
-		sid := fmt.Sprintf("%d", id)
-		container := containers[sid]
+		container := containers[int16(id)]
 		table.Append([]string{
-			sid,
+			fmt.Sprint(id),
 			container.Container.Arguments.Root,
 			container.Container.Arguments.Hostname,
 			strings.Join(container.Container.Arguments.Tags, ", "),
@@ -77,31 +63,25 @@ func containers(t Transport, c *cli.Context) {
 	table.Render()
 }
 
-func containerInspect(t Transport, c *cli.Context) {
-	id := c.Args().First()
-	if id == "" {
+func containerInspect(t client.Client, c *cli.Context) {
+	idstr := c.Args().First()
+	if idstr == "" {
 		log.Fatal("missing container id")
 	}
+	id, err := strconv.ParseInt(idstr, 10, 16)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	response, err := t.Run(Command{
-		Sync: true,
-		Content: pm.Command{
-			Command:   "corex.list",
-			Arguments: pm.MustArguments(M{}),
-		},
-	})
+	cont := client.Container(t)
+
+	containers, err := cont.List()
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	response.ValidateResultOrExit()
-	var containers map[string]interface{}
-	if err := json.Unmarshal([]byte(response.Data), &containers); err != nil {
-		log.Fatal(err)
-	}
-
-	container, ok := containers[id]
+	container, ok := containers[int16(id)]
 	if !ok {
 		log.Fatalf("no container with id: %s", id)
 	}

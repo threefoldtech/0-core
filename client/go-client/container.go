@@ -40,7 +40,7 @@ type ContainerResult struct {
 
 type ContainerManager interface {
 	Client(id int) Client
-	List() (map[int16]ContainerResult, error)
+	List(tags ...string) (map[int16]ContainerResult, error)
 }
 
 type containerMgr struct {
@@ -58,8 +58,8 @@ func (c *containerMgr) Client(id int) Client {
 	}
 }
 
-func (c *containerMgr) List() (map[int16]ContainerResult, error) {
-	r, err := sync(c.client, "corex.list", A{})
+func (c *containerMgr) List(tags ...string) (map[int16]ContainerResult, error) {
+	r, err := sync(c.client, "corex.find", A{"tags": tags})
 	if err != nil {
 		return nil, err
 	}

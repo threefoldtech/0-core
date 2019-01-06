@@ -2,45 +2,22 @@ package main
 
 import (
 	"github.com/codegangsta/cli"
-	"github.com/threefoldtech/0-core/base/pm"
+	client "github.com/threefoldtech/0-core/client/go-client"
 )
 
-func jobs(t Transport, c *cli.Context) {
-	response, err := t.Run(Command{
-		Sync: true,
-		Content: pm.Command{
-			Command:   "job.list",
-			Arguments: pm.MustArguments(M{}),
-		},
-	})
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	response.ValidateResultOrExit()
-	response.PrintYaml()
+func jobs(t client.Client, c *cli.Context) {
+	core := client.Core(t)
+	PrintOrDie(core.Jobs())
 }
 
-func jobKill(t Transport, c *cli.Context) {
+func jobKill(t client.Client, c *cli.Context) {
+	core := client.Core(t)
 	id := c.Args().First()
 	if id == "" {
 		log.Fatal("wrong usage")
 	}
 
-	response, err := t.Run(Command{
-		Sync: true,
-		Content: pm.Command{
-			Command: "job.kill",
-			Arguments: pm.MustArguments(M{
-				"id": id,
-			}),
-		},
-	})
-
-	if err != nil {
+	if err := core.KillJob(client.JobId(id), 0); err != nil {
 		log.Fatal(err)
 	}
-
-	response.ValidateResultOrExit()
 }

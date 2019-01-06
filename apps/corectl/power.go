@@ -2,37 +2,19 @@ package main
 
 import (
 	"github.com/codegangsta/cli"
-	"github.com/threefoldtech/0-core/base/pm"
+	client "github.com/threefoldtech/0-core/client/go-client"
 )
 
-func reboot(t Transport, c *cli.Context) {
-	response, err := t.Run(Command{
-		Sync: true,
-		Content: pm.Command{
-			Command: "core.reboot",
-		},
-	})
-
-	if err != nil {
+func reboot(t client.Client, c *cli.Context) {
+	power := client.Power(t)
+	if err := power.Reboot(); err != nil {
 		log.Fatal(err)
 	}
-
-	//you probably won't reach here but let's assume you did
-	response.ValidateResultOrExit()
 }
 
-func poweroff(t Transport, c *cli.Context) {
-	response, err := t.Run(Command{
-		Sync: true,
-		Content: pm.Command{
-			Command: "core.poweroff",
-		},
-	})
-
-	if err != nil {
+func poweroff(t client.Client, c *cli.Context) {
+	power := client.Power(t)
+	if err := power.PowerOff(); err != nil {
 		log.Fatal(err)
 	}
-
-	//you probably won't reach here but let's assume you did
-	response.ValidateResultOrExit()
 }

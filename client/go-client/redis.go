@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/url"
+	"regexp"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
@@ -16,6 +18,10 @@ const (
 
 	ResultNoTimeout      = 0
 	ResultDefaultTimeout = 10
+)
+
+var (
+	schemaRegex = regexp.MustCompile(`^(unix|tcp)(\+ssl)?`)
 )
 
 type redisClient struct {
@@ -31,17 +37,63 @@ func NewClientWithPool(pool *redis.Pool) Client {
 	return cl
 }
 
-func NewPool(address, password string) *redis.Pool {
+type options struct {
+	Network string
+	SSL     bool
+	Address string
+}
+
+func parseAddress(address string) (options, error) {
+	u, err := url.Parse(address)
+	if err != nil {
+		return options{}, err
+	}
+	scheme := u.Scheme
+	if len(scheme) == 0 {
+		scheme = "tcp"
+	}
+
+	parsed := schemaRegex.FindStringSubmatch(scheme)
+	if len(parsed) == 0 {
+		return options{}, fmt.Errorf("invalid address scheme '%s'", scheme)
+	}
+	switch parsed[1] {
+	case "tcp":
+		address = u.Host
+	case "unix":
+		address = u.Path
+	}
+
+	return options{
+		Network: parsed[1],
+		SSL:     parsed[2] == "+ssl",
+		Address: address,
+	}, nil
+}
+
+func NewPool(address, password string) (*redis.Pool, error) {
+	o, err := parseAddress(address)
+	if err != nil {
+		return nil, err
+	}
+
+	var opts []redis.DialOption
+	if o.SSL {
+		opts = append(opts,
+			redis.DialNetDial(func(network, address string) (net.Conn, error) {
+				return tls.Dial(network, address, &tls.Config{
+					InsecureSkipVerify: true,
+				})
+			}),
+		)
+	}
+
 	return &redis.Pool{
 		MaxIdle:     5,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
 			// the redis protocol should probably be made sett-able
-			c, err := redis.Dial("tcp", address, redis.DialNetDial(func(network, address string) (net.Conn, error) {
-				return tls.Dial(network, address, &tls.Config{
-					InsecureSkipVerify: true,
-				})
-			}))
+			c, err := redis.Dial(o.Network, o.Address, opts...)
 
 			if err != nil {
 				return nil, err
@@ -68,12 +120,15 @@ func NewPool(address, password string) *redis.Pool {
 			}
 			return nil
 		},
-	}
+	}, nil
 }
 
-func NewClient(address, password string) Client {
-	pool := NewPool(address, password)
-	return NewClientWithPool(pool)
+func NewClient(address, password string) (Client, error) {
+	pool, err := NewPool(address, password)
+	if err != nil {
+		return nil, err
+	}
+	return NewClientWithPool(pool), nil
 }
 
 func (c *redisClient) Raw(name string, args A, opts ...Option) (JobId, error) {
