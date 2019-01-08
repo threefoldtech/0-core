@@ -187,6 +187,6 @@ func main() {
 	screen.Push(row)
 	bs.Second()
 	screen.Refresh()
-
+	log.Info("System ready")
 	select {}
 }
