@@ -23,6 +23,7 @@ var (
 			"device_add":      manager.DeviceAdd,
 			"device_remove":   manager.DeviceRemove,
 			"subvol_create":   manager.SubvolCreate,
+			"subvol_delete":   manager.SubvolDelete,
 			"subvol_quota":    manager.SubvolQuota,
 			"subvol_list":     manager.SubvolList,
 			"subvol_snapshot": manager.SubvolSnapshot,
