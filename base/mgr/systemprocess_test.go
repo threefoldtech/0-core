@@ -9,7 +9,7 @@ import (
 )
 
 func TestSystemProcess_Run(t *testing.T) {
-	ps := NewSystemProcess(&TestingPIDTable{}, &pm.Command{
+	ps := newSystemProcess(&TestingPIDTable{}, &pm.Command{
 		Arguments: pm.MustArguments(
 			pm.SystemCommandArguments{
 				Name: "echo",
@@ -42,7 +42,7 @@ func TestSystemProcess_Run(t *testing.T) {
 }
 
 func TestSystemProcess_RunStderr(t *testing.T) {
-	ps := NewSystemProcess(&TestingPIDTable{}, &pm.Command{
+	ps := newSystemProcess(&TestingPIDTable{}, &pm.Command{
 		Arguments: pm.MustArguments(
 			pm.SystemCommandArguments{
 				Name: "sh",
@@ -79,7 +79,7 @@ func TestSystemProcess_RunStderr(t *testing.T) {
 }
 
 func TestSystemProcess_RunStdin(t *testing.T) {
-	ps := NewSystemProcess(&TestingPIDTable{}, &pm.Command{
+	ps := newSystemProcess(&TestingPIDTable{}, &pm.Command{
 		Arguments: pm.MustArguments(
 			pm.SystemCommandArguments{
 				Name:  "cat",

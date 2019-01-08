@@ -100,7 +100,7 @@ func (m *Manager) openRecursive(pl *Plugin) error {
 
 	for _, req := range pl.Requires {
 		if _, ok := m.plugins[req]; !ok {
-			return fmt.Errorf("plugin %s missing dep (%s)")
+			return fmt.Errorf("plugin %s missing dep (%s)", pl.Name, req)
 		}
 
 		if err := m.openRecursive(m.plugins[req]); err != nil {

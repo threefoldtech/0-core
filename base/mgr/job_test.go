@@ -1,4 +1,4 @@
-package pm
+package mgr
 
 import (
 	"fmt"
@@ -6,32 +6,33 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngaut/log"
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/stream"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestJob(t *testing.T) {
+func TestMain(m *testing.M) {
 	New()
-
+}
+func TestJob(t *testing.T) {
 	stdin := "hello world"
-	cmd := Command{
-		Command: CommandSystem,
-		Arguments: MustArguments(
-			SystemCommandArguments{
+	cmd := pm.Command{
+		Command: pm.CommandSystem,
+		Arguments: pm.MustArguments(
+			pm.SystemCommandArguments{
 				Name:  "cat",
 				StdIn: stdin,
 			},
 		),
 	}
 
-	job := newTestJob(&cmd, NewSystemProcess)
+	job := newTestJob(&cmd, newSystemProcess)
 
 	job.start(false)
 
 	result := job.Wait()
-	if ok := assert.Equal(t, StateSuccess, result.State); !ok {
+	if ok := assert.Equal(t, pm.StateSuccess, result.State); !ok {
 		t.Error()
 	}
 
@@ -41,15 +42,14 @@ func TestJob(t *testing.T) {
 }
 
 func TestJobMaxRestart(t *testing.T) {
-	New()
 
 	var counter int
-	var action = func(cmd *Command) (interface{}, error) {
+	var action = func(ctx pm.Context) (interface{}, error) {
 		counter++
 		return nil, fmt.Errorf("error")
 	}
 
-	cmd := Command{
+	cmd := pm.Command{
 		MaxRestart: 3,
 	}
 
@@ -58,7 +58,7 @@ func TestJobMaxRestart(t *testing.T) {
 	job.start(false)
 
 	result := job.Wait()
-	if ok := assert.Equal(t, StateError, result.State); !ok {
+	if ok := assert.Equal(t, pm.StateError, result.State); !ok {
 		t.Error()
 	}
 
@@ -68,19 +68,18 @@ func TestJobMaxRestart(t *testing.T) {
 }
 
 func TestJobMessages(t *testing.T) {
-	New()
 
-	var action = func(ctx *Context) (interface{}, error) {
-		ctx.Log("debug message", stream.LevelDebug)
-		ctx.Log("stdout message", stream.LevelStdout)
-		ctx.Log("stderr message", stream.LevelStderr)
+	var action = func(ctx pm.Context) (interface{}, error) {
+		ctx.Log("debug message", pm.LevelDebug)
+		ctx.Log("stdout message", pm.LevelStdout)
+		ctx.Log("stderr message", pm.LevelStderr)
 
 		return "result data", nil
 	}
 
-	cmd := Command{}
+	cmd := pm.Command{}
 
-	job := newTestJob(&cmd, NewInternalProcessWithCtx(action))
+	job := newTestJob(&cmd, NewInternalProcess(action))
 
 	var logs []*stream.Message
 	var subscriber = func(msg *stream.Message) {
@@ -92,7 +91,7 @@ func TestJobMessages(t *testing.T) {
 
 	log.Info("waiting for command to exit")
 	result := job.Wait()
-	if ok := assert.Equal(t, StateSuccess, result.State); !ok {
+	if ok := assert.Equal(t, pm.StateSuccess, result.State); !ok {
 		t.Error()
 	}
 
@@ -122,12 +121,11 @@ func TestJobMessages(t *testing.T) {
 }
 
 func TestJobTimeout(t *testing.T) {
-	New()
 
-	cmd := Command{
-		Command: CommandSystem,
-		Arguments: MustArguments(
-			SystemCommandArguments{
+	cmd := pm.Command{
+		Command: pm.CommandSystem,
+		Arguments: pm.MustArguments(
+			pm.SystemCommandArguments{
 				Name: "sleep",
 				Args: []string{"10s"},
 			},
@@ -135,29 +133,28 @@ func TestJobTimeout(t *testing.T) {
 		MaxTime: 1,
 	}
 
-	job := newTestJob(&cmd, NewSystemProcess)
+	job := newTestJob(&cmd, newSystemProcess)
 
 	job.start(false)
 
 	result := job.Wait()
-	if ok := assert.Equal(t, StateTimeout, result.State); !ok {
+	if ok := assert.Equal(t, pm.StateTimeout, result.State); !ok {
 		t.Error()
 	}
 }
 func TestJobSignal(t *testing.T) {
-	New()
 
-	cmd := Command{
-		Command: CommandSystem,
-		Arguments: MustArguments(
-			SystemCommandArguments{
+	cmd := pm.Command{
+		Command: pm.CommandSystem,
+		Arguments: pm.MustArguments(
+			pm.SystemCommandArguments{
 				Name: "sleep",
 				Args: []string{"10s"},
 			},
 		),
 	}
 
-	job := newTestJob(&cmd, NewSystemProcess)
+	job := newTestJob(&cmd, newSystemProcess)
 
 	go func() {
 		time.Sleep(time.Second)
@@ -167,21 +164,19 @@ func TestJobSignal(t *testing.T) {
 	job.start(false)
 
 	result := job.Wait()
-	if ok := assert.Equal(t, StateError, result.State); !ok {
+	if ok := assert.Equal(t, pm.StateError, result.State); !ok {
 		t.Error()
 	}
 }
 
 func TestJobMaxRecurring(t *testing.T) {
-	New()
-
 	var counter int
-	var action = func(cmd *Command) (interface{}, error) {
+	var action = func(ctx pm.Context) (interface{}, error) {
 		counter++
 		return nil, nil
 	}
 
-	cmd := Command{
+	cmd := pm.Command{
 		RecurringPeriod: 1,
 	}
 
@@ -195,7 +190,7 @@ func TestJobMaxRecurring(t *testing.T) {
 	job.start(false)
 
 	result := job.Wait()
-	if ok := assert.Equal(t, StateSuccess, result.State); !ok {
+	if ok := assert.Equal(t, pm.StateSuccess, result.State); !ok {
 		t.Error()
 	}
 
@@ -206,12 +201,11 @@ func TestJobMaxRecurring(t *testing.T) {
 
 func TestJobHooks(t *testing.T) {
 	t.Skip()
-	New()
 
-	cmd := Command{
-		Command: CommandSystem,
-		Arguments: MustArguments(
-			SystemCommandArguments{
+	cmd := pm.Command{
+		Command: pm.CommandSystem,
+		Arguments: pm.MustArguments(
+			pm.SystemCommandArguments{
 				Name: "sleep",
 				Args: []string{"2s"},
 			},
@@ -231,18 +225,18 @@ func TestJobHooks(t *testing.T) {
 		pidCalled = true
 	}
 
-	hooks := []RunnerHook{
-		&DelayHook{Delay: time.Second, Action: delay},
-		&ExitHook{Action: exit},
-		&PIDHook{Action: pid},
+	hooks := []pm.RunnerHook{
+		&pm.DelayHook{Delay: time.Second, Action: delay},
+		&pm.ExitHook{Action: exit},
+		&pm.PIDHook{Action: pid},
 	}
 
-	job := newTestJob(&cmd, NewSystemProcess, hooks...)
+	job := newTestJob(&cmd, newSystemProcess, hooks...)
 
 	job.start(false)
 
 	result := job.Wait()
-	if ok := assert.Equal(t, StateSuccess, result.State); !ok {
+	if ok := assert.Equal(t, pm.StateSuccess, result.State); !ok {
 		t.Error()
 	}
 

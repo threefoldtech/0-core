@@ -2,6 +2,7 @@ package mgr
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/threefoldtech/0-core/base/pm"
@@ -169,7 +170,7 @@ func TestBuiltInProcessRecover(t *testing.T) {
 		t.Fatal()
 	}
 
-	if ok := assert.Equal(t, `"i paniced"`, msg.Message); !ok {
+	if ok := assert.True(t, strings.HasPrefix(msg.Message, `"i paniced`)); !ok {
 		t.Fatal()
 	}
 }
