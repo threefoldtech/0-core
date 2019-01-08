@@ -14,8 +14,8 @@ import (
 
 	"path"
 
-	"github.com/libvirt/libvirt-go"
-	"github.com/op/go-logging"
+	libvirt "github.com/libvirt/libvirt-go"
+	logging "github.com/op/go-logging"
 	"github.com/pborman/uuid"
 	"github.com/threefoldtech/0-core/apps/core0/helper/filesystem"
 	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
@@ -854,9 +854,7 @@ func (m *kvmManager) mkDomain(seq uint16, params *CreateParams) (*Domain, error)
 	}
 
 	if params.KVM == true {
-		domain.CPU = &CPU{
-			Mode: CPUModeHostModel,
-		}
+		domain.Qemu.Args = append(domain.Qemu.Args, QemuArg{Value: "-cpu"}, QemuArg{Value: "host"})
 	}
 
 	return &domain, nil
