@@ -115,7 +115,7 @@ func (m *kvmManager) prepareVLanNetwork(nic *Nic) (*InterfaceDevice, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to ensure vlan:%s", err)
 	}
 
 	if result.State != pm.StateSuccess {
@@ -279,7 +279,7 @@ func (m *kvmManager) setDHCPHost(seq uint16) error {
 
 	job, err := m.api.Run(&pm.Command{
 		ID:      uuid.New(),
-		Command: "bridge.add_host",
+		Command: "bridge.host-add",
 		Arguments: pm.MustArguments(map[string]interface{}{
 			"bridge": DefaultBridgeName,
 			"mac":    mac,

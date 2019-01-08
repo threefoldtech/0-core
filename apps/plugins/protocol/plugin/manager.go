@@ -63,7 +63,7 @@ func (m *Manager) process() {
 
 		_, err = m.api.Run(&command)
 
-		if err == pm.UnknownCommandErr {
+		if pm.IsUnknownCommand(err) {
 			result := pm.NewJobResult(&command)
 			result.State = pm.StateUnknownCmd
 			m.Set(result)

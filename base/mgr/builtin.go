@@ -30,7 +30,7 @@ func getFactory(cmd *pm.Command) (ProcessFactory, error) {
 		}
 	}
 
-	return nil, pm.UnknownCommandErr
+	return nil, pm.UnknownCommandErr(cmd.Command)
 }
 
 //RegisterExtension registers a new command (extension) so it can be executed via commands
