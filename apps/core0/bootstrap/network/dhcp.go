@@ -42,7 +42,7 @@ func (d *dhcpProtocol) Configure(_ NetworkManager, inf string) error {
 	// }
 
 	hostname, _ := os.Hostname()
-	hostid := fmt.Sprintf("hostname:zero-os-%s", hostname)
+	hostid := fmt.Sprintf("hostname:%s", hostname)
 
 	cmd := &pm.Command{
 		ID:      fmt.Sprintf("udhcpc/%s", inf),

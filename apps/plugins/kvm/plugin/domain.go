@@ -88,6 +88,7 @@ type Domain struct {
 	Features FeaturesType `xml:"features"`
 	Devices  Devices      `xml:"devices"`
 	Qemu     Qemu         `xml:"qemu:commandline"`
+	CPU      *CPU         `xml:"cpu,omitempty"`
 }
 
 type DiskType string
@@ -102,7 +103,18 @@ const (
 
 	DiskDeviceTypeDisk  DiskDeviceType = "disk"
 	DiskDeviceTypeCDROM DiskDeviceType = "cdrom"
+
+	CPUModeHostPassthrough CPUMode = "host-passthrough"
+	CPUModeHostModel       CPUMode = "host-model"
+	CPUModeCustom          CPUMode = "custom"
 )
+
+type CPUMode string
+
+type CPU struct {
+	Mode  CPUMode `xml:"mode,attr"`
+	Model string  `xml:"model,omitempty"`
+}
 
 type Devices struct {
 	Emulator    string            `xml:"emulator"`

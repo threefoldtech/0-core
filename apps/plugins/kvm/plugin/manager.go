@@ -766,7 +766,9 @@ func (m *kvmManager) mkDomain(seq uint16, params *CreateParams) (*Domain, error)
 	}
 
 	if params.KVM == true {
-		domain.Qemu.Args = append(domain.Qemu.Args, QemuArg{Value: "-enable-kvm"})
+		domain.CPU = &CPU{
+			Mode: CPUModeHostModel,
+		}
 	}
 
 	return &domain, nil

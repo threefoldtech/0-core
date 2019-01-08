@@ -9,7 +9,7 @@ class Machinetests(BaseTest):
         super(Machinetests, self).setUp()
         self.check_zos_connection(Machinetests)
 
-    @unittest.skip("this test doesn't work on travis .. no idea why.. needs to be run manually")
+    @unittest.skip("https://github.com/threefoldtech/0-core/issues/96")
     def test001_create_destroy_list_kvm(self):
         """ zos-009
 
