@@ -180,12 +180,12 @@ class BaseTest(unittest.TestCase):
         container = self.client.container.create(root_url=root_url, storage=storage, host_network=host_network, nics=nics, tags=tags, privileged=privileged)
         return container.get(30)
 
-    def create_vm(self, name, flist, nics=[], port={}):
+    def create_vm(self, name, flist, memory=512, nics=[], port={}):
         cmdline = None
         if 'zero-os' in flist:
             cmdline = 'development'
-        vm_uuid = self.client.kvm.create(name=name, flist=flist, port=port,
-                                         cmdline=cmdline, nics=nics)
+        vm_uuid = self.client.kvm.create(name=name, flist=flist, memory=memory,
+                                         port=port, cmdline=cmdline, nics=nics)
         return vm_uuid
 
 

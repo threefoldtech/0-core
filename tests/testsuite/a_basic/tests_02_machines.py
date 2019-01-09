@@ -9,7 +9,6 @@ class Machinetests(BaseTest):
         super(Machinetests, self).setUp()
         self.check_zos_connection(Machinetests)
 
-    @unittest.skip("https://github.com/threefoldtech/0-core/issues/96")
     def test001_create_destroy_list_kvm(self):
         """ zos-009
 
@@ -41,7 +40,7 @@ class Machinetests(BaseTest):
 
         self.lg('Create another vm with the same name, should fail')
         with self.assertRaises(RuntimeError):
-            self.create_vm(name=vm_name)
+            self.create_vm(name=vm_name, flist=self.ubuntu_flist)
 
         self.lg('- List all virtual machines and check that VM {} is there '.format(vm_name))
         Vms_list = self.client.kvm.list()
@@ -49,7 +48,7 @@ class Machinetests(BaseTest):
 
         self.lg('- create another virtual machine with the same kvm domain ,should fail')
         with self.assertRaises(RuntimeError):
-            self.create_vm(name=vm_name)
+            self.create_vm(name=vm_name, flist=self.ubuntu_flist)
 
         self.lg('- Destroy VM {}'.format(vm_name))
         self.client.kvm.destroy(vm_uuid)
@@ -149,7 +148,6 @@ class Machinetests(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
-    @unittest.skip('https://github.com/threefoldtech/0-core/issues/96')
     def test004_pause_resume_get_kvm(self):
         """ zos-050
 
