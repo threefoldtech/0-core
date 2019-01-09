@@ -107,6 +107,7 @@ dhclient $interface
     vm_zos.nics.add(name='nic1', type_='bridge', networkid=bridge, hwaddr=vm_zos_mac)
     vm_zos.vcpus = 4
     vm_zos.memory = 8192
+    vm_zos.kvm = True
     disk = utils.create_disk(zos_client)
     vm_zos.disks.add(disk)
     vm_zos.kernel_args.add(name='development', key='development')
