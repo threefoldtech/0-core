@@ -4,29 +4,20 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"time"
-
-	"github.com/op/go-logging"
-	"github.com/threefoldtech/0-core/apps/core0/assets"
-	"github.com/threefoldtech/0-core/apps/core0/bootstrap"
-	"github.com/threefoldtech/0-core/apps/core0/logger"
-	"github.com/threefoldtech/0-core/apps/core0/options"
-	"github.com/threefoldtech/0-core/apps/core0/screen"
-	"github.com/threefoldtech/0-core/apps/core0/stats"
-	"github.com/threefoldtech/0-core/apps/core0/subsys/cgroups"
-	"github.com/threefoldtech/0-core/apps/core0/subsys/containers"
-	"github.com/threefoldtech/0-core/apps/core0/subsys/kvm"
-	"github.com/threefoldtech/0-core/base"
-	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/settings"
-
 	"os/signal"
 	"syscall"
+	"time"
 
-	_ "github.com/threefoldtech/0-core/apps/core0/builtin"
-	_ "github.com/threefoldtech/0-core/apps/core0/builtin/btrfs"
-	"github.com/threefoldtech/0-core/apps/core0/transport"
-	_ "github.com/threefoldtech/0-core/base/builtin"
+	logging "github.com/op/go-logging"
+	"github.com/threefoldtech/0-core/apps/core0/assets"
+	"github.com/threefoldtech/0-core/apps/core0/bootstrap"
+	"github.com/threefoldtech/0-core/apps/core0/options"
+	"github.com/threefoldtech/0-core/apps/core0/plugin"
+	"github.com/threefoldtech/0-core/apps/core0/screen"
+	"github.com/threefoldtech/0-core/base"
+	"github.com/threefoldtech/0-core/base/mgr"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/settings"
 )
 
 var (
@@ -80,7 +71,7 @@ func Splash() {
 	screen.Push(&screen.TextSection{})
 	screen.Push(&screen.TextSection{
 		Attributes: screen.Attributes{screen.Green},
-		Text:       fmt.Sprintf("Version: %s", core.Version().Short()),
+		Text:       fmt.Sprintf("Version: %s", base.Version().Short()),
 	})
 
 	screen.Push(&screen.TextSection{
@@ -123,7 +114,7 @@ func startEntropyGenerator() error {
 
 func main() {
 	var options = options.Options
-	fmt.Println(core.Version())
+	fmt.Println(base.Version())
 	if options.Version() {
 		os.Exit(0)
 	}
@@ -131,8 +122,6 @@ func main() {
 	if err := startEntropyGenerator(); err != nil {
 		log.Fatalf("fail to start entropy generator: %v", err)
 	}
-
-	pm.New()
 
 	if err := settings.LoadSettings(options.Config()); err != nil {
 		log.Fatal(err)
@@ -145,6 +134,11 @@ func main() {
 
 		log.Fatalf("\nConfig validation error, please fix and try again.")
 	}
+
+	//start process mgr.
+	log.Infof("Initialize process manager")
+	mgr.New()
+	mgr.RegisterExtension("bash", "sh", "", []string{"-c", "{script}"}, nil)
 
 	if !options.Agent() {
 		//Logging prepration
@@ -163,31 +157,23 @@ func main() {
 
 	logging.SetLevel(level, "")
 
+	log.Infof("Configure process manager")
 	var config = settings.Settings
-
-	pm.MaxJobs = config.Main.MaxJobs
-
-	//start process mgr.
-	log.Infof("Starting process manager")
-
-	pm.AddHandle((*console)(nil))
-	pm.Start()
-
-	//configure logging handlers from configurations
-	log.Infof("Configure logging")
-	cfg := transport.SinkConfig{Port: 6379}
-	sink, err := transport.NewSink(cfg)
+	mgr.MaxJobs = config.Main.MaxJobs
+	mgr.AddHandle((*console)(nil))
+	pluginMgr, err := plugin.New(settings.Settings.Main.Modules...)
 	if err != nil {
-		log.Errorf("failed to start command sink: %s", err)
+		log.Fatalf("failed to initialize plugin manager: %s", err)
 	}
-
-	logger.ConfigureLogging(sink)
+	mgr.AddRouter(pluginMgr)
+	if err := pluginMgr.Load(); err != nil {
+		log.Fatalf("failed to load plugins")
+	}
 
 	bs := bootstrap.NewBootstrap(options.Agent())
 	bs.First()
 
 	if !options.Agent() {
-		//Only allow splash screen if debug is not set, or if not running in agent mode
 		Splash()
 	}
 
@@ -197,41 +183,10 @@ func main() {
 	row := &screen.RowSection{
 		Cells: make([]screen.RowCell, 2),
 	}
+
 	screen.Push(row)
-
-	if err := cgroups.Init(); err != nil {
-		log.Fatal("failed to initialize cgroups subsystem")
-	}
-
-	contMgr, err := containers.ContainerSubsystem(sink, &row.Cells[0])
-	if err != nil {
-		log.Fatal("failed to intialize container subsystem", err)
-	}
-
 	bs.Second()
-
-	if err := kvm.KVMSubsystem(contMgr, &row.Cells[1]); err != nil {
-		log.Errorf("failed to initialize kvm subsystem: %s", err)
-	}
-
-	log.Infof("Starting local transport")
-	local, err := NewLocal(contMgr, "/var/run/core.sock")
-	if err != nil {
-		log.Errorf("Failed to start local transport: %s", err)
-	} else {
-		local.Start()
-	}
-
-	//start jobs sinks.
-	log.Infof("Starting Sinks")
-
-	sink.Start()
 	screen.Refresh()
-
-	if config.Stats.Enabled {
-		aggregator := stats.NewLedisStatsAggregator(sink)
-		pm.AddHandle(aggregator)
-	}
-
+	log.Info("System ready")
 	select {}
 }

@@ -3,10 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/threefoldtech/0-core/base/pm"
-	"gopkg.in/yaml.v2"
 	"io"
 	"os"
+
+	"github.com/threefoldtech/0-core/base/pm"
+	client "github.com/threefoldtech/0-core/client/go-client"
+	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -29,7 +31,7 @@ func (r *Response) Print() {
 	fmt.Println(string(data))
 }
 
-func (r *Response) PrintStreams() {
+func PrintStreams(r *client.Result) {
 	for i, s := range r.Streams {
 		if len(s) > 0 {
 			fmt.Fprintf(outputs[i], s)
@@ -37,9 +39,14 @@ func (r *Response) PrintStreams() {
 	}
 }
 
-func (r *Response) ValidateResultOrExit() {
+func PrintResultOrDie(r *client.Result, err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	if r.State != pm.StateSuccess {
+	PrintStreams(r)
+
+	if r.State != client.StateSuccess {
 		log.Errorf("State: %s", r.State)
 		if r.Data != "" {
 			log.Errorf("%s", r.Data)
@@ -50,6 +57,18 @@ func (r *Response) ValidateResultOrExit() {
 		}
 
 		os.Exit(1)
+	}
+}
+
+func PrintOrDie(obj interface{}, err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if out, err := yaml.Marshal(obj); err != nil {
+		log.Fatal(err)
+	} else {
+		fmt.Println(string(out))
 	}
 }
 

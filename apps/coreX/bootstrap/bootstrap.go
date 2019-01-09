@@ -6,10 +6,10 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"github.com/shirou/gopsutil/process"
 	"github.com/threefoldtech/0-core/apps/coreX/options"
-	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/settings"
 	"github.com/threefoldtech/0-core/base/utils"
 )
@@ -96,7 +96,8 @@ func (o *Bootstrap) populateMinimumDev() error {
 	return nil
 }
 
-func (o *Bootstrap) setupFS() error {
+func (o *Bootstrap) Start() error {
+	log.Debugf("setting up mounts")
 	os.MkdirAll("/etc", 0755)
 	os.MkdirAll("/var/run", 0755)
 
@@ -150,18 +151,13 @@ func (b *Bootstrap) startup() error {
 		return fmt.Errorf("failed to build startup tree: %v", errs)
 	}
 
-	pm.RunSlice(tree.Slice(settings.AfterInit.Weight(), settings.ToTheEnd.Weight()))
+	mgr.RunSlice(tree.Slice(settings.AfterInit.Weight(), settings.ToTheEnd.Weight()))
 
 	return nil
 }
 
 //Bootstrap registers extensions and startup system services.
 func (b *Bootstrap) Bootstrap(hostname string) error {
-	log.Debugf("setting up mounts")
-	if err := b.setupFS(); err != nil {
-		return err
-	}
-
 	log.Debugf("setting up hostname")
 	if err := updateHostname(hostname); err != nil {
 		return err
@@ -173,7 +169,7 @@ func (b *Bootstrap) Bootstrap(hostname string) error {
 	}
 
 	if options.Options.Unprivileged() {
-		pm.SetUnprivileged()
+		mgr.SetUnprivileged()
 		if err := b.revokePrivileges(); err != nil {
 			return err
 		}

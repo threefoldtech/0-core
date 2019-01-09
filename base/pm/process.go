@@ -1,26 +1,45 @@
 package pm
 
 import (
+	"fmt"
+	"io"
 	"syscall"
 
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 const (
 	//CommandSystem is the first and built in `core.system` command
-	CommandSystem = "core.system"
+	CommandSystem    = "core.system"
+	CommandContainer = "core.container"
 )
 
-//GetPID returns a PID of a process
-type GetPID func() (int, error)
+//SystemCommandArguments arguments to system command
+type SystemCommandArguments struct {
+	Name  string            `json:"name"`
+	Dir   string            `json:"dir"`
+	Args  []string          `json:"args"`
+	Env   map[string]string `json:"env"`
+	StdIn string            `json:"stdin"`
+}
 
-//PIDTable a table that keeps track of running process ids
-type PIDTable interface {
-	//PIDTable atomic registration of PID. MUST grantee that that no wait4 will happen
-	//on any of the child process until the register operation is done.
-	RegisterPID(g GetPID) (int, error)
-	//WaitPID waits for a certain ID until it exits
-	WaitPID(pid int) syscall.WaitStatus
+func (s *SystemCommandArguments) String() string {
+	return fmt.Sprintf("%v %s %v (%s)", s.Env, s.Name, s.Args, s.Dir)
+}
+
+//ContainerCommandArguments arguments for container command
+type ContainerCommandArguments struct {
+	Name        string            `json:"name"`
+	Dir         string            `json:"dir"`
+	Args        []string          `json:"args"`
+	Env         map[string]string `json:"env"`
+	HostNetwork bool              `json:"host_network"`
+	Chroot      string            `json:"chroot"`
+	Log         string            `json:"log"`
+}
+
+func (c *ContainerCommandArguments) String() string {
+	return fmt.Sprintf("%s %v %s", c.Name, c.Args, c.Chroot)
 }
 
 //ProcessStats holds process cpu and memory usage
@@ -35,6 +54,18 @@ type ProcessStats struct {
 type Process interface {
 	Command() *Command
 	Run() (<-chan *stream.Message, error)
+}
+
+//Channel is a 2 way communication channel that is mainly used
+//to talk to the main containerd process `coreX`
+type Channel interface {
+	io.ReadWriteCloser
+}
+
+//ContainerProcess interface
+type ContainerProcess interface {
+	Process
+	Channel() Channel
 }
 
 //Signaler a process that supports signals
@@ -54,6 +85,3 @@ type PIDer interface {
 	Process
 	GetPID() int32
 }
-
-//ProcessFactory interface
-type ProcessFactory func(PIDTable, *Command) Process

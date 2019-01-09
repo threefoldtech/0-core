@@ -2,35 +2,27 @@ package main
 
 import (
 	"github.com/codegangsta/cli"
-	"github.com/threefoldtech/0-core/base/pm"
+	client "github.com/threefoldtech/0-core/client/go-client"
 )
 
-func system(t Transport, c *cli.Context) {
+func system(t client.Client, c *cli.Context) {
 	if c.Args().First() == "" {
 		log.Fatalf("missing command to execute")
 		return
 	}
 	sync := !c.GlobalBool("async")
-	response, err := t.Run(Command{
-		Sync:      sync,
-		Container: c.GlobalString("container"),
-		Content: pm.Command{
-			Command: "core.system",
-			Arguments: pm.MustArguments(M{
-				"name": c.Args().First(),
-				"args": c.Args().Tail(),
-			}),
-		},
-	})
+
+	core := client.Core(t)
+	jobID, err := core.SystemArgs(c.Args().First(), c.Args().Tail(), nil, "", "")
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if sync {
-		response.PrintStreams()
-		response.ValidateResultOrExit()
-	} else {
-		log.Infof("Job started with ID: %s", response.ID)
+	if !sync {
+		log.Infof("Job started with ID: %s", jobID)
+		return
 	}
+
+	PrintResultOrDie(t.Result(jobID, c.GlobalInt("timeout")))
 }

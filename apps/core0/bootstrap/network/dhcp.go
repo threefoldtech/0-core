@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
@@ -35,7 +36,7 @@ func (d *dhcpProtocol) isPlugged(inf string) error {
 	return fmt.Errorf("interface %s has no carrier(%s)", inf, string(data))
 }
 
-func (d *dhcpProtocol) Configure(mgr NetworkManager, inf string) error {
+func (d *dhcpProtocol) Configure(_ NetworkManager, inf string) error {
 	// if err := d.isPlugged(inf); err != nil {
 	// 	return err
 	// }
@@ -62,7 +63,7 @@ func (d *dhcpProtocol) Configure(mgr NetworkManager, inf string) error {
 		),
 	}
 
-	if _, err := pm.Run(cmd); err != nil {
+	if _, err := mgr.Run(cmd); err != nil {
 		return err
 	}
 

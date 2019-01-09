@@ -8,7 +8,7 @@ base = github.com/threefoldtech/0-core/base
 ldflags0 = '-w -s -X $(base).Branch=$(branch) -X $(base).Revision=$(revision) -X $(base).Dirty=$(dirty)'
 ldflagsX = '-w -s -X $(base).Branch=$(branch) -X $(base).Revision=$(revision) -X $(base).Dirty=$(dirty) -extldflags "-static"'
 
-all: core0 coreX corectl redis-proxy
+all: core0 coreX corectl redis-proxy plugins
 
 core0: $(OUTPUT)
 	cd apps/core0 && go build -ldflags $(ldflags0) -o ../../$(OUTPUT)/$@
@@ -21,6 +21,9 @@ corectl: $(OUTPUT)
 
 redis-proxy: $(OUTPUT)
 	cd apps/redis-proxy && go build -ldflags $(ldflags0) -o ../../$(OUTPUT)/$@
+
+plugins:
+	cd apps/plugins && make
 
 $(OUTPUT):
 	mkdir -p $(OUTPUT)

@@ -27,7 +27,7 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "socket, s",
-			Value: "/var/run/core.sock",
+			Value: "unix:///var/run/redis.sock",
 			Usage: "Path to core socket",
 		},
 		cli.IntFlag{
@@ -53,35 +53,35 @@ func main() {
 		{
 			Name:   "ping",
 			Usage:  "checks connectivity with g8os",
-			Action: WithTransport(ping),
+			Action: WithClient(ping),
 		},
 		{
 			Name:            "execute",
 			Usage:           "execute arbitary commands",
 			Description:     "execute any command inside the core context",
 			ArgsUsage:       "command [args]",
-			Action:          WithTransport(system),
+			Action:          WithClient(system),
 			SkipFlagParsing: true,
 		},
 		{
 			Name:      "stop",
 			Usage:     "stops a process with `id`",
 			ArgsUsage: "id",
-			Action:    WithTransport(jobKill),
+			Action:    WithClient(jobKill),
 		},
 		{
 			Name:   "job",
 			Usage:  "control system jobs",
-			Action: WithTransport(jobs),
+			Action: WithClient(jobs),
 			Subcommands: []cli.Command{
 				{
 					Name:   "list",
-					Action: WithTransport(jobs),
+					Action: WithClient(jobs),
 					Usage:  "list jobs",
 				},
 				{
 					Name:      "kill",
-					Action:    WithTransport(jobKill),
+					Action:    WithClient(jobKill),
 					Usage:     "kill a job with `id`",
 					ArgsUsage: "id",
 				},
@@ -90,17 +90,17 @@ func main() {
 		{
 			Name:   "container",
 			Usage:  "container management",
-			Action: WithTransport(containers),
+			Action: WithClient(containers),
 			Subcommands: []cli.Command{
 				{
 					Name:      "list",
-					Action:    WithTransport(containers),
+					Action:    WithClient(containers),
 					Usage:     "list containers (default)",
 					ArgsUsage: "tag [tag...]",
 				},
 				{
 					Name:      "inspect",
-					Action:    WithTransport(containerInspect),
+					Action:    WithClient(containerInspect),
 					Usage:     "print detailed container info",
 					ArgsUsage: "id",
 				},
@@ -113,46 +113,40 @@ func main() {
 				{
 					Name:   "cpu",
 					Usage:  "display CPU info",
-					Action: WithTransport(info_cpu),
+					Action: WithClient(info_cpu),
 				},
 				{
 					Name:    "memory",
 					Aliases: []string{"mem"},
 					Usage:   "display memory info",
-					Action:  WithTransport(info_mem),
+					Action:  WithClient(info_mem),
 				},
 				{
 					Name:   "disk",
 					Usage:  "display disk info",
-					Action: WithTransport(info_disk),
+					Action: WithClient(info_disk),
 				},
 				{
 					Name:   "nic",
 					Usage:  "display NIC info",
-					Action: WithTransport(info_nic),
+					Action: WithClient(info_nic),
 				},
 				{
 					Name:   "os",
 					Usage:  "display OS info",
-					Action: WithTransport(info_os),
+					Action: WithClient(info_os),
 				},
 			},
 		},
 		{
 			Name:   "reboot",
 			Usage:  "reboot the machine",
-			Action: WithTransport(reboot),
+			Action: WithClient(reboot),
 		},
 		{
 			Name:   "poweroff",
 			Usage:  "Shuts down the machine",
-			Action: WithTransport(poweroff),
-		},
-		{
-			Name:      "statistics",
-			Usage:     "node statistics",
-			Action:    WithTransport(statistics),
-			ArgsUsage: "key [tags...]",
+			Action: WithClient(poweroff),
 		},
 	}
 	var args []string

@@ -6,7 +6,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	logging "github.com/op/go-logging"
+	"github.com/threefoldtech/0-core/base/stream"
+)
+
+var (
+	log = logging.MustGetLogger("pm")
 )
 
 //RunnerHook is a per process event handler
@@ -122,9 +127,9 @@ func (h *BufferHook) append(buf *bytes.Buffer, msg *stream.Message) {
 }
 
 func (h *BufferHook) Message(msg *stream.Message) {
-	if msg.Meta.Level() == stream.LevelStdout {
+	if msg.Meta.Level() == LevelStdout {
 		h.append(&h.Stdout, msg)
-	} else if msg.Meta.Level() == stream.LevelStderr {
+	} else if msg.Meta.Level() == LevelStderr {
 		h.append(&h.Stderr, msg)
 	}
 

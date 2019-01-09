@@ -2,20 +2,10 @@ package main
 
 import (
 	"github.com/codegangsta/cli"
-	"github.com/threefoldtech/0-core/base/pm"
+	client "github.com/threefoldtech/0-core/client/go-client"
 )
 
-func ping(t Transport, c *cli.Context) {
-	response, err := t.Run(Command{
-		Sync: true,
-		Content: pm.Command{
-			Command: "core.ping",
-		},
-	})
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	response.Print()
+func ping(t client.Client, c *cli.Context) {
+	core := client.Core(t)
+	PrintOrDie(core.Ping())
 }

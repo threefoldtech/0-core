@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/stream"
 )
 
 type MessageType string

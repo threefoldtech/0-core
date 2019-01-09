@@ -1,0 +1,658 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net"
+	"os"
+	"path"
+	"regexp"
+	"syscall"
+
+	"github.com/threefoldtech/0-core/apps/plugins/nft"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/utils"
+	"github.com/vishvananda/netlink"
+)
+
+var (
+	ruleHandlerP = regexp.MustCompile(`(?m:ip .addr ([\d\./]+) masquerade # handle (\d+))`)
+	HandlerP     = regexp.MustCompile(`handle (\d+)$`)
+)
+
+const (
+	NoneBridgeNetworkMode    BridgeNetworkMode = ""
+	DnsMasqBridgeNetworkMode BridgeNetworkMode = "dnsmasq"
+	StaticBridgeNetworkMode  BridgeNetworkMode = "static"
+)
+
+type BridgeNetworkMode string
+
+type NetworkStaticSettings struct {
+	CIDR string `json:"cidr"`
+}
+
+func (n *NetworkStaticSettings) Validate() error {
+	ip, network, err := net.ParseCIDR(n.CIDR)
+	if err != nil {
+		return err
+	}
+
+	if network.IP.Equal(ip) {
+		return fmt.Errorf("Invalid IP")
+	}
+
+	return nil
+}
+
+type NetworkDnsMasqSettings struct {
+	NetworkStaticSettings
+	Start net.IP `json:"start"`
+	End   net.IP `json:"end"`
+}
+
+func (n *NetworkDnsMasqSettings) Validate() error {
+	ip, network, err := net.ParseCIDR(n.CIDR)
+	if err != nil {
+		return err
+	}
+
+	if network.IP.Equal(ip) {
+		return fmt.Errorf("Invalid IP")
+	}
+
+	if !network.Contains(n.Start) {
+		return fmt.Errorf("start ip address out of range")
+	}
+
+	if !network.Contains(n.End) {
+		return fmt.Errorf("end ip address out of range")
+	}
+
+	return nil
+}
+
+type BridgeNetwork struct {
+	Mode     BridgeNetworkMode `json:"mode"`
+	Nat      bool              `json:"nat"`
+	Settings json.RawMessage   `json:"settings"`
+}
+
+type BridgeCreateArguments struct {
+	Name      string        `json:"name"`
+	HwAddress string        `json:"hwaddr"`
+	Network   BridgeNetwork `json:"network"`
+}
+
+func (br *BridgeCreateArguments) Validate() error {
+	name := len(br.Name)
+	if 1 > name || name > 15 {
+		return fmt.Errorf("Bridge name must be between 1 and 15 characters")
+	}
+
+	if br.Name == "default" {
+		return fmt.Errorf("Bridge name can't be 'default'")
+	}
+
+	return nil
+}
+
+type BridgeDeleteArguments struct {
+	Name string `json:"name"`
+}
+
+type BridgeAddHost struct {
+	Bridge string `json:"bridge"`
+	IP     string `json:"ip"`
+	Mac    string `json:"mac"`
+}
+
+func (b *Manager) intersect(n1 *net.IPNet, n2 *net.IPNet) bool {
+	ip1 := n1.IP.Mask(n2.Mask)
+	ip2 := n2.IP.Mask(n1.Mask)
+	return n2.Contains(ip1) || n1.Contains(ip2)
+}
+
+func (b *Manager) conflict(addr *netlink.Addr) error {
+	links, err := netlink.LinkList()
+	if err != nil {
+		return err
+	}
+	for _, link := range links {
+		addresses, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+		if err != nil {
+			return err
+		}
+		for _, address := range addresses {
+			if b.intersect(address.IPNet, addr.IPNet) {
+				return fmt.Errorf("overlapping range with %s on %s", address, link.Attrs().Name)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (b *Manager) bridgeStaticNetworking(bridge *netlink.Bridge, network *BridgeNetwork) (*netlink.Addr, error) {
+	var settings NetworkStaticSettings
+	if err := json.Unmarshal(network.Settings, &settings); err != nil {
+		return nil, err
+	}
+
+	if err := settings.Validate(); err != nil {
+		return nil, err
+	}
+
+	addr, err := netlink.ParseAddr(settings.CIDR)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := b.conflict(addr); err != nil {
+		return nil, err
+	}
+
+	if err := netlink.AddrAdd(bridge, addr); err != nil {
+		return nil, err
+	}
+
+	//we still dnsmasq also for the default bridge for dns resolving.
+
+	leases := fmt.Sprintf("/var/lib/misc/%s.leases", bridge.Name)
+	os.RemoveAll(leases)
+
+	args := []string{
+		"--no-hosts",
+		"--keep-in-foreground",
+		fmt.Sprintf("--pid-file=/var/run/dnsmasq/%s.pid", bridge.Name),
+		fmt.Sprintf("--dhcp-leasefile=%s", leases),
+		fmt.Sprintf("--listen-address=%s", addr.IP),
+		fmt.Sprintf("--interface=%s", bridge.Name),
+		"--bind-interfaces",
+		"--except-interface=lo",
+	}
+
+	cmd := &pm.Command{
+		ID:      b.dnsmasqPName(bridge.Name),
+		Command: pm.CommandSystem,
+		Arguments: pm.MustArguments(
+			pm.SystemCommandArguments{
+				Name: "dnsmasq",
+				Args: args,
+			},
+		),
+	}
+
+	onExit := &pm.ExitHook{
+		Action: func(state bool) {
+			if !state {
+				log.Errorf("dnsmasq for %s exited with an error", bridge.Name)
+			}
+		},
+	}
+
+	log.Debugf("dnsmasq(%s): %s", bridge.Name, args)
+	_, err = b.api.Run(cmd, onExit)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return addr, nil
+}
+
+func (b *Manager) dnsmasqPName(n string) string {
+	return fmt.Sprintf("dnsmasq-%s", n)
+}
+
+func (b *Manager) dnsmasqHostsFilePath(n string) string {
+	return fmt.Sprintf("/var/run/dnsmasq/%s", b.dnsmasqPName(n))
+}
+
+func (b *Manager) bridgeDnsMasqNetworking(bridge *netlink.Bridge, network *BridgeNetwork) (*netlink.Addr, error) {
+	var settings NetworkDnsMasqSettings
+	if err := json.Unmarshal(network.Settings, &settings); err != nil {
+		return nil, err
+	}
+
+	if err := settings.Validate(); err != nil {
+		return nil, err
+	}
+
+	os.MkdirAll("/var/run/dnsmasq", 0755)
+
+	addr, err := netlink.ParseAddr(settings.CIDR)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := b.conflict(addr); err != nil {
+		return nil, err
+	}
+
+	if err := netlink.AddrAdd(bridge, addr); err != nil {
+		return nil, err
+	}
+
+	hostsFile := b.dnsmasqHostsFilePath(bridge.Name)
+	os.RemoveAll(hostsFile)
+	os.MkdirAll(hostsFile, 0755)
+
+	leases := fmt.Sprintf("/var/lib/misc/%s.leases", bridge.Name)
+	os.RemoveAll(leases)
+
+	args := []string{
+		"--no-hosts",
+		"--keep-in-foreground",
+		fmt.Sprintf("--pid-file=/var/run/dnsmasq/%s.pid", bridge.Name),
+		fmt.Sprintf("--dhcp-leasefile=%s", leases),
+		fmt.Sprintf("--listen-address=%s", addr.IP),
+		fmt.Sprintf("--interface=%s", bridge.Name),
+		fmt.Sprintf("--dhcp-range=%s,%s,%s", settings.Start, settings.End, net.IP(addr.Mask)),
+		fmt.Sprintf("--dhcp-option=6,%s", addr.IP),
+		fmt.Sprintf("--dhcp-hostsfile=%s", hostsFile),
+		"--bind-interfaces",
+		"--except-interface=lo",
+	}
+
+	cmd := &pm.Command{
+		ID:      b.dnsmasqPName(bridge.Name),
+		Command: pm.CommandSystem,
+		Arguments: pm.MustArguments(
+			pm.SystemCommandArguments{
+				Name: "dnsmasq",
+				Args: args,
+			},
+		),
+		Flags: pm.JobFlags{
+			NoOutput: true,
+		},
+	}
+
+	onExit := &pm.ExitHook{
+		Action: func(state bool) {
+			if !state {
+				log.Errorf("dnsmasq for %s exited with an error", bridge.Name)
+			}
+		},
+	}
+
+	log.Debugf("dnsmasq(%s): %s", bridge.Name, args)
+	_, err = b.api.Run(cmd, onExit)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return addr, nil
+}
+
+func (b *Manager) addHost(ctx pm.Context) (interface{}, error) {
+	var args BridgeAddHost
+	cmd := ctx.Command()
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+
+	name := b.dnsmasqPName(args.Bridge)
+	job, ok := b.api.JobOf(name)
+	if !ok {
+		//either no bridge with that name, or this bridge does't have dnsmasq settings.
+		return nil, fmt.Errorf("not supported no dnsmasq process found")
+	}
+
+	//write file for the host
+	if err := ioutil.WriteFile(
+		path.Join(b.dnsmasqHostsFilePath(args.Bridge), args.IP),
+		[]byte(fmt.Sprintf("%s,%s", args.Mac, args.IP)),
+		0644,
+	); err != nil {
+		return nil, err
+	}
+
+	return nil, job.Signal(syscall.SIGHUP)
+}
+
+func (b *Manager) addNic(ctx pm.Context) (interface{}, error) {
+	var args struct {
+		Name string `json:"name"`
+		Nic  string `json:"nic"`
+	}
+	cmd := ctx.Command()
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, pm.BadRequestError(err)
+	}
+
+	link, err := netlink.LinkByName(args.Name)
+	if err != nil {
+		return nil, pm.NotFoundError(err)
+	}
+
+	if link.Type() != "bridge" {
+		return nil, pm.BadRequestError(fmt.Errorf("not a bridge"))
+	}
+
+	nic, err := netlink.LinkByName(args.Nic)
+	if err != nil {
+		return nil, pm.NotFoundError(err)
+	}
+
+	return nil, netlink.LinkSetMaster(nic, link.(*netlink.Bridge))
+}
+
+func (b *Manager) removeNic(ctx pm.Context) (interface{}, error) {
+	var args struct {
+		Nic string `json:"nic"`
+	}
+
+	cmd := ctx.Command()
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, pm.BadRequestError(err)
+	}
+
+	nic, err := netlink.LinkByName(args.Nic)
+	if err != nil {
+		return nil, pm.NotFoundError(err)
+	}
+
+	return nil, netlink.LinkSetNoMaster(nic)
+}
+
+func (b *Manager) listNic(ctx pm.Context) (interface{}, error) {
+	var args struct {
+		Name string `json:"name"`
+	}
+
+	cmd := ctx.Command()
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, pm.BadRequestError(err)
+	}
+
+	link, err := netlink.LinkByName(args.Name)
+	if err != nil {
+		return nil, pm.NotFoundError(err)
+	}
+
+	if link.Type() != "bridge" {
+		return nil, pm.BadRequestError(fmt.Errorf("not a bridge"))
+	}
+
+	index := link.Attrs().Index
+	list := make([]string, 0)
+	links, err := netlink.LinkList()
+	if err != nil {
+		return nil, pm.InternalError(err)
+	}
+
+	for _, link := range links {
+		if link.Attrs().MasterIndex == index {
+			list = append(list, link.Attrs().Name)
+		}
+	}
+
+	return list, nil
+}
+
+func (b *Manager) bridgeNetworking(bridge *netlink.Bridge, network *BridgeNetwork) error {
+	var addr *netlink.Addr
+	var err error
+	switch network.Mode {
+	case StaticBridgeNetworkMode:
+		addr, err = b.bridgeStaticNetworking(bridge, network)
+	case DnsMasqBridgeNetworkMode:
+		addr, err = b.bridgeDnsMasqNetworking(bridge, network)
+	case NoneBridgeNetworkMode:
+		return nil
+	default:
+		return fmt.Errorf("invalid networking mode %s", network.Mode)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if network.Nat && addr != nil {
+		return b.setNAT(addr)
+	}
+
+	return nil
+}
+
+func (b *Manager) setNAT(addr *netlink.Addr) error {
+	//enable nat-ting
+	n := nft.Nft{
+		"nat": nft.Table{
+			Family: nft.FamilyIP,
+			Chains: nft.Chains{
+				"post": nft.Chain{
+					Rules: []nft.Rule{
+						//{Body: fmt.Sprintf("ip daddr %s masquerade", addr.IPNet.String())},
+						{Body: fmt.Sprintf("ip saddr %s masquerade", addr.IPNet.String())},
+					},
+				},
+			},
+		},
+	}
+
+	return b.nft.Apply(n)
+}
+
+func (b *Manager) unsetNAT(addr []netlink.Addr) error {
+	//enable nat-ting
+	job, err := b.api.System("nft", "list", "ruleset", "-a")
+	if err != nil {
+		return err
+	}
+
+	var ips []string
+	for _, ip := range addr {
+		//this trick to get the corred network ID from netlink addresses
+		_, n, _ := net.ParseCIDR(ip.IPNet.String())
+		ips = append(ips, n.String())
+	}
+
+	for _, line := range ruleHandlerP.FindAllStringSubmatch(job.Streams.Stdout(), -1) {
+		ip := line[1]
+		handle := line[2]
+		if utils.InString(ips, ip) {
+			b.api.System("nft", "delete", "rule", "nat", "post", "handle", handle)
+		}
+	}
+
+	return nil
+}
+
+func (b *Manager) create(ctx pm.Context) (interface{}, error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	var args BridgeCreateArguments
+	cmd := ctx.Command()
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+
+	if err := args.Validate(); err != nil {
+		return nil, err
+	}
+
+	var hw net.HardwareAddr
+
+	if args.HwAddress != "" {
+		var err error
+		hw, err = net.ParseMAC(args.HwAddress)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	bridge := &netlink.Bridge{
+		LinkAttrs: netlink.LinkAttrs{
+			Name:         args.Name,
+			HardwareAddr: hw,
+			TxQLen:       1000, //needed other wise bridge won't work
+		},
+	}
+
+	if err := netlink.LinkAdd(bridge); err != nil {
+		return nil, err
+	}
+
+	var err error
+
+	defer func() {
+		if err != nil {
+			netlink.LinkDel(bridge)
+		}
+	}()
+
+	if args.HwAddress != "" {
+		if err = netlink.LinkSetHardwareAddr(bridge, hw); err != nil {
+			return nil, err
+		}
+	}
+
+	if err = netlink.LinkSetUp(bridge); err != nil {
+		return nil, err
+	}
+
+	if err := b.nftAllow(args.Name); err != nil {
+		return nil, err
+	}
+
+	if err = b.bridgeNetworking(bridge, &args.Network); err != nil {
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+func (b *Manager) nftAllow(br string) error {
+	name := fmt.Sprintf("\"%v\"", br)
+
+	n := nft.Nft{
+		// "nat": nft.Table{
+		// 	Family: nft.FamilyIP,
+		// 	Chains: nft.Chains{
+		// 		"pre": nft.Chain{
+		// 			Rules: []nft.Rule{
+		// 				{Body: fmt.Sprintf("iif %s meta mark set 1", name)},
+		// 			},
+		// 		},
+		// 	},
+		// },
+		"filter": nft.Table{
+			Family: nft.FamilyINET,
+			Chains: nft.Chains{
+				"input": nft.Chain{
+					Rules: []nft.Rule{
+						{Body: fmt.Sprintf("iif %s udp dport {53,67,68} accept", name)},
+					},
+				},
+				// "forward": nft.Chain{
+				// 	Rules: []nft.Rule{
+				// 		{Body: fmt.Sprintf("iif %s meta mark set 1", name)},
+				// 		{Body: fmt.Sprintf("iif %s oif %s meta mark set 2", name, name)},
+				// 		{Body: fmt.Sprintf("oif %s meta mark 1 drop", name)},
+				// 	},
+				// },
+			},
+		},
+	}
+
+	return b.nft.Apply(n)
+}
+
+func (b *Manager) unNFT(idx int) error {
+	ruleset, err := b.nft.Get()
+	if err != nil {
+		return err
+	}
+
+	pat, err := regexp.Compile(fmt.Sprintf(`[io]if %d\s+`, idx))
+	if err != nil {
+		return err
+	}
+
+	var errored bool
+	for tname, table := range ruleset {
+		for cname, chain := range table.Chains {
+			for _, rule := range chain.Rules {
+				if ok := pat.MatchString(rule.Body); ok {
+					if err := b.nft.Drop(table.Family, tname, cname, rule.Handle); err != nil {
+						log.Errorf("nft delete rule: %s", err)
+						errored = true
+					}
+				}
+			}
+		}
+	}
+
+	if errored {
+		return fmt.Errorf("failed to clean up nft rules")
+	}
+
+	return nil
+}
+
+func (b *Manager) list(ctx pm.Context) (interface{}, error) {
+	links, err := netlink.LinkList()
+	if err != nil {
+		return nil, err
+	}
+
+	bridges := make([]string, 0)
+	for _, link := range links {
+		if link.Type() == "bridge" {
+			bridges = append(bridges, link.Attrs().Name)
+		}
+	}
+
+	return bridges, nil
+}
+
+func (b *Manager) delete(ctx pm.Context) (interface{}, error) {
+	b.m.Lock()
+	b.m.Unlock()
+
+	var args BridgeDeleteArguments
+	cmd := ctx.Command()
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+
+	link, err := netlink.LinkByName(args.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	if link.Type() != "bridge" {
+		return nil, fmt.Errorf("bridge not found")
+	}
+
+	//make sure to stop dnsmasq, just in case it's running
+	if job, ok := b.api.JobOf(fmt.Sprintf("dnsmasq-%s", link.Attrs().Name)); ok {
+		job.Signal(syscall.SIGTERM)
+	}
+
+	addresses, err := netlink.AddrList(link, netlink.FAMILY_V4)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := b.unsetNAT(addresses); err != nil {
+		return nil, err
+	}
+
+	if err := netlink.LinkDel(link); err != nil {
+		return nil, err
+	}
+
+	//we remove the bridge first before we remove the nft rules
+	if err := b.unNFT(link.Attrs().Index); err != nil {
+		log.Errorf("error cleaning up nft rules for bridge %s: %s", args.Name, err)
+	}
+
+	return nil, nil
+}

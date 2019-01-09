@@ -1,4 +1,4 @@
-package core
+package base
 
 import "fmt"
 
@@ -18,10 +18,14 @@ type Ver interface {
 	String() string
 }
 
-type version struct{}
+type version struct {
+	Branch   string `json:"branch"`
+	Revision string `json:"revision"`
+	Dirty    bool   `json:"dirty"`
+}
 
 func (v *version) String() string {
-	s := fmt.Sprintf("Version: %s @Revision: %s", Branch, Revision)
+	s := fmt.Sprintf("Version: %s @Revision: %s", v.Branch, v.Revision)
 	if Dirty != "" {
 		s += " (dirty-repo)"
 	}
@@ -30,7 +34,7 @@ func (v *version) String() string {
 }
 
 func (v *version) Short() string {
-	s := fmt.Sprintf("%s@%s", Branch, Revision[0:7])
+	s := fmt.Sprintf("%s@%s", v.Branch, v.Revision[0:7])
 	if Dirty != "" {
 		s += "(D)"
 	}
@@ -38,5 +42,9 @@ func (v *version) Short() string {
 }
 
 func Version() Ver {
-	return &version{}
+	return &version{
+		Branch:   Branch,
+		Revision: Revision,
+		Dirty:    len(Dirty) > 0,
+	}
 }

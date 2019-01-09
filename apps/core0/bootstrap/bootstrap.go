@@ -13,6 +13,7 @@ import (
 	"github.com/threefoldtech/0-core/apps/core0/bootstrap/network"
 	"github.com/threefoldtech/0-core/apps/core0/options"
 	"github.com/threefoldtech/0-core/apps/core0/screen"
+	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/settings"
 	"github.com/threefoldtech/0-core/base/utils"
@@ -67,7 +68,8 @@ func NewBootstrap(agent bool) *Bootstrap {
 
 func (b *Bootstrap) registerExtensions(extensions map[string]settings.Extension) {
 	for extKey, extCfg := range extensions {
-		if err := pm.RegisterExtension(extKey, extCfg.Binary, extCfg.Cwd, extCfg.Args, extCfg.Env); err != nil {
+		log.Infof("registering extension (%s)", extKey)
+		if err := mgr.RegisterExtension(extKey, extCfg.Binary, extCfg.Cwd, extCfg.Args, extCfg.Env); err != nil {
 			log.Error(err)
 		}
 	}
@@ -76,7 +78,7 @@ func (b *Bootstrap) registerExtensions(extensions map[string]settings.Extension)
 func (b *Bootstrap) startupServices(s, e settings.After) {
 	log.Debugf("Starting up '%s' services", s)
 	slice := b.t.Slice(s.Weight(), e.Weight())
-	pm.RunSlice(slice)
+	mgr.RunSlice(slice)
 	log.Debugf("'%s' services are booted", s)
 }
 
@@ -239,7 +241,7 @@ func (b *Bootstrap) watchers() {
 
 	go func() {
 		for {
-			result, err := pm.System("zerotier-cli", "-D/tmp/zt", "info")
+			result, err := mgr.System("zerotier-cli", "-D/tmp/zt", "info")
 			if err == nil {
 				ztstatus := result.Streams.Stdout()
 
@@ -247,7 +249,7 @@ func (b *Bootstrap) watchers() {
 				zerotier.Text = fmt.Sprintf(screenStateLine, "Zerotier", ztstatus, "")
 			}
 
-			result, err = pm.System("uptime")
+			result, err = mgr.System("uptime")
 			if err == nil {
 				uptimestatus := result.Streams.Stdout()
 				uptime.Text = fmt.Sprintf(screenStateLine, "Uptime", uptimestatus, "")
@@ -260,7 +262,7 @@ func (b *Bootstrap) watchers() {
 }
 
 func (b *Bootstrap) syslogd() {
-	pm.Run(&pm.Command{
+	mgr.Run(&pm.Command{
 		ID:      "syslogd",
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(
@@ -275,7 +277,7 @@ func (b *Bootstrap) syslogd() {
 		Flags: pm.JobFlags{Protected: true},
 	})
 
-	pm.Run(&pm.Command{
+	mgr.Run(&pm.Command{
 		ID:      "klogd",
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(
@@ -289,7 +291,7 @@ func (b *Bootstrap) syslogd() {
 		Flags: pm.JobFlags{Protected: true},
 	})
 
-	pm.System("dmesg", "-n", "1")
+	mgr.System("dmesg", "-n", "1")
 }
 
 func (b *Bootstrap) First() {
@@ -297,14 +299,6 @@ func (b *Bootstrap) First() {
 		if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &syscall.Rlimit{65536, 65536}); err != nil {
 			log.Errorf("failed to setup max open files limit: %s", err)
 		}
-
-		if err := b.setNFT(); err != nil {
-			log.Criticalf("failed to setup NFT: %s", err)
-		}
-	}
-
-	if err := MonitorIPChangesUpdateSocat(); err != nil {
-		log.Critical("failed to start dnat ip monitoring")
 	}
 
 	//register core extensions
