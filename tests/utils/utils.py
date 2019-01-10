@@ -68,6 +68,15 @@ class BaseTest(unittest.TestCase):
         # "response" has stderr, stdout and returncode(should be 0 in successful case)
         return response
 
+    def vm_reachable(self, ip, pub_port, timeout=60):
+        while(timeout > 0):
+            res = self.execute_command(cmd='pwd', ip=self.target_ip, port=pub_port)
+            if res.stderr == '':
+                return True
+            time.sleep(1)
+            timeout -= 1
+        return False
+
     def get_process_id(self, cmdline):
         """
         Get the id of certain process

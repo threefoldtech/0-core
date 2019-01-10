@@ -184,7 +184,7 @@ class Machinetests(BaseTest):
         time.sleep(15)
         cmd = 'pwd'
         response = '/root\n'
-        flag = self.vm_reachable(cmd, pub_port)
+        flag = self.vm_reachable(self.target_ip, pub_port)
         self.assertTrue(flag, "vm is not reachable")
 
         self.lg('Pause VM1 and check state from get method ,should be paused')
@@ -232,7 +232,7 @@ class Machinetests(BaseTest):
         self.lg('Make sure vm is reachable')
         time.sleep(15)
         cmd = 'uptime'
-        flag = self.vm_reachable(cmd, pub_port)
+        flag = self.vm_reachable(self.target_ip, pub_port)
         self.assertTrue(flag, "vm is not reachable")
 
         self.lg('Reset VM1 and make sure it is working after reseting')
