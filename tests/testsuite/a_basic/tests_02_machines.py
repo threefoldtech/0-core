@@ -149,15 +149,6 @@ class Machinetests(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
-    def vm_reachable(self, cmd, pub_port, timeout=60):
-        while(timeout > 0):
-            res = self.execute_command(cmd=cmd, ip=self.target_ip, port=pub_port)
-            if res.stderr == '':
-                return True
-            time.sleep(1)
-            timeout -= 1
-        return False
-
     def test004_pause_resume_get_kvm(self):
         """ zos-050
 
