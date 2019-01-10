@@ -98,7 +98,6 @@ func getFList(src string) (FList, error) {
 	}
 
 	if u.Scheme == "file" || u.Scheme == "" {
-		// check file exists
 		return LocalFList(u.Path), nil
 	} else if u.Scheme == "http" || u.Scheme == "https" {
 		if u.Hostname() != HubHost {
