@@ -149,6 +149,15 @@ class Machinetests(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
+    def vm_reachable(self, cmd, pub_port, timeout=60):
+        while(timeout > 0):
+            res = self.execute_command(cmd=cmd, ip=self.target_ip, port=pub_port)
+            if res.stderr == '':
+                return True
+            time.sleep(1)
+            timeout -= 1
+        return False
+
     def test004_pause_resume_get_kvm(self):
         """ zos-050
 
@@ -172,11 +181,11 @@ class Machinetests(BaseTest):
         vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist,
                                  config=config, nics=nics, port={pub_port: 22})
         self.lg('Make sure VM1 is reachable')
-        time.sleep(20)
-        cmd='pwd'
+        time.sleep(15)
+        cmd = 'pwd'
         response = '/root\n'
-        res = self.execute_command(cmd=cmd, ip=self.target_ip, port=pub_port)
-        self.assertEqual(res.stdout, response)
+        flag = self.vm_reachable(cmd, pub_port)
+        self.assertTrue(flag, "vm is not reachable")
 
         self.lg('Pause VM1 and check state from get method ,should be paused')
         self.client.kvm.pause(vm_uuid)
@@ -201,7 +210,7 @@ class Machinetests(BaseTest):
 
     @unittest.skip('https://github.com/threefoldtech/0-core/issues/35')
     def test005_reset_reboot_shutdown_kvm(self):
-        """ zos-000
+        """ zos-053
 
         *Test case for testing reseting, rebooting and shutdown VMs*
 
@@ -221,10 +230,10 @@ class Machinetests(BaseTest):
         vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist,
                                  config=config, nics=nics, port={pub_port: 22})
         self.lg('Make sure vm is reachable')
-        time.sleep(20)
+        time.sleep(15)
         cmd = 'uptime'
-        res = self.execute_command(cmd=cmd, ip=self.target_ip, port=pub_port)
-        self.assertEqual(res.stderr, '')
+        flag = self.vm_reachable(cmd, pub_port)
+        self.assertTrue(flag, "vm is not reachable")
 
         self.lg('Reset VM1 and make sure it is working after reseting')
         self.client.kvm.reset(vm_uuid)
