@@ -1,6 +1,7 @@
 from utils.utils import BaseTest
 import time
 import unittest
+from random import randint
 
 
 class Machinetests(BaseTest):
@@ -154,27 +155,92 @@ class Machinetests(BaseTest):
         *Test case for testing pausing resuming VMs*
 
         **Test Scenario:**
-        #. Create virtual machine (VM), should succeed
-        #. Pause the VM and check state from get method, should be paused
-        #. Resume the VM and check state from get method, should be resumed
+        #. Create virtual machine (VM1), should succeed
+        #. Pause VM1 and check state from get method, should be paused
+        #. Make sure you can't reach VM1.
+        #. Resume VM1 and check state from get method, should be resumed
+        #. Make sure you can reach the VM1.
         #. Destroy VM1, should succeed
         """
-
         self.lg('{} STARTED'.format(self._testID))
         vm_name = self.rand_str()
         self.lg('- Create virtual machine {} , should succeed'.format(vm_name))
-        vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist)
-        time.sleep(3)
+        pub_key = self.create_ssh_key()
+        nics = [{'type': 'default'}]
+        pub_port = randint(4000, 5000)
+        config = {'/root/.ssh/authorized_keys': pub_key}
+        vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist,
+                                 config=config, nics=nics, port={pub_port: 22})
+        self.lg('Make sure VM1 is reachable')
+        time.sleep(15)
+        cmd = 'pwd'
+        response = '/root\n'
+        flag = self.vm_reachable(self.target_ip, pub_port)
+        self.assertTrue(flag, "vm is not reachable")
 
-        self.lg('Pause the VM and check state from get method ,should be paused')
+        self.lg('Pause VM1 and check state from get method ,should be paused')
         self.client.kvm.pause(vm_uuid)
         state_1 = self.client.kvm.get(vm_uuid)['state']
-        self.assertEqual(state_1,'paused')
+        self.assertEqual(state_1, 'paused')
 
-        self.lg('Resume the VM and check state from get method, should be resumed')
+        self.lg('Make sure you can\'t reach VM1')
+        res = self.execute_command(cmd=cmd, ip=self.target_ip, port=pub_port)
+        self.assertIn('No route to host', res.stderr)
+
+        self.lg('Resume VM1 and check state from get method, should be resumed')
         self.client.kvm.resume(vm_uuid)
         state_2 = self.client.kvm.get(vm_uuid)['state']
-        self.assertEqual(state_2,'running')
+        self.assertEqual(state_2, 'running')
+
+        self.lg('Make sure you can reach the VM1')
+        res = self.execute_command(cmd=cmd, ip=self.target_ip, port=pub_port)
+        self.assertEqual(res.stdout, response)
 
         self.lg('- Destroy VM {}'.format(vm_name))
         self.client.kvm.destroy(vm_uuid)
+
+    @unittest.skip('https://github.com/threefoldtech/0-core/issues/35')
+    def test005_reset_reboot_shutdown_kvm(self):
+        """ zos-053
+
+        *Test case for testing reseting, rebooting and shutdown VMs*
+
+        **Test Scenario:**
+        #. Create virtual machine (VM1), should succeed
+        #. Reset VM1 and make sure it is working after reseting.
+        #. Reboot VM1 and make sure it is working after rebooting.
+        #. shutdown VM1, and make sure you can't list it.
+        """
+        self.lg('{} STARTED'.format(self._testID))
+        vm_name = self.rand_str()
+        self.lg('- Create virtual machine {} , should succeed'.format(vm_name))
+        pub_key = self.create_ssh_key()
+        nics = [{'type': 'default'}]
+        pub_port = randint(4000, 5000)
+        config = {'/root/.ssh/authorized_keys': pub_key}
+        vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist,
+                                 config=config, nics=nics, port={pub_port: 22})
+        self.lg('Make sure vm is reachable')
+        time.sleep(15)
+        cmd = 'uptime'
+        flag = self.vm_reachable(self.target_ip, pub_port)
+        self.assertTrue(flag, "vm is not reachable")
+
+        self.lg('Reset VM1 and make sure it is working after reseting')
+        self.client.kvm.reset(vm_uuid)
+        # check that reset has been done
+        res = self.execute_command(cmd=cmd, ip=self.target_ip, port=pub_port)
+        self.assertEqual(int(res.stdout.split()[2]), 0)
+        time.sleep(50)
+
+        self.lg('Reboot VM1 make sure it is working after rebooting')
+        self.client.kvm.reboot(vm_uuid)
+        # check that reboot has been done
+        res = self.execute_command(cmd=cmd, ip=self.target_ip, port=pub_port)
+        self.assertEqual(int(res.stdout.split()[2]), 0)
+
+        self.lg('shutdown VM1, and make sure you can\'t list it')
+        self.client.kvm.shutdown(vm_uuid)
+        time.sleep(10)
+        vm = [vm for vm in self.client.kvm.list() if vm['uuid'] == vm_uuid]
+        self.assertFalse(vm)
