@@ -1,19 +1,11 @@
 package main
 
 import (
-	"archive/tar"
-	"compress/bzip2"
-	"compress/gzip"
-	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"net/http"
-	"net/url"
 	"os"
 	"path"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -26,147 +18,9 @@ import (
 const (
 	CacheBaseDir    = "/var/cache"
 	CacheZeroFSDir  = CacheBaseDir + "/zerofs"
+	CacheFListDir   = CacheBaseDir + "/flist"
 	LocalRouterFile = CacheBaseDir + "/router.yaml"
 )
-
-func getHash(s string) string {
-	m := md5.New()
-	io.WriteString(m, s)
-	return fmt.Sprintf("%x", m.Sum(nil))
-}
-
-//a helper to close all under laying readers in a flist file stream since decompression doesn't
-//auto close the under laying layer.
-type underLayingCloser struct {
-	readers []io.Reader
-}
-
-//close all layers.
-func (u *underLayingCloser) Close() error {
-	for i := len(u.readers) - 1; i >= 0; i-- {
-		r := u.readers[i]
-		if c, ok := r.(io.Closer); ok {
-			c.Close()
-		}
-	}
-
-	return nil
-}
-
-//read only from the last layer.
-func (u *underLayingCloser) Read(p []byte) (int, error) {
-	return u.readers[len(u.readers)-1].Read(p)
-}
-
-func getMetaDBTar(src string) (io.ReadCloser, error) {
-	u, err := url.Parse(src)
-	if err != nil {
-		return nil, err
-	}
-
-	var reader io.ReadCloser
-	base := path.Base(u.Path)
-
-	if u.Scheme == "file" || u.Scheme == "" {
-		// check file exists
-		_, err := os.Stat(u.Path)
-		if err != nil {
-			return nil, err
-		}
-		reader, err = os.Open(u.Path)
-		if err != nil {
-			return nil, err
-		}
-	} else if u.Scheme == "http" || u.Scheme == "https" {
-		response, err := http.Get(src)
-		if err != nil {
-			return nil, err
-		}
-
-		if response.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("failed to download flist: %s", response.Status)
-		}
-
-		reader = response.Body
-	} else {
-		return nil, fmt.Errorf("invalid flist url (%s)", src)
-	}
-
-	var closer underLayingCloser
-	closer.readers = append(closer.readers, reader)
-
-	ext := path.Ext(base)
-	switch ext {
-	case ".tgz":
-		fallthrough
-	case ".flist":
-		fallthrough
-	case ".gz":
-		if r, err := gzip.NewReader(reader); err != nil {
-			closer.Close()
-			return nil, err
-		} else {
-			closer.readers = append(closer.readers, r)
-		}
-		return &closer, nil
-	case ".tbz2":
-		fallthrough
-	case ".bz2":
-		closer.readers = append(closer.readers, bzip2.NewReader(reader))
-		return &closer, err
-	case ".tar":
-		return &closer, nil
-	}
-
-	return nil, fmt.Errorf("unknown flist format %s", ext)
-}
-
-func getMetaDB(location, src string) (string, error) {
-	reader, err := getMetaDBTar(src)
-	if err != nil {
-		return "", err
-	}
-
-	defer reader.Close()
-
-	archive := tar.NewReader(reader)
-	db := fmt.Sprintf("%s.db", location)
-	if err := os.MkdirAll(db, 0755); err != nil {
-		return "", err
-	}
-
-	for {
-		header, err := archive.Next()
-		if err != nil && err != io.EOF {
-			return "", err
-		} else if err == io.EOF {
-			break
-		}
-
-		if header.FileInfo().IsDir() {
-			continue
-		}
-
-		base := path.Join(db, path.Dir(header.Name))
-		if err := os.MkdirAll(base, 0755); err != nil {
-			return "", err
-		}
-
-		file, err := os.Create(path.Join(db, header.Name))
-		if err != nil {
-			return "", err
-		}
-
-		if _, err := io.Copy(file, archive); err != nil {
-			file.Close()
-			return "", err
-		}
-
-		file.Close()
-	}
-
-	return db, nil
-}
 
 func (m *Manager) mount(ctx pm.Context) (interface{}, error) {
 	var args struct {
@@ -190,9 +44,13 @@ func (m *Manager) MountFList(namespace, storage, src string, target string, hook
 		return err
 	}
 
-	hash := getHash(src)
-	backend := path.Join(CacheBaseDir, namespace, hash)
+	meta, err := getMeta(src)
 
+	if err != nil {
+		return err
+	}
+
+	backend := path.Join(CacheBaseDir, namespace, meta.Hash)
 	os.RemoveAll(backend)
 	os.MkdirAll(backend, 0755)
 
@@ -202,26 +60,8 @@ func (m *Manager) MountFList(namespace, storage, src string, target string, hook
 		"--backend", backend,
 		"--cache", cache,
 		"--log", path.Join(backend, "fs.log"),
-	}
-
-	if strings.HasPrefix(src, "restic:") {
-		if err := m.RestoreRepo(
-			strings.TrimPrefix(src, "restic:"),
-			path.Join(backend, "ro"),
-		); err != nil {
-			return err
-		}
-	} else {
-		//assume an flist, an flist requires the meta and storage url
-		db, err := getMetaDB(backend, src)
-		if err != nil {
-			return err
-		}
-
-		g8ufs = append(g8ufs,
-			"--meta", db,
-			"--storage-url", storage,
-		)
+		"--meta", meta.Base,
+		"--storage-url", storage,
 	}
 
 	//local router files
@@ -241,7 +81,6 @@ func (m *Manager) MountFList(namespace, storage, src string, target string, hook
 		}),
 	}
 
-	var err error
 	var j pm.Job
 	var o sync.Once
 	var wg sync.WaitGroup
@@ -287,17 +126,23 @@ func (m *Manager) MergeFList(namespace, target, base, flist string) error {
 		return fmt.Errorf("no filesystem running for the provided namespace and target (%s/%s)", namespace, target)
 	}
 
-	backend := path.Join(CacheBaseDir, namespace, getHash(flist))
-	os.MkdirAll(backend, 0755)
-
-	db, err := getMetaDB(backend, flist)
+	meta, err := getMeta(flist)
 	if err != nil {
 		return err
 	}
 
 	//append db to the backend/.layered file
-	baseBackend := path.Join(CacheBaseDir, namespace, getHash(base))
-	if err := ioutil.WriteFile(path.Join(baseBackend, ".layered"), []byte(db), 0644); err != nil {
+	f, err := getFList(base)
+	if err != nil {
+		return err
+	}
+	hash, err := f.Hash()
+	if err != nil {
+		return err
+	}
+
+	baseBackend := path.Join(CacheBaseDir, namespace, hash)
+	if err := ioutil.WriteFile(path.Join(baseBackend, ".layered"), []byte(meta.Base), 0644); err != nil {
 		return err
 	}
 
