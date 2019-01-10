@@ -8,6 +8,7 @@ import requests
 import json
 import os
 import socket
+import subprocess
 
 
 class BaseTest(unittest.TestCase):
@@ -49,6 +50,23 @@ class BaseTest(unittest.TestCase):
 
     def rand_str(self):
         return str(uuid.uuid4()).replace('-', '')[1:10]
+
+    def create_ssh_key(self):
+        # create sshkey and return the public key
+        keypath = '/root/.ssh/id_rsa.pub'
+        if not os.path.isfile(keypath):
+            os.system("echo  | ssh-keygen -P ''")
+        with open(keypath, "r") as key:
+            pub_key = key.read()
+        pub_key.replace('\n', '')
+        return pub_key
+
+    def execute_command(self, cmd, ip='', port=22):
+        target = "ssh -o 'StrictHostKeyChecking no' -p {} root@{} '{}'".format(port, ip, cmd)
+        response = subprocess.run(target, shell=True, universal_newlines=True,
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # "response" has stderr, stdout and returncode(should be 0 in successful case)
+        return response
 
     def get_process_id(self, cmdline):
         """
@@ -180,12 +198,15 @@ class BaseTest(unittest.TestCase):
         container = self.client.container.create(root_url=root_url, storage=storage, host_network=host_network, nics=nics, tags=tags, privileged=privileged)
         return container.get(30)
 
-    def create_vm(self, name, flist, memory=512, nics=[], port={}):
+    def create_vm(self, name, flist, media=None, cpu=2, memory=512,
+                  share_cache=False, nics=None, port=None, mount=None,
+                  tags=None, config=None):
         cmdline = None
         if 'zero-os' in flist:
             cmdline = 'development'
-        vm_uuid = self.client.kvm.create(name=name, flist=flist, memory=memory,
-                                         port=port, cmdline=cmdline, nics=nics)
+        vm_uuid = self.client.kvm.create(name=name, flist=flist, media=media, cpu=cpu,
+                                         memory=memory, nics=nics, port=port, mount=mount,
+                                         tags=tags, config=config, cmdline=cmdline, share_cache=share_cache)
         return vm_uuid
 
 
