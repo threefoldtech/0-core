@@ -26,8 +26,7 @@ class AdvancedMachines(BaseTest):
                 continue
         return False
 
-    @parameterized.expand(['memory', 'cpu'])
-    def test001_create_kvm_with_params_memory_cpu(self, param):
+    def test001_create_kvm_with_params_memory_cpu(self):
         """ zos-054
 
         *Test case for creating kvm with parameters(memory, cpu)*
@@ -41,16 +40,14 @@ class AdvancedMachines(BaseTest):
 
         self.lg('Create VM (VM1) with one of parameters(memory, cpu)')
         vm_name = self.rand_str()
-        if param == 'cpu':
-            value = randint(1, 3)
-            self.vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist, cpu=value)
-        else:
-            value = randint(1, 3) * 1024
-            self.vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist, memory=value)
+        cpu = randint(1, 3)
+        memory = randint(1, 3) * 1024
+        self.vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist, memory=memory, cpu=cpu)
 
         self.lg('Check that VM1 has been created with the specified parameters')
         info = self.client.kvm.get(self.vm_uuid)['params']
-        self.assertEqual(info[param], value)
+        self.assertEqual(info['cpu'], cpu)
+        self.assertEqual(info['memory'], memory)
         
         self.lg('{} ENDED'.format(self._testID))
     
@@ -95,16 +92,14 @@ class AdvancedMachines(BaseTest):
 
         self.lg('Download ubuntu image')
         image = 'Ubuntu.1604.uefi.x64.qcow2'
-        img_loc = '/var/cache/images'
+        img_loc = '/var/cache/{}'.format(self.rand_str())
         img_ftp = 'ftp://pub:pub1234@ftp.aydo.com/Linux/ubuntu/Ubuntu.1604.uefi.x64.qcow2'
         media_path =  '{}/{}'.format(img_loc, image)
-        location = self.client.filesystem.exists(img_loc)
-        if not self.client.filesystem.exists(media_path):
-            if not location:
-                state = self.client.bash('mkdir -p {}'.format(img_loc)).get().state
-                self.assertEqual(state, 'SUCCESS')
-            state = self.client.bash('wget {} -P {}'.format(img_ftp, img_loc)).get(150).state
-            self.assertEqual(state, 'SUCCESS')
+        
+        state = self.client.bash('mkdir -p {}'.format(img_loc)).get().state
+        self.assertEqual(state, 'SUCCESS')
+        state = self.client.bash('wget {} -P {}'.format(img_ftp, img_loc)).get(150).state
+        self.assertEqual(state, 'SUCCESS')
 
         self.lg('Create VM (VM1) with ubuntu image')
         vm_name = self.rand_str()
@@ -117,12 +112,8 @@ class AdvancedMachines(BaseTest):
         self.assertIn(info['media'][0]['url'], media_path)
 
         self.lg('Delete the ubuntu image')
-        if location:
-            response = self.client.bash('rm -rf {}'.format(media_path)).get()
-            self.assertEqual(response.state, 'SUCCESS')
-        else:
-            response = self.client.bash('rm -rf {}'.format(img_loc)).get()
-            self.assertEqual(response.state, 'SUCCESS')
+        response = self.client.bash('rm -rf {}'.format(img_loc)).get()
+        self.assertEqual(response.state, 'SUCCESS')
 
         self.lg('{} ENDED'.format(self._testID))
 
@@ -137,7 +128,7 @@ class AdvancedMachines(BaseTest):
         #. Create a directory (D1) on host and file (F1) inside it
         #. Create a vm (VM1) with mount directory (D1), should succeed
         #. Try to access VM1 and get F1, should be found
-        #. Check that content of F1, should be same
+        #. Check that content of F1, should be the same
         #. Remove D1
         """
         self.lg('{} STARTED'.format(self._testID))
@@ -164,7 +155,7 @@ class AdvancedMachines(BaseTest):
         cmd = 'cat /mnt/{}'.format(file_name)           
         resposne = self.execute_command(cmd=cmd, ip=self.target_ip, port=pub_port)
 
-        self.lg('Check that content of F1, should be same')
+        self.lg('Check that content of F1, should be the same')
         content = resposne.stdout.strip()
         self.assertEqual(content, data)
 
@@ -185,7 +176,7 @@ class AdvancedMachines(BaseTest):
         #. Create a file (F1) inside /var/cache/zerofs
         #. Create a vm (VM1) with share_cache param, should succeed
         #. Try to access VM1 and get F1, should be found
-        #. Check that content of F1, should be same
+        #. Check that content of F1, should be the same
         #. Remove F1
         """
         self.lg('{} STARTED'.format(self._testID))
@@ -210,7 +201,7 @@ class AdvancedMachines(BaseTest):
         cmd = 'cat zoscahe/{}'.format(file_name)
         response = client.bash(cmd).get()
 
-        self.lg('Check that content of F1, should be same')
+        self.lg('Check that content of F1, should be the same')
         content = response.stdout.strip()
         self.assertEqual(content, data)
 
