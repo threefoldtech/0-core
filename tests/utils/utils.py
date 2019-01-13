@@ -211,8 +211,9 @@ class BaseTest(unittest.TestCase):
                   share_cache=False, nics=None, port=None, mount=None,
                   tags=None, config=None):
         cmdline = None
-        if 'zero-os' in flist:
-            cmdline = 'development'
+        if flist and not media:
+            if 'zero-os' in flist:
+                cmdline = 'development'
         vm_uuid = self.client.kvm.create(name=name, flist=flist, media=media, cpu=cpu,
                                          memory=memory, nics=nics, port=port, mount=mount,
                                          tags=tags, config=config, cmdline=cmdline, share_cache=share_cache)
