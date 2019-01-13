@@ -185,7 +185,8 @@ class Machinetests(BaseTest):
 
         self.lg('Make sure you can\'t reach VM1')
         res = self.execute_command(cmd=cmd, ip=self.target_ip, port=pub_port)
-        self.assertIn('No route to host', res.stderr)
+        if not ('No route to host' in res.stderr or 'Connection timed out' in res.stderr):
+            self.assertTrue(False, 'vm is reachable')
 
         self.lg('Resume VM1 and check state from get method, should be resumed')
         self.client.kvm.resume(vm_uuid)

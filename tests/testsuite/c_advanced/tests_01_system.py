@@ -24,7 +24,7 @@ class SystemTests(BaseTest):
                 continue
         return False
 
-    def test001_update_zos_versoin(self):
+    def test001_update_zos_version(self):
 
         """ zos-052
         *Test case for updating zeroos version
