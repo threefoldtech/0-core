@@ -11,9 +11,11 @@ class AdvancedMachines(BaseTest):
         super(AdvancedMachines, self).setUp()
         self.check_zos_connection(AdvancedMachines)
         self.zos_flist = 'https://hub.grid.tf/tf-autobuilder/zero-os-development.flist'
+        self.vm_uuid = None
 
     def tearDown(self):
-        self.client.kvm.destroy(self.vm_uuid)
+        if self.vm_uuid:
+            self.client.kvm.destroy(self.vm_uuid)
         super().tearDown()
         
     def ping_zos(self, client, timeout=60):
@@ -43,6 +45,7 @@ class AdvancedMachines(BaseTest):
         cpu = randint(1, 3)
         memory = randint(1, 3) * 1024
         self.vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist, memory=memory, cpu=cpu)
+        self.assertTrue(self.vm_uuid)
 
         self.lg('Check that VM1 has been created with the specified parameters')
         info = self.client.kvm.get(self.vm_uuid)['params']
@@ -67,11 +70,11 @@ class AdvancedMachines(BaseTest):
         vm_name = self.rand_str()
         tags = self.rand_str()
         self.vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist, tags=[tags])
+        self.assertTrue(self.vm_uuid)
 
         self.lg('Search for (VM1) by its tags, should be found')
         vms = self.client.kvm.list()
-        for vm in vms:
-            vm_info = [vm for tag in vm['tags'] if tags[:5] in tag]
+        vm_info = [vm for vm in vms if (vm['tags'] and vm['tags'][0]==tags)]
         self.assertTrue(vm_info)
         
         self.lg('{} ENDED'.format(self._testID))
@@ -91,9 +94,9 @@ class AdvancedMachines(BaseTest):
         self.lg('{} STARTED'.format(self._testID))
 
         self.lg('Download ubuntu image')
-        image = 'Ubuntu.1604.uefi.x64.qcow2'
+        image = 'ubuntu-18.04-minimal-cloudimg-amd64.img'
         img_loc = '/var/cache/{}'.format(self.rand_str())
-        img_ftp = 'ftp://pub:pub1234@ftp.aydo.com/Linux/ubuntu/Ubuntu.1604.uefi.x64.qcow2'
+        img_ftp = 'https://cloud-images.ubuntu.com/minimal/releases/bionic/release-20181122.1/ubuntu-18.04-minimal-cloudimg-amd64.img'
         media_path =  '{}/{}'.format(img_loc, image)
         
         state = self.client.bash('mkdir -p {}'.format(img_loc)).get().state
@@ -105,6 +108,7 @@ class AdvancedMachines(BaseTest):
         vm_name = self.rand_str()
         media = [{'url': media_path}]
         self.vm_uuid = self.create_vm(name=vm_name, flist=None, media=media)
+        self.assertTrue(self.vm_uuid)
 
         self.lg('Create VM (VM1) with the ubuntu image has been downloaded')
         self.assertTrue(self.vm_uuid)
@@ -148,6 +152,7 @@ class AdvancedMachines(BaseTest):
         config = {'/root/.ssh/authorized_keys': pub_key}
         vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist, config=config, nics=nics,
                                  port={pub_port: 22}, mount=[{'source': dir_path, 'target': '/mnt'}])
+        self.assertTrue(self.vm_uuid)
 
         self.lg('Try to access VM1 and get F1, should be found')
         flag = self.vm_reachable(self.target_ip, pub_port)
@@ -193,6 +198,7 @@ class AdvancedMachines(BaseTest):
         pub_port = randint(4000, 5000)
         vm_uuid = self.create_vm(name=vm_name, flist=self.zos_flist, nics=nics,
                                  port={pub_port: 6379}, share_cache=True)
+        self.assertTrue(self.vm_uuid)
 
         self.lg('Try to access VM1 and get F1, should be found')
         client = Client(self.target_ip, port=pub_port)
