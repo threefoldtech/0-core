@@ -254,6 +254,18 @@ func processArgs(args map[string]interface{}, values map[string]interface{}) {
 	}
 }
 
+// convert os Environ slice to map mainly to be used in processArgs for startup files
+func osEnvironAsMap() map[string]interface{} {
+	r := make(map[string]interface{})
+	for _, l := range os.Environ() {
+		parts := strings.SplitN(l, "=", 2)
+		if len(parts) == 2 {
+			r[parts[0]] = parts[1]
+		}
+	}
+	return r
+}
+
 /*
 RunSlice runs a slice of processes honoring dependencies. It won't just
 start in order, but will also make sure a service won't start until it's dependencies are
@@ -292,6 +304,7 @@ func RunSlice(slice settings.StartupSlice) {
 			startup.Args = make(map[string]interface{})
 		}
 
+		processArgs(startup.Args, osEnvironAsMap())
 		processArgs(startup.Args, cmdline)
 
 		cmd := &Command{
