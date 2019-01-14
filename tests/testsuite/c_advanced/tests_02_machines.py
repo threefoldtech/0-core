@@ -74,8 +74,7 @@ class AdvancedMachines(BaseTest):
 
         self.lg('Search for (VM1) by its tags, should be found')
         vms = self.client.kvm.list()
-        for vm in vms:
-            vm_info = [vm for tag in vm['tags'] if tags[:5] in tag]
+        vm_info = [vm for vm in vms if (vm['tags'] and vm['tags'][0]==tags)]
         self.assertTrue(vm_info)
         
         self.lg('{} ENDED'.format(self._testID))
