@@ -24,8 +24,8 @@ class SystemTests(BaseTest):
                 continue
         return False
 
-    def test001_update_zos_version(self):
-
+    @unittest.skip('connection to the nested vm is not stable')
+    def test001_update_zos_versoin(self):
         """ zos-052
         *Test case for updating zeroos version
 
