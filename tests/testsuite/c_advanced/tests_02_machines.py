@@ -11,7 +11,7 @@ class AdvancedMachines(BaseTest):
         super(AdvancedMachines, self).setUp()
         self.check_zos_connection(AdvancedMachines)
         self.zos_flist = 'https://hub.grid.tf/tf-autobuilder/zero-os-development.flist'
-        self.vm_uuid = ''
+        self.vm_uuid = None
 
     def tearDown(self):
         if self.vm_uuid:
