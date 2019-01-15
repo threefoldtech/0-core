@@ -35,6 +35,8 @@ type jobImb struct {
 	registerPID func(GetPID) (int, error)
 	waitPID     func(int) syscall.WaitStatus
 	running     int32
+
+	backoff BackOff
 }
 
 /*
@@ -65,6 +67,11 @@ func newJob(command *pm.Command, factory ProcessFactory, hooks ...pm.RunnerHook)
 
 		registerPID: registerPID,
 		waitPID:     waitPID,
+		backoff: BackOff{
+			Delay:    2 * time.Second,
+			Multiply: 1.5,
+			Max:      5 * time.Minute,
+		},
 	}
 
 	job.wg.Add(1)
@@ -315,8 +322,9 @@ loop:
 
 		if r.command.Flags.Protected {
 			//immediate restart
-			log.Debugf("Re-spawning protected service '%s' in 1 second", r.command.ID)
-			<-time.After(1 * time.Second)
+			delay := r.backoff.Duration()
+			log.Debugf("Re-spawning protected service '%s' in %s", r.command.ID, delay)
+			<-time.After(delay)
 			continue
 		}
 
