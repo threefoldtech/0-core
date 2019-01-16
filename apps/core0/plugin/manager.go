@@ -7,12 +7,17 @@ import (
 	"plugin"
 	"runtime/debug"
 	"strings"
+	"sync"
 
 	"github.com/threefoldtech/0-core/base/mgr"
 
 	logging "github.com/op/go-logging"
 	plg "github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
+)
+
+const (
+	PluginNamespace = "plugin"
 )
 
 var (
@@ -29,6 +34,8 @@ type Plugin struct {
 type Manager struct {
 	path    []string
 	plugins map[string]*Plugin
+
+	l sync.RWMutex
 }
 
 //New create a new plugin manager
@@ -41,20 +48,41 @@ func New(path ...string) (*Manager, error) {
 	return m, nil
 }
 
+func (m *Manager) internal(name string) (action pm.Action, ok bool) {
+	switch name {
+	case "list":
+		action = m.list
+	case "load":
+		action = m.load
+	}
+
+	if action != nil {
+		return action, true
+	}
+
+	return nil, false
+}
+
 //Get action from fqn
+//implements Router
 func (m *Manager) Get(name string) (pm.Action, bool) {
 	parts := strings.SplitN(name, ".", 2)
 	if len(parts) == 0 {
-		return nil, false
-	}
-	plugin, ok := m.plugins[parts[0]]
-	if !ok {
 		return nil, false
 	}
 
 	target := ""
 	if len(parts) == 2 {
 		target = parts[1]
+	}
+
+	if parts[0] == PluginNamespace {
+		return m.internal(target)
+	}
+
+	plugin, ok := m.plugins[parts[0]]
+	if !ok {
+		return nil, false
 	}
 
 	action, ok := plugin.Actions[target]
@@ -121,6 +149,9 @@ func (m *Manager) openRecursive(pl *Plugin) error {
 }
 
 func (m *Manager) Load() error {
+	m.l.Lock()
+	defer m.l.Unlock()
+
 	for _, p := range m.path {
 		if err := m.loadPath(p); err != nil {
 			return err
