@@ -3,7 +3,10 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
+	"path"
 	"strings"
 	"syscall"
 	"time"
@@ -298,6 +301,10 @@ func (b *Bootstrap) First() {
 	if !b.agent {
 		if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &syscall.Rlimit{65536, 65536}); err != nil {
 			log.Errorf("failed to setup max open files limit: %s", err)
+		}
+
+		if err := ioutil.WriteFile(path.Join("/proc", fmt.Sprint(os.Getpid()), "oom_score_adj"), []byte("-1000"), 0644); err != nil {
+			log.Errorf("failed to adjust oom score")
 		}
 	}
 
