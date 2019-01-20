@@ -103,3 +103,7 @@ func (m *Router) Aggregate(op, key string, value float64, id string, tags ...pm.
 func (m *Router) Shutdown(except ...string) {
 	mgr.Shutdown(except...)
 }
+
+func (m *Router) Store() plugin.Store {
+	panic("not implemented")
+}

@@ -23,8 +23,9 @@ var (
 	ip ipmgr
 
 	Plugin = plugin.Plugin{
-		Name:    "ip",
-		Version: "1.0",
+		Name:      "ip",
+		Version:   "1.0",
+		CanUpdate: false,
 		Open: func(api plugin.API) error {
 			ip.api = api
 			return nil

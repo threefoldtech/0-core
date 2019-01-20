@@ -9,8 +9,9 @@ var (
 	manager Manager
 
 	Plugin = plugin.Plugin{
-		Name:    "pprof",
-		Version: "1.0",
+		Name:      "pprof",
+		Version:   "1.0",
+		CanUpdate: true,
 		Open: func(api plugin.API) error {
 			manager.api = api
 			return nil

@@ -36,6 +36,18 @@ type Manager struct {
 	plugins map[string]*Plugin
 
 	l sync.RWMutex
+
+	stores map[string]plg.Store
+	sm     sync.Locker
+}
+
+type ScopedManager struct {
+	*Manager
+	scope string
+}
+
+func (s ScopedManager) Store() plg.Store {
+	return s.Manager.Store(s.scope)
 }
 
 //New create a new plugin manager
@@ -43,6 +55,7 @@ func New(path ...string) (*Manager, error) {
 	m := &Manager{
 		path:    path,
 		plugins: make(map[string]*Plugin),
+		stores:  make(map[string]plg.Store),
 	}
 
 	return m, nil
@@ -117,7 +130,7 @@ func (m *Manager) safeOpen(pl *Plugin) (err error) {
 		}
 	}()
 
-	err = pl.Open(m)
+	err = pl.Open(ScopedManager{Manager: m, scope: pl.Name})
 	return
 }
 

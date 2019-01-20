@@ -19,9 +19,10 @@ var (
 
 	//Plugin entry point
 	Plugin = plugin.Plugin{
-		Name:     "aggregator",
-		Version:  "1.0",
-		Requires: []string{"protocol"},
+		Name:      "aggregator",
+		Version:   "1.0",
+		CanUpdate: false,
+		Requires:  []string{"protocol"},
 		Open: func(api plugin.API) error {
 			initManager(&manager, api)
 			return nil

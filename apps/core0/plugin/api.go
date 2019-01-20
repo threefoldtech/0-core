@@ -5,6 +5,7 @@ import (
 
 	"github.com/threefoldtech/0-core/base"
 	"github.com/threefoldtech/0-core/base/mgr"
+	plg "github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
@@ -56,4 +57,19 @@ func (m *Manager) Shutdown(except ...string) {
 
 func (m *Manager) Aggregate(op, key string, value float64, id string, tags ...pm.Tag) {
 	mgr.Aggregate(op, key, value, id, tags...)
+}
+
+func (m *Manager) Store(scope string) plg.Store {
+	m.sm.Lock()
+	defer m.sm.Unlock()
+
+	store, ok := m.stores[scope]
+	if ok {
+		return store
+	}
+
+	store = newStore()
+	m.stores[scope] = store
+
+	return store
 }

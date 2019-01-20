@@ -8,9 +8,9 @@ import (
 
 var (
 	Plugin = plugin.Plugin{
-		Name:    "config",
-		Version: "1.0",
-
+		Name:      "config",
+		Version:   "1.0",
+		CanUpdate: true,
 		Actions: map[string]pm.Action{
 			"get": get,
 		},

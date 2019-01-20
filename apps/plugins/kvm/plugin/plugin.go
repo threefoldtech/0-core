@@ -16,8 +16,9 @@ var (
 	manager kvmManager
 
 	Plugin = plugin.Plugin{
-		Name:    "kvm",
-		Version: "1.0",
+		Name:      "kvm",
+		Version:   "1.0",
+		CanUpdate: false,
 		Requires: []string{
 			"bridge",
 			"socat",

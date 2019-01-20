@@ -27,8 +27,9 @@ var (
 	fs filesystem
 
 	Plugin = plugin.Plugin{
-		Name:    "filesystem",
-		Version: "1.0",
+		Name:      "filesystem",
+		Version:   "1.0",
+		CanUpdate: true,
 		Open: func(api plugin.API) error {
 			return initFS(&fs)
 		},

@@ -16,4 +16,12 @@ type API interface {
 	Plugin(name string) (interface{}, error)
 	Shutdown(except ...string)
 	Aggregate(op, key string, value float64, id string, tags ...pm.Tag)
+	Store() Store
+}
+
+//Store stores data on the core0 context
+type Store interface {
+	Set(key string, value []byte) error
+	Get(key string) ([]byte, error)
+	List() (map[string][]byte, error)
 }

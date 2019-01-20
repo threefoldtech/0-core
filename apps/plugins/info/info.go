@@ -29,8 +29,9 @@ var (
 
 	//Plugin entry point
 	Plugin = plugin.Plugin{
-		Name:    "info",
-		Version: "1.0",
+		Name:      "info",
+		Version:   "1.0",
+		CanUpdate: true,
 		Open: func(a plugin.API) error {
 			api = a
 			return nil

@@ -11,8 +11,9 @@ var (
 	manager Manager
 
 	Plugin = plugin.Plugin{
-		Name:    "monitor",
-		Version: "1.0",
+		Name:      "monitor",
+		Version:   "1.0",
+		CanUpdate: true,
 		Open: func(api plugin.API) error {
 			manager.api = api
 			return nil

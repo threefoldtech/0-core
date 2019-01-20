@@ -15,8 +15,9 @@ var (
 
 	//Plugin entry point
 	Plugin = plugin.Plugin{
-		Name:    "protocol",
-		Version: "1.0",
+		Name:      "protocol",
+		Version:   "1.0",
+		CanUpdate: false,
 		//we require nft just to make sure firewall rules are applied before accepting connections
 		Requires: []string{"nft"},
 		Open: func(api plugin.API) error {

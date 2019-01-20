@@ -20,8 +20,9 @@ var (
 	_       containers.API = (*Manager)(nil)
 
 	Plugin = plugin.Plugin{
-		Name:    "corex",
-		Version: "1.0",
+		Name:      "corex",
+		Version:   "1.0",
+		CanUpdate: false,
 		Requires: []string{
 			"cgroup",
 			"socat",

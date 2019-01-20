@@ -15,8 +15,9 @@ var (
 	_   nft.API = (*manager)(nil)
 
 	Plugin = plugin.Plugin{
-		Name:    "nft",
-		Version: "1.0",
+		Name:      "nft",
+		Version:   "1.0",
+		CanUpdate: false,
 		Open: func(api plugin.API) error {
 			return newManager(&mgr, api)
 		},

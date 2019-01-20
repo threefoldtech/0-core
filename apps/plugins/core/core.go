@@ -15,8 +15,9 @@ var (
 	mgr coreManager
 
 	Plugin = plugin.Plugin{
-		Name:    "core",
-		Version: "1.0",
+		Name:      "core",
+		Version:   "1.0",
+		CanUpdate: true,
 		Open: func(api plugin.API) error {
 			return initMgr(&mgr, api)
 		},
