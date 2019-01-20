@@ -38,7 +38,7 @@ type Manager struct {
 	l sync.RWMutex
 
 	stores map[string]plg.Store
-	sm     sync.Locker
+	sm     sync.Mutex
 }
 
 type ScopedManager struct {

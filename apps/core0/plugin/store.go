@@ -13,23 +13,29 @@ func newStore() *store {
 	}
 }
 
-func (s *store) Set(key string, value []byte) error {
+func (s *store) Set(key string, value []byte) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
 	s.data[key] = value
-	return nil
 }
 
-func (s *store) Get(key string) ([]byte, error) {
+func (s *store) Get(key string) ([]byte, bool) {
 	s.m.RLock()
 	defer s.m.RUnlock()
 
-	data, _ := s.data[key]
-	return data, nil
+	data, ok := s.data[key]
+	return data, ok
 }
 
-func (s *store) List() (map[string][]byte, error) {
+func (s *store) Del(key string) {
+	s.m.RLock()
+	defer s.m.RUnlock()
+
+	delete(s.data, key)
+}
+
+func (s *store) List() map[string][]byte {
 	data := make(map[string][]byte)
 	s.m.RLock()
 	defer s.m.RUnlock()
@@ -37,5 +43,5 @@ func (s *store) List() (map[string][]byte, error) {
 		data[k] = v
 	}
 
-	return data, nil
+	return data
 }

@@ -21,7 +21,8 @@ type API interface {
 
 //Store stores data on the core0 context
 type Store interface {
-	Set(key string, value []byte) error
-	Get(key string) ([]byte, error)
-	List() (map[string][]byte, error)
+	Set(key string, value []byte)
+	Get(key string) ([]byte, bool)
+	Del(key string)
+	List() map[string][]byte
 }
