@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -25,7 +26,7 @@ var (
 	Plugin = plugin.Plugin{
 		Name:      "ip",
 		Version:   "1.0",
-		CanUpdate: false,
+		CanUpdate: true,
 		Open: func(api plugin.API) error {
 			ip.api = api
 			return nil
@@ -64,6 +65,12 @@ type ipmgr struct {
 
 func (m *ipmgr) initBonding() {
 	m.bondOnce.Do(func() {
+		_, err := os.Stat("/sys/module/bonding")
+		if err == nil {
+			//nothing to do
+			return
+		}
+
 		m.api.System("modprobe", "bonding")
 		link, err := netlink.LinkByName("bond0")
 		if err != nil {
