@@ -54,11 +54,18 @@ func (m *Manager) GetGroup(subsystem cgroup.Subsystem, name string) (cgroup.Grou
 	}
 
 	p := path.Join(CGroupBase, string(subsystem), name)
-	if err := os.Mkdir(p, 0755); err != nil && !os.IsExist(err) {
+	if _, err := os.Stat(p); err == nil {
+		//group was created before
+		return mkg(name, subsystem), nil
+	}
+
+	if err := os.Mkdir(p, 0755); err != nil {
 		return nil, err
 	}
 
-	return mkg(name, subsystem), nil
+	group := mkg(name, subsystem)
+	group.Reset()
+	return group, nil
 }
 
 //Get group only if it exists

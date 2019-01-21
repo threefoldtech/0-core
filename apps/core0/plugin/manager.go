@@ -180,7 +180,8 @@ func (m *Manager) loadPath(p string) error {
 		plugin, err := m.loadPlugin(path.Join(p, item.Name()))
 
 		if err != nil {
-			return err
+			log.Errorf("failed to load %s: %s", item.Name(), err)
+			continue
 		}
 
 		m.plugins[plugin.Name] = &Plugin{Plugin: plugin}
