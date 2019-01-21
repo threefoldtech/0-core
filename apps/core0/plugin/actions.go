@@ -38,25 +38,27 @@ func (m *Manager) load(ctx pm.Context) (interface{}, error) {
 		return nil, pm.BadRequestError(err)
 	}
 
-	pl, err := m.loadPlugin(args.Path)
+	pls, err := m.loadPlugins(args.Path)
 	if err != nil {
 		return nil, err
 	}
 
 	m.l.Lock()
 	defer m.l.Unlock()
-	if current, ok := m.plugins[pl.Name]; ok {
-		if !current.CanUpdate {
-			return nil, fmt.Errorf("plugin %s does not support hot update", current.Name)
+	for _, pl := range pls {
+		if current, ok := m.plugins[pl.Name]; ok {
+			if !current.CanUpdate {
+				return nil, fmt.Errorf("plugin %s does not support hot update", current.Name)
+			}
 		}
-	}
 
-	plugin := &Plugin{Plugin: pl}
-	if err := m.openRecursive(plugin); err != nil {
-		return nil, err
-	}
+		plugin := &Plugin{Plugin: pl}
+		if err := m.openRecursive(plugin); err != nil {
+			return nil, err
+		}
 
-	m.plugins[pl.Name] = plugin
+		m.plugins[pl.Name] = plugin
+	}
 
 	return nil, nil
 }

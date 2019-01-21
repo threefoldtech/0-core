@@ -102,7 +102,7 @@ func (m *Manager) Get(name string) (pm.Action, bool) {
 	return action, ok
 }
 
-func (m *Manager) loadPlugin(p string) (*plg.Plugin, error) {
+func (m *Manager) loadPlugins(p string) ([]*plg.Plugin, error) {
 	log.Infof("loading plugin %s", p)
 	plug, err := plugin.Open(p)
 	if err != nil {
@@ -114,11 +114,14 @@ func (m *Manager) loadPlugin(p string) (*plg.Plugin, error) {
 		return nil, err
 	}
 
-	if plugin, ok := sym.(*plg.Plugin); ok {
-		return plugin, nil
+	switch sym := sym.(type) {
+	case *plg.Plugin:
+		return []*plg.Plugin{sym}, nil
+	case *[]*plg.Plugin:
+		return *sym, nil
+	default:
+		return nil, fmt.Errorf("plugin symbol of wrong type: %T", sym)
 	}
-
-	return nil, fmt.Errorf("plugin symbol of wrong type: %T", sym)
 }
 
 func (m *Manager) safeOpen(pl *Plugin) (err error) {
@@ -221,13 +224,14 @@ func (m *Manager) loadPath(p string) error {
 			continue
 		}
 
-		plugin, err := m.loadPlugin(path.Join(p, item.Name()))
+		plugins, err := m.loadPlugins(path.Join(p, item.Name()))
 
 		if err != nil {
 			return err
 		}
-
-		m.plugins[plugin.Name] = &Plugin{Plugin: plugin}
+		for _, p := range plugins {
+			m.plugins[p.Name] = &Plugin{Plugin: p}
+		}
 	}
 
 	return nil

@@ -167,7 +167,7 @@ func main() {
 	}
 	mgr.AddRouter(pluginMgr)
 	if err := pluginMgr.Load(); err != nil {
-		log.Fatalf("failed to load plugins")
+		log.Fatalf("failed to load plugins: %s", err)
 	}
 
 	bs := bootstrap.NewBootstrap(options.Agent())
