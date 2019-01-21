@@ -227,8 +227,10 @@ func (m *Manager) loadPath(p string) error {
 		plugins, err := m.loadPlugins(path.Join(p, item.Name()))
 
 		if err != nil {
-			return err
+			log.Errorf("failed to load '%s': %v", item.Name(), err)
+			continue
 		}
+
 		for _, p := range plugins {
 			m.plugins[p.Name] = &Plugin{Plugin: p}
 		}
