@@ -99,14 +99,14 @@ func (m *kvmManager) prepareVLanNetwork(nic *Nic) (*InterfaceDevice, error) {
 		}
 	}
 	//find the container with OVS tag
-	ovs := m.container.GetOneWithTags(OVSTag)
+	ovs := m.container().GetOneWithTags(OVSTag)
 	if ovs == nil {
 		return nil, fmt.Errorf("ovs is needed for VLAN network type")
 	}
 
 	//ensure that a bridge is available with that vlan tag.
 	//we dispatch the ovs.vlan-ensure command to container.
-	result, err := m.container.Dispatch(ovs.ID(), &pm.Command{
+	result, err := m.container().Dispatch(ovs.ID(), &pm.Command{
 		Command: "ovs.vlan-ensure",
 		Arguments: pm.MustArguments(map[string]interface{}{
 			"master": OVSBackPlane,
@@ -167,14 +167,14 @@ func (m *kvmManager) prepareVXLanNetwork(nic *Nic) (*InterfaceDevice, error) {
 		}
 	}
 	//find the container with OVS tag
-	ovs := m.container.GetOneWithTags(OVSTag)
+	ovs := m.container().GetOneWithTags(OVSTag)
 	if ovs == nil {
 		return nil, fmt.Errorf("ovs is needed for VXLAN network type")
 	}
 
 	//ensure that a bridge is available with that vlan tag.
 	//we dispatch the ovs.vxlan-ensure command to container.
-	result, err := m.container.Dispatch(ovs.ID(), &pm.Command{
+	result, err := m.container().Dispatch(ovs.ID(), &pm.Command{
 		Command: "ovs.vxlan-ensure",
 		Arguments: pm.MustArguments(map[string]interface{}{
 			"master": OVSVXBackend,

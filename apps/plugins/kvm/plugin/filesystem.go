@@ -52,7 +52,7 @@ func (m *kvmManager) flistMount(uuid, src, storage string, cfg map[string]string
 		},
 	}
 
-	if err = m.filesystem.MountFList(namespace, storage, src, target, onExit); err != nil {
+	if err = m.filesystem().MountFList(namespace, storage, src, target, onExit); err != nil {
 		return
 	}
 

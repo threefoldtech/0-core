@@ -55,9 +55,6 @@ type LibvirtConnection struct {
 }
 
 type kvmManager struct {
-	container     containers.API
-	socat         socat.API
-	filesystem    zfs.API
 	sequence      uint16
 	sequenceMutex sync.Mutex
 	libvirt       LibvirtConnection
@@ -68,6 +65,18 @@ type kvmManager struct {
 
 	devDeleteEvent *Sync
 	api            plugin.API
+}
+
+func (m *kvmManager) socat() socat.API {
+	return m.api.MustPlugin("socat").(socat.API)
+}
+
+func (m *kvmManager) filesystem() zfs.API {
+	return m.api.MustPlugin("zfs").(zfs.API)
+}
+
+func (m *kvmManager) container() containers.API {
+	return m.api.MustPlugin("corex").(containers.API)
 }
 
 var (
@@ -777,7 +786,7 @@ func (m *kvmManager) setPortForward(uuid string, seq uint16, host string, contai
 	id := m.forwardId(uuid)
 	var err error
 
-	if err = m.socat.SetPortForward(id, ip, host, container); err != nil {
+	if err = m.socat().SetPortForward(id, ip, host, container); err != nil {
 		return err
 	}
 
@@ -825,7 +834,7 @@ func (m *kvmManager) prepareFlist(params *CreateParams, domain *Domain) error {
 
 	if params.ShareCache {
 		domain.Devices.Filesystems = append(domain.Devices.Filesystems, Filesystem{
-			Source: FilesystemDir{m.filesystem.GetCacheZeroFSDir()},
+			Source: FilesystemDir{m.filesystem().GetCacheZeroFSDir()},
 			Target: FilesystemDir{"zoscache"}, //the <root> here matches the one in the cmdline root=<root>
 		})
 	}
@@ -1956,7 +1965,7 @@ func (m *kvmManager) portforwardRemove(ctx pm.Context) (interface{}, error) {
 	if _, err := conn.LookupDomainByUUIDString(params.UUID); err != nil {
 		return nil, fmt.Errorf("couldn't find domain with the uuid %s", params.UUID)
 	}
-	err = m.socat.RemovePortForward(m.forwardId(params.UUID), params.HostPort, params.ContainerPort)
+	err = m.socat().RemovePortForward(m.forwardId(params.UUID), params.HostPort, params.ContainerPort)
 	if err != nil {
 		return nil, err
 	}

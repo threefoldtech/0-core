@@ -167,8 +167,6 @@ func (m *Manager) openRecursive(pl *Plugin) error {
 }
 
 func (m *Manager) Load() error {
-	m.l.Lock()
-	defer m.l.Unlock()
 
 	for _, p := range m.path {
 		if err := m.loadPath(p); err != nil {
@@ -203,10 +201,11 @@ func (m *Manager) Load() error {
 			mgr.AddHandle(api)
 		}
 	}
-
+	m.l.Lock()
 	for _, bad := range errored {
 		delete(m.plugins, bad)
 	}
+	m.l.Unlock()
 
 	return nil
 }
@@ -232,10 +231,11 @@ func (m *Manager) loadPath(p string) error {
 			log.Errorf("failed to load '%s': %v", item.Name(), err)
 			continue
 		}
-
+		m.l.Lock()
 		for _, p := range plugins {
 			m.plugins[p.Name] = &Plugin{Plugin: p}
 		}
+		m.l.Unlock()
 	}
 
 	return nil

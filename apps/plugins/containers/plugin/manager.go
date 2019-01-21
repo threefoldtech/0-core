@@ -136,7 +136,7 @@ func (c *ContainerCreateArguments) Validate(m *Manager) error {
 	}
 
 	for host, guest := range c.Port {
-		if !m.socat.ValidHost(host) {
+		if !m.socat().ValidHost(host) {
 			return fmt.Errorf("invalid host port '%s'", host)
 		}
 		if guest < 0 || guest > 65535 {
@@ -214,7 +214,7 @@ func (c *ContainerCreateArguments) Validate(m *Manager) error {
 	}
 
 	for _, cgroup := range c.CGroups {
-		if !m.cgroup.Exists(cgroup.Subsystem(), cgroup.Name()) {
+		if !m.cgroup().Exists(cgroup.Subsystem(), cgroup.Name()) {
 			return fmt.Errorf("invalid cgroup %v", cgroup)
 		}
 	}
@@ -223,18 +223,33 @@ func (c *ContainerCreateArguments) Validate(m *Manager) error {
 }
 
 type Manager struct {
-	api        plugin.API
-	cgroup     cgroup.API
-	socat      socat.API
-	filesystem zfs.API
-	protocol   protocol.API
-	logger     pm.MessageHandler
+	api plugin.API
 
 	sequence uint16
 	seqM     sync.Mutex
 
 	containers map[uint16]*container
 	conM       sync.RWMutex
+}
+
+func (m *Manager) cgroup() cgroup.API {
+	return m.api.MustPlugin("cgroup").(cgroup.API)
+}
+
+func (m *Manager) socat() socat.API {
+	return m.api.MustPlugin("socat").(socat.API)
+}
+
+func (m *Manager) filesystem() zfs.API {
+	return m.api.MustPlugin("zfs").(zfs.API)
+}
+
+func (m *Manager) protocol() protocol.API {
+	return m.api.MustPlugin("protocol").(protocol.API)
+}
+
+func (m *Manager) logger() pm.MessageHandler {
+	return m.api.MustPlugin("logger").(pm.MessageHandler)
 }
 
 /*
@@ -247,7 +262,7 @@ TODO:
 */
 
 func (m *Manager) setUpCGroups() error {
-	devices, err := m.cgroup.GetGroup(DevicesCGroup.Subsystem(), DevicesCGroup.Name())
+	devices, err := m.cgroup().GetGroup(DevicesCGroup.Subsystem(), DevicesCGroup.Name())
 	if err != nil {
 		return err
 	}
@@ -514,7 +529,7 @@ func (m *Manager) getCoreXQueue(id uint16) string {
 }
 
 func (m *Manager) pushToContainer(container *container, cmd *pm.Command) error {
-	m.protocol.Flag(cmd.ID)
+	m.protocol().Flag(cmd.ID)
 	return container.dispatch(cmd)
 }
 
@@ -564,7 +579,7 @@ func (m *Manager) Dispatch(id uint16, cmd *pm.Command) (*pm.JobResult, error) {
 		return nil, err
 	}
 
-	return m.protocol.Get(cmd.ID, 300)
+	return m.protocol().Get(cmd.ID, 300)
 }
 
 type ContainerArguments struct {
@@ -711,7 +726,7 @@ func (m *Manager) portforwardRemove(ctx pm.Context) (interface{}, error) {
 		return nil, pm.NotFoundError(fmt.Errorf("container does not exist"))
 	}
 
-	if err := m.socat.RemovePortForward(container.forwardId(), args.HostPort, args.ContainerPort); err != nil {
+	if err := m.socat().RemovePortForward(container.forwardId(), args.HostPort, args.ContainerPort); err != nil {
 		return nil, err
 	}
 	delete(container.Args.Port, args.HostPort)

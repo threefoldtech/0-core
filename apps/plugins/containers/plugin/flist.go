@@ -92,7 +92,7 @@ func (m *Manager) flistCreate(ctx pm.Context) (interface{}, error) {
 	srcPath := containerPath(cont, args.Src)
 
 	// create flist
-	storage := m.socat.Resolve(args.Storage)
+	storage := m.socat().Resolve(args.Storage)
 
 	zflistArgs := []string{"--archive", archivePath, "--create", srcPath, "--backend", storage}
 	if args.Token != "" {

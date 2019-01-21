@@ -1,14 +1,8 @@
 package main
 
 import (
-	"fmt"
-
 	logging "github.com/op/go-logging"
-	"github.com/threefoldtech/0-core/apps/plugins/cgroup"
 	"github.com/threefoldtech/0-core/apps/plugins/containers"
-	"github.com/threefoldtech/0-core/apps/plugins/protocol"
-	"github.com/threefoldtech/0-core/apps/plugins/socat"
-	"github.com/threefoldtech/0-core/apps/plugins/zfs"
 	"github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
 )
@@ -64,46 +58,6 @@ func main() {}
 
 func iniManager(mgr *Manager, api plugin.API) error {
 	mgr.api = api
-	var ok bool
-	if api, err := api.Plugin("cgroup"); err == nil {
-		if mgr.cgroup, ok = api.(cgroup.API); !ok {
-			return fmt.Errorf("invalid cgroup api")
-		}
-	} else {
-		return err
-	}
-
-	if api, err := api.Plugin("socat"); err == nil {
-		if mgr.socat, ok = api.(socat.API); !ok {
-			return fmt.Errorf("invalid socat api")
-		}
-	} else {
-		return err
-	}
-
-	if api, err := api.Plugin("zfs"); err == nil {
-		if mgr.filesystem, ok = api.(zfs.API); !ok {
-			return fmt.Errorf("invalid zfs api")
-		}
-	} else {
-		return err
-	}
-
-	if api, err := api.Plugin("protocol"); err == nil {
-		if mgr.protocol, ok = api.(protocol.API); !ok {
-			return fmt.Errorf("invalid protocol api")
-		}
-	} else {
-		return err
-	}
-
-	if api, err := api.Plugin("logger"); err == nil {
-		if mgr.logger, ok = api.(pm.MessageHandler); !ok {
-			return fmt.Errorf("invalid logger api")
-		}
-	} else {
-		return err
-	}
 
 	mgr.containers = make(map[uint16]*container)
 	log.Debugf("setting up containers cgroups")
