@@ -14,6 +14,7 @@ type API interface {
 	JobOf(id string) (pm.Job, bool)
 	Jobs() map[string]pm.Job
 	Plugin(name string) (interface{}, error)
+	MustPlugin(name string) interface{}
 	Shutdown(except ...string)
 	Aggregate(op, key string, value float64, id string, tags ...pm.Tag)
 	Store() Store

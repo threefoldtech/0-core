@@ -8,9 +8,10 @@ import (
 )
 
 type info struct {
-	Name      string `json:"name"`
-	Version   string `json:"version"`
-	Updatable bool   `json:"updateable"`
+	Name      string   `json:"name"`
+	Version   string   `json:"version"`
+	Updatable bool     `json:"updateable"`
+	Requires  []string `json:"requires,omitempty"`
 }
 
 func (m *Manager) list(ctx pm.Context) (interface{}, error) {
@@ -23,6 +24,7 @@ func (m *Manager) list(ctx pm.Context) (interface{}, error) {
 			Name:      p.Name,
 			Version:   p.Version,
 			Updatable: p.CanUpdate,
+			Requires:  p.Requires,
 		})
 	}
 

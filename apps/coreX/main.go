@@ -12,7 +12,7 @@ import (
 	"github.com/threefoldtech/0-core/apps/plugins/base/info"
 	"github.com/threefoldtech/0-core/apps/plugins/base/ip"
 	"github.com/threefoldtech/0-core/apps/plugins/base/job"
-	"github.com/threefoldtech/0-core/apps/plugins/process"
+	"github.com/threefoldtech/0-core/apps/plugins/base/process"
 	"github.com/threefoldtech/0-core/base"
 	"github.com/threefoldtech/0-core/base/mgr"
 	"github.com/threefoldtech/0-core/base/pm"

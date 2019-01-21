@@ -67,7 +67,7 @@ func (s *socatManager) monitorIPChangesUpdateSocat() error {
 		}
 
 		for ip := range current {
-			if err := s.nft.IPv4SetDel(nft.FamilyIP, "nat", "host", ip); err != nil {
+			if err := s.nft().IPv4SetDel(nft.FamilyIP, "nat", "host", ip); err != nil {
 				log.Errorf("failed to delete host ip(%s): %s", ip, err)
 			}
 		}
@@ -78,7 +78,7 @@ func (s *socatManager) monitorIPChangesUpdateSocat() error {
 			current[ip] = struct{}{}
 		}
 
-		if err := s.nft.IPv4Set(nft.FamilyIP, "nat", "host", ips...); err != nil {
+		if err := s.nft().IPv4Set(nft.FamilyIP, "nat", "host", ips...); err != nil {
 			log.Errorf("failed to set host ips(%s): %s", strings.Join(ips, ","), err)
 		}
 	}

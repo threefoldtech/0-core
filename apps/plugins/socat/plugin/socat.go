@@ -12,8 +12,8 @@ import (
 	"github.com/threefoldtech/0-core/apps/plugins/nft"
 	"github.com/threefoldtech/0-core/apps/plugins/socat"
 
-	"github.com/op/go-logging"
-	"github.com/patrickmn/go-cache"
+	logging "github.com/op/go-logging"
+	cache "github.com/patrickmn/go-cache"
 )
 
 func main() {} //silence error
@@ -57,7 +57,6 @@ var (
 
 type socatManager struct {
 	api plugin.API
-	nft nft.API
 
 	rm    sync.Mutex
 	rules map[int]rule
@@ -67,21 +66,15 @@ type socatManager struct {
 }
 
 func newSocatManager(mgr *socatManager, api plugin.API) error {
-	p, err := api.Plugin("nft")
-	if err != nil {
-		return err
-	}
-	nft, ok := p.(nft.API)
-	if !ok {
-		return fmt.Errorf("wrong nft api")
-	}
-
 	mgr.api = api
-	mgr.nft = nft
 	mgr.rules = make(map[int]rule)
 	mgr.reserved = cache.New(2*time.Minute, 1*time.Minute)
 
 	return mgr.init()
+}
+
+func (s *socatManager) nft() nft.API {
+	return s.api.MustPlugin("nft").(nft.API)
 }
 
 func (s *socatManager) init() error {
@@ -139,7 +132,7 @@ func (s *socatManager) SetPortForward(namespace string, ip string, host string, 
 		},
 	}
 
-	if err := s.nft.Apply(set); err != nil {
+	if err := s.nft().Apply(set); err != nil {
 		return err
 	}
 
@@ -190,7 +183,7 @@ func (s *socatManager) RemovePortForward(namespace string, host string, dest int
 		},
 	}
 
-	if err := s.nft.DropRules(set); err != nil {
+	if err := s.nft().DropRules(set); err != nil {
 		return err
 	}
 
@@ -233,7 +226,7 @@ func (s *socatManager) RemoveAll(namespace string) error {
 		},
 	}
 
-	if err := s.nft.DropRules(set); err != nil {
+	if err := s.nft().DropRules(set); err != nil {
 		log.Errorf("failed to delete ruleset: %s", err)
 		return err
 	}

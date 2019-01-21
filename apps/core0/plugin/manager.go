@@ -92,8 +92,10 @@ func (m *Manager) Get(name string) (pm.Action, bool) {
 	if parts[0] == PluginNamespace {
 		return m.internal(target)
 	}
-
+	m.l.RLock()
 	plugin, ok := m.plugins[parts[0]]
+	m.l.RUnlock()
+
 	if !ok {
 		return nil, false
 	}

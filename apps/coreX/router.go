@@ -96,6 +96,15 @@ func (m *Router) Plugin(name string) (interface{}, error) {
 	return plg.API(), nil
 }
 
+func (m *Router) MustPlugin(name string) interface{} {
+	plugin, err := m.Plugin(name)
+	if err != nil {
+		panic(fmt.Sprintf("plugin %v not found", name))
+	}
+
+	return plugin
+}
+
 func (m *Router) Aggregate(op, key string, value float64, id string, tags ...pm.Tag) {
 	mgr.Aggregate(op, key, value, id, tags...)
 }
