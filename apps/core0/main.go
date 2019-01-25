@@ -173,7 +173,12 @@ func main() {
 	bs := bootstrap.NewBootstrap(options.Agent())
 	bs.First()
 
-	if !options.Agent() {
+	var showSplash = true
+	if _, ok := options.Kernel["nosplash"]; ok {
+		showSplash = false
+	}
+
+	if showSplash && !options.Agent() {
 		Splash()
 	}
 
@@ -185,8 +190,10 @@ func main() {
 	}
 
 	screen.Push(row)
+
 	bs.Second()
 	screen.Refresh()
+
 	log.Info("System ready")
 	select {}
 }
