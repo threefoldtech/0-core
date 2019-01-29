@@ -88,7 +88,7 @@ func (k KernelOptions) Cmdline() []byte {
 	return []byte(buf.String())
 }
 
-func parseKerenlOptions(content string) KernelOptions {
+func parseKernelOptions(content string) KernelOptions {
 	options := KernelOptions{}
 	cmdline, _ := shlex.Split(strings.TrimSpace(content))
 	for _, option := range cmdline {
@@ -113,5 +113,5 @@ func GetKernelOptions() KernelOptions {
 		return KernelOptions{}
 	}
 
-	return parseKerenlOptions(string(content))
+	return parseKernelOptions(string(content))
 }

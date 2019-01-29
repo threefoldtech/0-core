@@ -697,6 +697,44 @@ func (d *Manager) spindown(ctx pm.Context) (interface{}, error) {
 	return nil, nil
 }
 
+func (d *Manager) parseHdparm(lines []string) (bool, error) {
+	for _, i := range lines {
+		if strings.Contains(i, "drive state") {
+			d := strings.Split(i, ":")
+			if strings.TrimSpace(d[1]) == "standby" {
+				return true, nil
+			}
+			return false, nil
+		}
+	}
+	return false, fmt.Errorf("hdparm returned unparsable result for isStandby")
+}
+
+func (d *Manager) isStandby(ctx pm.Context) (interface{}, error) {
+	var args struct {
+		Disk string `json:"disk"`
+	}
+	cmd := ctx.Command()
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+	// assert disk exists
+	if !utils.Exists(args.Disk) {
+		return nil, pm.BadRequestError(fmt.Errorf("disk doesn't exist: %s", args.Disk))
+
+	}
+	bytes, err := d.api.System("hdparm", "-C", fmt.Sprintf(args.Disk))
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(bytes.Streams.Stdout(), "\n")
+	ret, err := d.parseHdparm(lines)
+	if err != nil {
+		return nil, pm.BadRequestError(err)
+	}
+	return ret, nil
+}
+
 func (d *Manager) seektime(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Disk string `json:"disk"`

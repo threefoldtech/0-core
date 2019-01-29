@@ -25,6 +25,7 @@ var (
 			"smartctl-health": manager.smartctlHealth,
 			"spindown":        manager.spindown,
 			"seektime":        manager.seektime,
+			"isstandby":       manager.isStandby,
 		},
 	}
 )

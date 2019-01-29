@@ -1,6 +1,7 @@
 package disk
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -102,4 +103,37 @@ SMART support is: Enabled
 		t.Fatal()
 	}
 
+}
+
+func TestParseHdparm(t *testing.T) {
+	var m Manager
+
+	inputfalse := `
+/dev/sdc:
+ drive state is:  active/idle
+`
+	inputtrue := `
+/dev/sdc:
+ drive state is:  standby
+`
+	bogus := `
+ljlkj
+jlkjl:jlkjlkj
+/dev/sdc:
+ drive state is:  unknown
+
+`
+
+	t.Logf("testing hdparm")
+	ret, _ := m.parseHdparm(strings.Split(inputtrue, "\n"))
+	assert.True(t, ret, "Should return true")
+
+	ret, _ = m.parseHdparm(strings.Split(inputfalse, "\n"))
+	if ok := assert.False(t, ret); !ok {
+		t.Fatal()
+	}
+	ret, _ = m.parseHdparm(strings.Split(bogus, "\n"))
+	if ok := assert.False(t, ret); !ok {
+		t.Fatal()
+	}
 }

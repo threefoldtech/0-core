@@ -3,8 +3,9 @@ package options
 import (
 	"flag"
 	"fmt"
-	"github.com/threefoldtech/0-core/base/utils"
 	"os"
+
+	"github.com/threefoldtech/0-core/base/utils"
 )
 
 type AppOptions struct {

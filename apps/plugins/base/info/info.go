@@ -73,7 +73,9 @@ func getMemInfo(ctx pm.Context) (interface{}, error) {
 
 type NicInfo struct {
 	net.InterfaceStat
-	Speed int64 `json:"speed"`
+	Speed     int64 `json:"speed"`
+	Carrier   bool  `json:"carrier"`
+	OperState bool  `json:"operstate"`
 }
 
 func getNicInfo(ctx pm.Context) (interface{}, error) {
@@ -89,13 +91,24 @@ func getNicInfo(ctx pm.Context) (interface{}, error) {
 		ret[i].HardwareAddr = ifc.HardwareAddr
 		ret[i].Flags = ifc.Flags
 		ret[i].Addrs = ifc.Addrs
-		dat, err := ioutil.ReadFile("/sys/class/net/" + ifc.Name + "/speed")
-		if err != nil {
-			speed = 0
-		} else {
-			speed, _ = strconv.ParseInt(strings.Trim(string(dat), "\n"), 10, 64)
-		}
+		// no need to check for erros here, as the file is necessarily there,
+		// as it's read in just before by net.Interfaces
+		dat, _ := ioutil.ReadFile("/sys/class/net/" + ifc.Name + "/speed")
+		speed, _ = strconv.ParseInt(strings.Trim(string(dat), "\n"), 10, 64)
 		ret[i].Speed = speed
+		dat, _ = ioutil.ReadFile("/sys/class/net/" + ifc.Name + "/carrier")
+		carrier, _ := strconv.ParseBool(strings.Trim(string(dat), "\n"))
+		ret[i].Carrier = carrier
+		dat, _ = ioutil.ReadFile("/sys/class/net/" + ifc.Name + "/operstate")
+		op := strings.Trim(string(dat), "\n")
+		var operstate bool
+		switch op {
+		case "up", "1":
+			operstate = true
+		case "down", "0":
+			operstate = false
+		}
+		ret[i].OperState = operstate
 	}
 	return ret, nil
 }
