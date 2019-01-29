@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -105,6 +106,8 @@ SMART support is: Enabled
 }
 
 func TestParseHdparm(t *testing.T) {
+	var m Manager
+
 	inputfalse := `
 /dev/sdc:
  drive state is:  active/idle
@@ -122,14 +125,14 @@ jlkjl:jlkjlkj
 `
 
 	t.Logf("testing hdparm")
-	ret, _ := parseHdparm(strings.Split(inputtrue, "\n"))
+	ret, _ := m.parseHdparm(strings.Split(inputtrue, "\n"))
 	assert.True(t, ret, "Should return true")
 
-	ret, _ = parseHdparm(strings.Split(inputfalse, "\n"))
+	ret, _ = m.parseHdparm(strings.Split(inputfalse, "\n"))
 	if ok := assert.False(t, ret); !ok {
 		t.Fatal()
 	}
-	ret, _ = parseHdparm(strings.Split(bogus, "\n"))
+	ret, _ = m.parseHdparm(strings.Split(bogus, "\n"))
 	if ok := assert.False(t, ret); !ok {
 		t.Fatal()
 	}
