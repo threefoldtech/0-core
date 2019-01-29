@@ -448,7 +448,7 @@ func (c *container) forwardId() string {
 
 func (c *container) setPortForward(host string, dest int) error {
 	ip := c.getDefaultIP().String()
-	return c.mgr.socat.SetPortForward(c.forwardId(), ip, host, dest)
+	return c.mgr.socat().SetPortForward(c.forwardId(), ip, host, dest)
 }
 
 func (c *container) setPortForwards() error {
@@ -808,7 +808,7 @@ func (c *container) destroyNetwork() {
 			if err := c.unBridge(idx, network, nil); err != nil {
 				log.Errorf("failed to destroy network: %v", err)
 			}
-			if err := c.mgr.socat.RemoveAll(c.forwardId()); err != nil {
+			if err := c.mgr.socat().RemoveAll(c.forwardId()); err != nil {
 				log.Errorf("failed to destroy port forwards: %v", err)
 			}
 		}

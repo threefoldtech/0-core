@@ -14,8 +14,9 @@ var (
 
 	//Plugin plugin entry point
 	Plugin = plugin.Plugin{
-		Name:    "zfs",
-		Version: "1.0",
+		Name:      "zfs",
+		Version:   "1.0",
+		CanUpdate: true,
 		Open: func(api plugin.API) error {
 			manager.api = api
 			return nil

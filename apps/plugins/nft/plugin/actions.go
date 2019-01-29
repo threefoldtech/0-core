@@ -42,7 +42,7 @@ func (b *manager) parsePort(ctx pm.Context) (string, error) {
 }
 
 func (b *manager) exists(rule string) bool {
-	_, ok := b.rules[rule]
+	_, ok := b.api.Store().Get(rule)
 	return ok
 }
 
@@ -51,7 +51,7 @@ func (b *manager) register(rule string) error {
 		return fmt.Errorf("exists")
 	}
 
-	b.rules[rule] = struct{}{}
+	b.api.Store().Set(rule, nil)
 	return nil
 }
 
@@ -82,7 +82,7 @@ func (b *manager) openPort(ctx pm.Context) (interface{}, error) {
 	}
 
 	if err := b.Apply(n); err != nil {
-		delete(b.rules, rule)
+		b.api.Store().Del(rule)
 		return nil, err
 	}
 
@@ -120,7 +120,7 @@ func (b *manager) dropPort(ctx pm.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	delete(b.rules, rule)
+	b.api.Store().Del(rule)
 	return nil, nil
 }
 
@@ -128,8 +128,8 @@ func (b *manager) listPorts(ctx pm.Context) (interface{}, error) {
 	b.m.RLock()
 	defer b.m.RUnlock()
 
-	ports := make([]string, 0, len(b.rules))
-	for port := range b.rules {
+	var ports []string
+	for port := range b.api.Store().List() {
 		ports = append(ports, port)
 	}
 	return ports, nil

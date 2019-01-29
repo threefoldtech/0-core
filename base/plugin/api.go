@@ -14,6 +14,16 @@ type API interface {
 	JobOf(id string) (pm.Job, bool)
 	Jobs() map[string]pm.Job
 	Plugin(name string) (interface{}, error)
+	MustPlugin(name string) interface{}
 	Shutdown(except ...string)
 	Aggregate(op, key string, value float64, id string, tags ...pm.Tag)
+	Store() Store
+}
+
+//Store stores data on the core0 context
+type Store interface {
+	Set(key string, value []byte)
+	Get(key string) ([]byte, bool)
+	Del(key string)
+	List() map[string][]byte
 }

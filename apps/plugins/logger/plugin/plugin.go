@@ -16,9 +16,10 @@ var (
 
 	//Plugin entry point
 	Plugin = plugin.Plugin{
-		Name:     "logger",
-		Version:  "1.0",
-		Requires: []string{"protocol"},
+		Name:      "logger",
+		Version:   "1.0",
+		CanUpdate: false,
+		Requires:  []string{"protocol"},
 		Open: func(api plugin.API) error {
 			return initManager(&manager, api)
 		},

@@ -10,8 +10,9 @@ import (
 var (
 	manager Manager
 	Plugin  = plugin.Plugin{
-		Name:    "rtinfo",
-		Version: "1.0",
+		Name:      "rtinfo",
+		Version:   "1.0",
+		CanUpdate: false,
 		Open: func(api plugin.API) error {
 			manager.api = api
 			manager.info = make(map[string]*rtinfoParams)

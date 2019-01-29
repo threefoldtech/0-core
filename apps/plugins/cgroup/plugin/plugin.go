@@ -27,8 +27,9 @@ var (
 
 	//Plugin export plugin
 	Plugin = plugin.Plugin{
-		Name:    "cgroup",
-		Version: "1.0",
+		Name:      "cgroup",
+		Version:   "1.0",
+		CanUpdate: true,
 		Open: func(api plugin.API) error {
 			return initManager(&manager, api)
 		},

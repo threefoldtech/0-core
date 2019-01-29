@@ -15,8 +15,9 @@ var (
 	_   nft.API = (*manager)(nil)
 
 	Plugin = plugin.Plugin{
-		Name:    "nft",
-		Version: "1.0",
+		Name:      "nft",
+		Version:   "1.0",
+		CanUpdate: true,
 		Open: func(api plugin.API) error {
 			return newManager(&mgr, api)
 		},
@@ -91,16 +92,12 @@ var (
 
 func newManager(mgr *manager, api plugin.API) error {
 	mgr.api = api
-	mgr.rules = make(map[string]struct{})
-
 	return mgr.init()
 }
 
 type manager struct {
 	api plugin.API
-
-	rules map[string]struct{}
-	m     sync.RWMutex
+	m   sync.RWMutex
 }
 
 func (m *manager) init() error {

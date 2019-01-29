@@ -175,7 +175,7 @@ func (c *container) onStart(pid int) {
 	}
 
 	for _, cgroup := range c.Args.CGroups {
-		group, err := c.mgr.cgroup.Get(cgroup.Subsystem(), cgroup.Name())
+		group, err := c.mgr.cgroup().Get(cgroup.Subsystem(), cgroup.Name())
 		if err != nil {
 			log.Errorf("can't find cgroup %s", err)
 			continue

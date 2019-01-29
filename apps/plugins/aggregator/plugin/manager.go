@@ -82,7 +82,7 @@ func (r *Manager) query(ctx pm.Context) (interface{}, error) {
 			}
 		}
 
-		data, err := r.protocol.Database().GetKey(key)
+		data, err := r.database().GetKey(key)
 		if err != nil {
 			log.Errorf("failed to get state for metric: %s", key)
 			continue
@@ -143,7 +143,7 @@ func (r *Manager) Stats(op string, key string, value float64, id string, tags ..
 	//touch key in cache so we know we are tracking this key
 	r.cache.Set(internal, nil, cache.DefaultExpiration)
 
-	data, err := r.protocol.Database().GetKey(internal)
+	data, err := r.database().GetKey(internal)
 	if err != nil {
 		log.Errorf("failed to get value for %s: %s", key, err)
 		return
@@ -179,7 +179,7 @@ func (r *Manager) Stats(op string, key string, value float64, id string, tags ..
 		}
 
 		if data, err := json.Marshal(&p); err == nil {
-			r.protocol.Database().RPush(queue, data)
+			r.database().RPush(queue, data)
 		} else {
 			log.Errorf("statistics point marshal error: %s", err)
 		}
@@ -191,7 +191,7 @@ func (r *Manager) Stats(op string, key string, value float64, id string, tags ..
 		return
 	}
 
-	if err := r.protocol.Database().SetKey(internal, data); err != nil {
+	if err := r.database().SetKey(internal, data); err != nil {
 		log.Errorf("failed to save state object for %s: %s", key, err)
 	}
 }

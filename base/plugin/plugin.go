@@ -8,13 +8,14 @@ import (
 
 //Plugin description type
 type Plugin struct {
-	Name     string
-	Version  string
-	Requires []string
-	Open     func(API) error
-	Close    func() error
-	API      func() interface{}
-	Actions  map[string]pm.Action
+	Name      string
+	Version   string
+	CanUpdate bool
+	Requires  []string
+	Open      func(API) error
+	Close     func() error
+	API       func() interface{}
+	Actions   map[string]pm.Action
 }
 
 func (p *Plugin) String() string {

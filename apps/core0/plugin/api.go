@@ -5,6 +5,7 @@ import (
 
 	"github.com/threefoldtech/0-core/base"
 	"github.com/threefoldtech/0-core/base/mgr"
+	plg "github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
@@ -39,6 +40,8 @@ func (m *Manager) Jobs() map[string]pm.Job {
 
 //Plugin plugin API getter
 func (m *Manager) Plugin(name string) (interface{}, error) {
+	m.l.RLock()
+	defer m.l.RUnlock()
 	plg, ok := m.plugins[name]
 	if !ok {
 		return nil, fmt.Errorf("plugin not found")
@@ -50,10 +53,34 @@ func (m *Manager) Plugin(name string) (interface{}, error) {
 	return plg.API(), nil
 }
 
+func (m *Manager) MustPlugin(name string) interface{} {
+	plugin, err := m.Plugin(name)
+	if err != nil {
+		panic(fmt.Sprintf("plugin %v not found", name))
+	}
+
+	return plugin
+}
+
 func (m *Manager) Shutdown(except ...string) {
 	mgr.Shutdown(except...)
 }
 
 func (m *Manager) Aggregate(op, key string, value float64, id string, tags ...pm.Tag) {
 	mgr.Aggregate(op, key, value, id, tags...)
+}
+
+func (m *Manager) Store(scope string) plg.Store {
+	m.sm.Lock()
+	defer m.sm.Unlock()
+
+	store, ok := m.stores[scope]
+	if ok {
+		return store
+	}
+
+	store = newStore()
+	m.stores[scope] = store
+
+	return store
 }

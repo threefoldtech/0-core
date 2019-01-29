@@ -1,13 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	libvirt "github.com/libvirt/libvirt-go"
-	"github.com/threefoldtech/0-core/apps/plugins/containers"
-	"github.com/threefoldtech/0-core/apps/plugins/socat"
-	"github.com/threefoldtech/0-core/apps/plugins/zfs"
 	"github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
 )
@@ -16,8 +12,9 @@ var (
 	manager kvmManager
 
 	Plugin = plugin.Plugin{
-		Name:    "kvm",
-		Version: "1.0",
+		Name:      "kvm",
+		Version:   "1.0",
+		CanUpdate: false,
 		Requires: []string{
 			"bridge",
 			"socat",
@@ -67,31 +64,6 @@ func iniManager(mgr *kvmManager, api plugin.API) error {
 	mgr.evch = make(chan map[string]interface{}, 100)
 	mgr.domainsInfo = make(map[string]*DomainInfo)
 	mgr.devDeleteEvent = NewSync()
-
-	var ok bool
-	if api, err := api.Plugin("socat"); err == nil {
-		if mgr.socat, ok = api.(socat.API); !ok {
-			return fmt.Errorf("invalid socat api")
-		}
-	} else {
-		return err
-	}
-
-	if api, err := api.Plugin("zfs"); err == nil {
-		if mgr.filesystem, ok = api.(zfs.API); !ok {
-			return fmt.Errorf("invalid zfs api")
-		}
-	} else {
-		return err
-	}
-
-	if api, err := api.Plugin("corex"); err == nil {
-		if mgr.container, ok = api.(containers.API); !ok {
-			return fmt.Errorf("invalid containers api")
-		}
-	} else {
-		return err
-	}
 
 	if err := libvirt.EventRegisterDefaultImpl(); err != nil {
 		return err

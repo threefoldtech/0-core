@@ -7,12 +7,17 @@ import (
 	"plugin"
 	"runtime/debug"
 	"strings"
+	"sync"
 
 	"github.com/threefoldtech/0-core/base/mgr"
 
 	logging "github.com/op/go-logging"
 	plg "github.com/threefoldtech/0-core/base/plugin"
 	"github.com/threefoldtech/0-core/base/pm"
+)
+
+const (
+	PluginNamespace = "plugin"
 )
 
 var (
@@ -29,6 +34,20 @@ type Plugin struct {
 type Manager struct {
 	path    []string
 	plugins map[string]*Plugin
+
+	l sync.RWMutex
+
+	stores map[string]plg.Store
+	sm     sync.Mutex
+}
+
+type ScopedManager struct {
+	*Manager
+	scope string
+}
+
+func (s ScopedManager) Store() plg.Store {
+	return s.Manager.Store(s.scope)
 }
 
 //New create a new plugin manager
@@ -36,19 +55,32 @@ func New(path ...string) (*Manager, error) {
 	m := &Manager{
 		path:    path,
 		plugins: make(map[string]*Plugin),
+		stores:  make(map[string]plg.Store),
 	}
 
 	return m, nil
 }
 
+func (m *Manager) internal(name string) (action pm.Action, ok bool) {
+	switch name {
+	case "list":
+		action = m.list
+	case "load":
+		action = m.load
+	}
+
+	if action != nil {
+		return action, true
+	}
+
+	return nil, false
+}
+
 //Get action from fqn
+//implements Router
 func (m *Manager) Get(name string) (pm.Action, bool) {
 	parts := strings.SplitN(name, ".", 2)
 	if len(parts) == 0 {
-		return nil, false
-	}
-	plugin, ok := m.plugins[parts[0]]
-	if !ok {
 		return nil, false
 	}
 
@@ -57,11 +89,22 @@ func (m *Manager) Get(name string) (pm.Action, bool) {
 		target = parts[1]
 	}
 
+	if parts[0] == PluginNamespace {
+		return m.internal(target)
+	}
+	m.l.RLock()
+	plugin, ok := m.plugins[parts[0]]
+	m.l.RUnlock()
+
+	if !ok {
+		return nil, false
+	}
+
 	action, ok := plugin.Actions[target]
 	return action, ok
 }
 
-func (m *Manager) loadPlugin(p string) (*plg.Plugin, error) {
+func (m *Manager) loadPlugins(p string) ([]*plg.Plugin, error) {
 	log.Infof("loading plugin %s", p)
 	plug, err := plugin.Open(p)
 	if err != nil {
@@ -73,11 +116,14 @@ func (m *Manager) loadPlugin(p string) (*plg.Plugin, error) {
 		return nil, err
 	}
 
-	if plugin, ok := sym.(*plg.Plugin); ok {
-		return plugin, nil
+	switch sym := sym.(type) {
+	case *plg.Plugin:
+		return []*plg.Plugin{sym}, nil
+	case *[]*plg.Plugin:
+		return *sym, nil
+	default:
+		return nil, fmt.Errorf("plugin symbol of wrong type: %T", sym)
 	}
-
-	return nil, fmt.Errorf("plugin symbol of wrong type: %T", sym)
 }
 
 func (m *Manager) safeOpen(pl *Plugin) (err error) {
@@ -89,7 +135,7 @@ func (m *Manager) safeOpen(pl *Plugin) (err error) {
 		}
 	}()
 
-	err = pl.Open(m)
+	err = pl.Open(ScopedManager{Manager: m, scope: pl.Name})
 	return
 }
 
@@ -121,6 +167,7 @@ func (m *Manager) openRecursive(pl *Plugin) error {
 }
 
 func (m *Manager) Load() error {
+
 	for _, p := range m.path {
 		if err := m.loadPath(p); err != nil {
 			return err
@@ -154,10 +201,11 @@ func (m *Manager) Load() error {
 			mgr.AddHandle(api)
 		}
 	}
-
+	m.l.Lock()
 	for _, bad := range errored {
 		delete(m.plugins, bad)
 	}
+	m.l.Unlock()
 
 	return nil
 }
@@ -177,14 +225,17 @@ func (m *Manager) loadPath(p string) error {
 			continue
 		}
 
-		plugin, err := m.loadPlugin(path.Join(p, item.Name()))
+		plugins, err := m.loadPlugins(path.Join(p, item.Name()))
 
 		if err != nil {
-			log.Errorf("failed to load %s: %s", item.Name(), err)
+			log.Errorf("failed to load '%s': %v", item.Name(), err)
 			continue
 		}
-
-		m.plugins[plugin.Name] = &Plugin{Plugin: plugin}
+		m.l.Lock()
+		for _, p := range plugins {
+			m.plugins[p.Name] = &Plugin{Plugin: p}
+		}
+		m.l.Unlock()
 	}
 
 	return nil

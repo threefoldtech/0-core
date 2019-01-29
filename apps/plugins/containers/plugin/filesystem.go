@@ -44,7 +44,7 @@ func (c *container) flistConfigOverride(target string, cfg map[string]string) er
 //usually used for debugging
 func (c *container) mergeFList(src string) error {
 	namespace := fmt.Sprintf("containers/%s", c.name())
-	return c.mgr.filesystem.MergeFList(namespace, c.root(), c.Args.Root, src)
+	return c.mgr.filesystem().MergeFList(namespace, c.root(), c.Args.Root, src)
 }
 
 func (c *container) mountFList(src string, target string, cfg map[string]string, hooks ...pm.RunnerHook) error {
@@ -56,7 +56,7 @@ func (c *container) mountFList(src string, target string, cfg map[string]string,
 		c.Args.Storage = storage
 	}
 
-	err := c.mgr.filesystem.MountFList(namespace, storage, src, target, hooks...)
+	err := c.mgr.filesystem().MountFList(namespace, storage, src, target, hooks...)
 	if err != nil {
 		return err
 	}

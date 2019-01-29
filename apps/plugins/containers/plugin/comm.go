@@ -54,14 +54,14 @@ func (c *container) rewind() {
 				log.Errorf("failed to load container command result: %s", err)
 			}
 			result.Container = uint64(c.id)
-			c.mgr.protocol.Set(&result)
+			c.mgr.protocol().Set(&result)
 		case "log":
 			var msg stream.Message
 			if err := json.Unmarshal(message.Payload, &msg); err != nil {
 				log.Errorf("failed to load container log message: %s", err)
 			}
 
-			c.mgr.logger.Message(&pm.Command{ID: message.Command, Core: c.id}, &msg)
+			c.mgr.logger().Message(&pm.Command{ID: message.Command, Core: c.id}, &msg)
 		case "stats":
 			var stat struct {
 				Operation string   `json:"operation"`

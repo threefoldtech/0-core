@@ -177,7 +177,7 @@ func (m *Manager) restore(ctx pm.Context) (interface{}, error) {
 
 	defer os.RemoveAll(tmp)
 
-	if err := m.filesystem.RestoreRepo(args.URL, tmp, backupMetaName); err != nil {
+	if err := m.filesystem().RestoreRepo(args.URL, tmp, backupMetaName); err != nil {
 		return nil, err
 	}
 
