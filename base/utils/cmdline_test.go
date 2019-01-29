@@ -35,9 +35,16 @@ func TestCmdParsing(t *testing.T) {
 	cmdline := parseKernelOptions("zerotier=mynetwork")
 	validateKeyValue(cmdline, "zerotier", "mynetwork", t)
 
+	cmdline = parseKernelOptions("noautonic=enp2s0f0 noautonic=enp2s0f1")
+	vals := []string{"enp2s0f0", "enp2s0f1"}
+	validateMultiValueForKey(cmdline, "noautonic", vals, t)
+
+	cmdline = parseKernelOptions(`something   zerotier="my network"  development`)
+	validateKeyValue(cmdline, "zerotier", "my network", t)
+
 	cl := cmdline.Cmdline()
 
-	parsed := parseKerenlOptions(string(cl))
+	parsed := parseKernelOptions(string(cl))
 
 	if !parsed.Is("something") {
 		t.Error("`something` is not set")
