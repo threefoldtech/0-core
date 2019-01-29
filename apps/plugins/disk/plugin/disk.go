@@ -697,6 +697,31 @@ func (d *Manager) spindown(ctx pm.Context) (interface{}, error) {
 	return nil, nil
 }
 
+
+func (d *Manager) isStandby(ctx pm.Context) (interface{}, error) {
+	var args struct {
+		Disk string `json:"disk"`
+	}
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, err
+	}
+	// assert disk exists
+	if !utils.Exists(args.Disk) {
+		return nil, pm.BadRequestError(fmt.Errorf("disk doesn't exist: %s", args.Disk))
+
+	}
+	bytes, err := pm.System("hdparm", "-C", fmt.Sprintf(args.Disk))
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(bytes.Streams.Stdout(), "\n")
+	ret, err := parseHdparm(lines)
+	if err != nil {
+		return nil, pm.BadRequestError(err)
+	}
+	return ret, nil
+}
+
 func (d *Manager) seektime(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Disk string `json:"disk"`

@@ -16,20 +16,24 @@ func validateKeyValue(mapping KernelOptions, key string, value string, t *testin
 
 }
 
-func TestCmdParsing(t *testing.T) {
-	cmdline := parseKerenlOptions("zerotier=mynetwork")
-	validateKeyValue(cmdline, "zerotier", "mynetwork", t)
-
-	cmdline = parseKerenlOptions(`something   zerotier="my network"  rgergerger`)
-	validateKeyValue(cmdline, "zerotier", "my network", t)
-	if !cmdline.Is("something") {
-		t.Error("`something` is not set")
+func validateMultiValueForKey(opts KernelOptions, key string, values []string, t *testing.T) {
+	if vals, ok := opts[key]; ok {
+		if len(vals) != len(values) {
+			t.Fatalf("no multiple values for %s", key)
+		}
+		for i, v := range vals {
+			t.Logf("got value %+v", v)
+			if v != values[i] {
+				t.Fatalf("%s index %d is not eq to %s", values[i], i, v)
+			}
+		}
 	}
+	t.Logf("%+v", opts)
 }
 
-func TestCmdCmdline(t *testing.T) {
-	cmdline := parseKerenlOptions(`something   zerotier="my network"  development`)
-	validateKeyValue(cmdline, "zerotier", "my network", t)
+func TestCmdParsing(t *testing.T) {
+	cmdline := parseKernelOptions("zerotier=mynetwork")
+	validateKeyValue(cmdline, "zerotier", "mynetwork", t)
 
 	cl := cmdline.Cmdline()
 

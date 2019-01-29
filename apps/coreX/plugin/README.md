@@ -25,7 +25,7 @@ func version(input json.RawMessage) (interface{}, error) {
 
 var (
 	Plugin = plugin.Commands{
-		"version": version,
+		"version": Version,
 	}
 )
 

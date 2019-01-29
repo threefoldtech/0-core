@@ -113,5 +113,5 @@ func GetKernelOptions() KernelOptions {
 		return KernelOptions{}
 	}
 
-	return parseKerenlOptions(string(content))
+	return parseKernelOptions(string(content))
 }
