@@ -14,8 +14,8 @@ import (
 
 	"path"
 
-	"github.com/libvirt/libvirt-go"
-	"github.com/op/go-logging"
+	libvirt "github.com/libvirt/libvirt-go"
+	logging "github.com/op/go-logging"
 	"github.com/pborman/uuid"
 	"github.com/threefoldtech/0-core/apps/core0/helper/filesystem"
 	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
@@ -216,6 +216,7 @@ type CreateParams struct {
 	Config     map[string]string `json:"config"` //overrides vm config (from flist)
 	Tags       pm.Tags           `json:"tags"`
 	Storage    string            `json:"storage"` //ardb storage needed for g8ufs mounts.
+	KVM        bool              `json:"kvm"`
 }
 
 type FListBootConfig struct {
@@ -850,6 +851,10 @@ func (m *kvmManager) mkDomain(seq uint16, params *CreateParams) (*Domain, error)
 		}
 
 		domain.Devices.Filesystems = append(domain.Devices.Filesystems, fs)
+	}
+
+	if params.KVM == true {
+		domain.Qemu.Args = append(domain.Qemu.Args, QemuArg{Value: "-cpu"}, QemuArg{Value: "host"})
 	}
 
 	return &domain, nil
