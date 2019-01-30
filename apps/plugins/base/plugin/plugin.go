@@ -13,6 +13,7 @@ import (
 	"github.com/threefoldtech/0-core/apps/plugins/base/monitor"
 	"github.com/threefoldtech/0-core/apps/plugins/base/power"
 	"github.com/threefoldtech/0-core/apps/plugins/base/pprof"
+	"github.com/threefoldtech/0-core/apps/plugins/base/process"
 	"github.com/threefoldtech/0-core/apps/plugins/base/web"
 	"github.com/threefoldtech/0-core/base/plugin"
 )
@@ -32,6 +33,7 @@ var (
 		&pprof.Plugin,
 		&monitor.Plugin,
 		&web.Plugin,
+		&process.Plugin,
 	}
 )
 
