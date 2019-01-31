@@ -8,7 +8,8 @@ matrix:
       before_install:
         - source tests/before_install.sh
       install:
-        - sudo pip install client/py-client/.
+        - pip3 install client/py-client/.
+        - sudo chmod 777 -R /opt/python/3.5.6
         - sudo bash tests/install_zt.sh
       before_script:
         - sudo python3 -u tests/env_setup.py --zos_ip $ZOS_ip --zerotierid $ZT_NET_ID --branch $TRAVIS_BRANCH --zt_token $ZT_TOKEN --client_id $CLIENT_ID --client_secret $CLIENT_SECRET
