@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 from jumpscale import j
 from zeroos.core0 import client
 import os
+import requests
 
 
 def teardown(options):
@@ -23,7 +24,7 @@ def teardown(options):
     if vm_uuid:
         zos_client.kvm.destroy(vm_uuid[0])
     bridge = os.environ['bridge']
-    if bridge in zos_client.client.bridge.list():
+    if bridge in zos_client.bridge.list():
         zos_client.bridge.delete(bridge)
 
     # remove the zos_vm disk from the host 

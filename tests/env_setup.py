@@ -88,11 +88,12 @@ dhclient $interface
     bridge = os.environ['bridge']
     vm_zos_mac = utils.random_mac()
     vm_ubuntu_mac = utils.random_mac()
+    ubuntu_port = int(os.environ['ubuntu_port'])
     cidr = '10.100.{}.1/24'.format(rand_num)
     start = '10.100.{}.2'.format(rand_num)
     end = '10.100.{}.254'.format(rand_num)
     zos_client.bridge.create(bridge, network='dnsmasq', nat=True,
-                                    settings={'cidr': cidr, 'start': start, 'end': end})
+                             settings={'cidr': cidr, 'start': start, 'end': end})
     zos_client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_zos_ip, 'mac': vm_zos_mac})
     zos_client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_ubuntu_ip, 'mac': vm_ubuntu_mac})
 
@@ -101,7 +102,7 @@ dhclient $interface
     print('zos_vm ip: ' + vm_zos_ip)
     zos_client.bash('qemu-img create -f qcow2 /var/cache/{}.qcow2 30G'.format(ubuntu_port))
     nic = [{'type': 'bridge', 'id': bridge, 'hwaddr': vm_zos_mac}]
-    zos_client.kvm.create(name='zos_vm', flist=zos_flist, cpu=4, memory=8192, nics=nic, kvm=True,
+    zos_client.kvm.create(name=vm_zos_name, flist=zos_flist, cpu=4, memory=8192, nics=nic, kvm=True,
                           media=[{'url': '/var/cache/{}.qcow2'.format(ubuntu_port)}], cmdline='development')
 
     # create sshkey and provide the public key
@@ -115,9 +116,8 @@ dhclient $interface
     # create an ubuntu vm to run testcases from
     print('* Creating ubuntu vm to fire the testsuite from')
     print('ubuntu_vm ip: ' + vm_ubuntu_ip)
-    ubuntu_port = int(os.environ['ubuntu_port'])
     nics = [{'type': 'default'}, {'type': 'bridge', 'id': bridge, 'hwaddr': vm_ubuntu_mac}]
-    zos_client.kvm.create(name='ubuntu-vm', flist=ubuntu_flist, cpu=4, memory=8192, nics=nics, 
+    zos_client.kvm.create(name=vm_ubuntu_name, flist=ubuntu_flist, cpu=4, memory=8192, nics=nics, 
                           port={ubuntu_port: 22},  config = {'/root/.ssh/authorized_keys': pub_key})
 
     # access the ubuntu vm and start ur testsuite
