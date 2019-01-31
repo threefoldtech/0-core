@@ -1,5 +1,4 @@
 from argparse import ArgumentParser
-from jumpscale import j
 from zeroos.core0 import client
 import os
 import requests

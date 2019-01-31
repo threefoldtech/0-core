@@ -1,5 +1,4 @@
 #python script for 0-core testcases
-from jumpscale import j
 import os
 from argparse import ArgumentParser
 from subprocess import Popen, PIPE
@@ -69,7 +68,7 @@ def main(options):
     rand_num = random.randint(3, 125)
     vm_zos_ip = '10.100.{}.{}'.format(rand_num, random.randint(3, 125))
     vm_ubuntu_ip = '10.100.{}.{}'.format(rand_num, random.randint(126, 253))
-    zos_flist = 'https://hub.grid.tf/tf-autobuilder/zero-os-development.flist'
+    zos_flist = 'https://hub.grid.tf/tf-autobuilder/zero-os-{}.flist'.format(options.branch)
     ubuntu_flist = 'https://hub.grid.tf/tf-bootable/ubuntu:lts.flist'
 
     script = """
