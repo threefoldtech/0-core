@@ -3,11 +3,12 @@ from jumpscale import j
 import os
 from argparse import ArgumentParser
 from subprocess import Popen, PIPE
+from zeroos.core0 import client
 import random
 import uuid
 import time
 import shlex
-
+import requests
 
 class Utils(object):
     def __init__(self, options):
@@ -48,17 +49,6 @@ class Utils(object):
         cmd = templ.format(port, ip, cmd)
         return self.stream_run_cmd(cmd)
 
-    def create_disk(self, zos_client):
-        zdb_name = str(uuid.uuid4())[0:8]
-        mount_path = zos_client.zerodbs.prepare()
-        zdb = zos_client.primitives.create_zerodb(name=zdb_name, path=mount_path[0],
-                                                  node_port=random.randint(4000, 5000),
-                                                  mode='user', sync=False, admin='mypassword')
-        zdb.deploy()
-        disk = zos_client.primitives.create_disk('mydisk', zdb, size=50)
-        disk.deploy()
-        return disk
-
     def random_mac(self):
         return "52:54:00:%02x:%02x:%02x" % (random.randint(0, 255),
                                             random.randint(0, 255),
@@ -69,12 +59,18 @@ def main(options):
     utils = Utils(options)
 
     # get zeroos host client
-    zos_client = j.clients.zos.get('zos-kds-farm', data={'host': '{}'.format(options.zos_ip)})
+    params = {'grant_type': 'client_credentials','client_id': options.client_id,
+              'client_secret': options.client_secret,'response_type': 'id_token',
+              'scope': 'user:memberof:threefold.sysadmin,offline_access'}
+    jwt = requests.post('https://itsyou.online/v1/oauth/access_token', params=params).text
+    zos_client = client.Client(options.zos_ip, password=jwt)
     vm_zos_name = os.environ['vm_zos_name']
     vm_ubuntu_name = os.environ['vm_ubuntu_name']
     rand_num = random.randint(3, 125)
     vm_zos_ip = '10.100.{}.{}'.format(rand_num, random.randint(3, 125))
     vm_ubuntu_ip = '10.100.{}.{}'.format(rand_num, random.randint(126, 253))
+    zos_flist = 'https://hub.grid.tf/tf-autobuilder/zero-os-development.flist'
+    ubuntu_flist = 'https://hub.grid.tf/tf-bootable/ubuntu:lts.flist'
 
     script = """
 apt-get install git python3-pip -y
@@ -95,23 +91,18 @@ dhclient $interface
     cidr = '10.100.{}.1/24'.format(rand_num)
     start = '10.100.{}.2'.format(rand_num)
     end = '10.100.{}.254'.format(rand_num)
-    zos_client.client.bridge.create(bridge, network='dnsmasq', nat=True,
+    zos_client.bridge.create(bridge, network='dnsmasq', nat=True,
                                     settings={'cidr': cidr, 'start': start, 'end': end})
-    zos_client.client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_zos_ip, 'mac': vm_zos_mac})
-    zos_client.client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_ubuntu_ip, 'mac': vm_ubuntu_mac})
+    zos_client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_zos_ip, 'mac': vm_zos_mac})
+    zos_client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_ubuntu_ip, 'mac': vm_ubuntu_mac})
 
     # create a zeroos vm
     print('* Creating zero-os vm')
     print('zos_vm ip: ' + vm_zos_ip)
-    vm_zos = zos_client.primitives.create_virtual_machine(name=vm_zos_name, type_='zero-os:{}'.format(options.branch))
-    vm_zos.nics.add(name='nic1', type_='bridge', networkid=bridge, hwaddr=vm_zos_mac)
-    vm_zos.vcpus = 4
-    vm_zos.memory = 8192
-    vm_zos.kvm = True
-    disk = utils.create_disk(zos_client)
-    vm_zos.disks.add(disk)
-    vm_zos.kernel_args.add(name='development', key='development')
-    vm_zos.deploy()
+    zos_client.bash('qemu-img create -f qcow2 /var/cache/{}.qcow2 30G'.format(ubuntu_port))
+    nic = [{'type': 'bridge', 'id': bridge, 'hwaddr': vm_zos_mac}]
+    zos_client.kvm.create(name='zos_vm', flist=zos_flist, cpu=4, memory=8192, nics=nic, kvm=True,
+                          media=[{'url': '/var/cache/{}.qcow2'.format(ubuntu_port)}], cmdline='development')
 
     # create sshkey and provide the public key
     keypath = '/root/.ssh/id_rsa.pub'
@@ -125,14 +116,9 @@ dhclient $interface
     print('* Creating ubuntu vm to fire the testsuite from')
     print('ubuntu_vm ip: ' + vm_ubuntu_ip)
     ubuntu_port = int(os.environ['ubuntu_port'])
-    vm_ubuntu = zos_client.primitives.create_virtual_machine(name=vm_ubuntu_name, type_='ubuntu:lts')
-    vm_ubuntu.nics.add(name='nic2', type_='default')
-    vm_ubuntu.nics.add(name='nic3', type_='bridge', networkid=bridge, hwaddr=vm_ubuntu_mac)
-    vm_ubuntu.configs.add('sshkey', '/root/.ssh/authorized_keys', pub_key)
-    vm_ubuntu.ports.add('port2', ubuntu_port, 22)
-    vm_ubuntu.vcpus = 4
-    vm_ubuntu.memory = 8192
-    vm_ubuntu.deploy()
+    nics = [{'type': 'default'}, {'type': 'bridge', 'id': bridge, 'hwaddr': vm_ubuntu_mac}]
+    zos_client.kvm.create(name='ubuntu-vm', flist=ubuntu_flist, cpu=4, memory=8192, nics=nics, 
+                          port={ubuntu_port: 22},  config = {'/root/.ssh/authorized_keys': pub_key})
 
     # access the ubuntu vm and start ur testsuite
     time.sleep(10)
@@ -179,5 +165,9 @@ if __name__ == "__main__":
                         help="0-core branch that the tests will run from")
     parser.add_argument("-t", "--zt_token", type=str, dest="zt_token", default='sgtQtwEMbRcDgKgtHEMzYfd2T7dxtbed', required=True,
                         help="zerotier token that will be used for the core0 tests")
+    parser.add_argument("-d", "--client_id", type=str, dest="client_id",
+                        help="client id to generate token for zos client")
+    parser.add_argument("-s", "--client_secret", type=str, dest="client_secret",
+                        help="client secret to generate token for zos client")
     options = parser.parse_args()
     main(options)
