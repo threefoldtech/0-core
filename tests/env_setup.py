@@ -39,12 +39,12 @@ class Utils(object):
         return rc
 
     def send_script_to_remote_machine(self, script, ip, port):
-        templ = 'scp -o StrictHostKeyChecking=no -r -o UserKnownHostsFile=/dev/null  -i ~/.ssh/id_rsa.pub -P {} {} root@{}:'
+        templ = 'sudo scp -o StrictHostKeyChecking=no -r -o UserKnownHostsFile=/dev/null -P {} {} root@{}:'
         cmd = templ.format(port, script, ip)
         self.run_cmd(cmd)
 
     def run_cmd_on_remote_machine(self, cmd, ip, port):
-        templ = 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null  -i ~/.ssh/id_rsa.pub -p {} root@{} {}'
+        templ = 'sudo ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p {} root@{} {}'
         cmd = templ.format(port, ip, cmd)
         return self.stream_run_cmd(cmd)
 
@@ -64,6 +64,7 @@ def main(options):
     jwt = requests.post('https://itsyou.online/v1/oauth/access_token', params=params).text
     zos_client = client.Client(options.zos_ip, password=jwt)
     vm_zos_name = os.environ['vm_zos_name']
+    pub_key = os.environ['pub_key']
     vm_ubuntu_name = os.environ['vm_ubuntu_name']
     rand_num = random.randint(3, 125)
     vm_zos_ip = '10.100.{}.{}'.format(rand_num, random.randint(3, 125))
@@ -103,14 +104,6 @@ dhclient $interface
     nic = [{'type': 'bridge', 'id': bridge, 'hwaddr': vm_zos_mac}]
     zos_client.kvm.create(name=vm_zos_name, flist=zos_flist, cpu=4, memory=8192, nics=nic, kvm=True,
                           media=[{'url': '/var/cache/{}.qcow2'.format(ubuntu_port)}], cmdline='development')
-
-    # create sshkey and provide the public key
-    keypath = os.path.expanduser('~/.ssh/id_rsa.pub')
-    if not os.path.isfile(keypath):
-        os.system("echo  | ssh-keygen -P ''")
-    with open(keypath, "r") as key:
-        pub_key = key.read()
-    pub_key.replace('\n', '')
 
     # create an ubuntu vm to run testcases from
     print('* Creating ubuntu vm to fire the testsuite from')
