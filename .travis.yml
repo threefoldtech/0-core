@@ -10,7 +10,7 @@ matrix:
       install:
         - pip3 install requests
         - pip3 install client/py-client/.
-        - sudo bash tests/install_zt.sh
+        - source tests/install_zt.sh
       before_script:
         - python3 -u tests/env_setup.py --zos_ip $ZOS_ip --zerotierid $ZT_NET_ID --branch $TRAVIS_BRANCH --zt_token $ZT_TOKEN --client_id $CLIENT_ID --client_secret $CLIENT_SECRET
       script:
