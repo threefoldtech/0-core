@@ -7,6 +7,7 @@ zerotier-cli join ${ZT_NET_ID}
 sudo ifconfig "$(ls /sys/class/net | grep zt)" mtu 1280
 
 # generate a key
-sudo ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa
+mkdir -p ~/.ssh
+ssh-keygen -f ~/.ssh/id_rsa -P ''
 eval `ssh-agent -s`
 ssh-add ~/.ssh/id_rsa
