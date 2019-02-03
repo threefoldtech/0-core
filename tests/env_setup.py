@@ -117,7 +117,7 @@ dhclient $interface
     print('ubuntu_vm ip: ' + vm_ubuntu_ip)
     nics = [{'type': 'default'}, {'type': 'bridge', 'id': bridge, 'hwaddr': vm_ubuntu_mac}]
     zos_client.kvm.create(name=vm_ubuntu_name, flist=ubuntu_flist, cpu=4, memory=8192, nics=nics, 
-                          port={ubuntu_port: 22},  config = {keypath: pub_key})
+                          port={ubuntu_port: 22},  config = {'/root/.ssh/authorized_keys': pub_key})
 
     # access the ubuntu vm and start ur testsuite
     time.sleep(10)
