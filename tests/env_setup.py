@@ -39,12 +39,12 @@ class Utils(object):
         return rc
 
     def send_script_to_remote_machine(self, script, ip, port):
-        templ = 'scp -o StrictHostKeyChecking=no -r -o UserKnownHostsFile=/dev/null -P {} {} root@{}:'
+        templ = 'scp -o StrictHostKeyChecking=no -r -o UserKnownHostsFile=/dev/null  -i ~/.ssh/id_rsa.pub -P {} {} root@{}:'
         cmd = templ.format(port, script, ip)
         self.run_cmd(cmd)
 
     def run_cmd_on_remote_machine(self, cmd, ip, port):
-        templ = 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p {} root@{} {}'
+        templ = 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null  -i ~/.ssh/id_rsa.pub -p {} root@{} {}'
         cmd = templ.format(port, ip, cmd)
         return self.stream_run_cmd(cmd)
 
