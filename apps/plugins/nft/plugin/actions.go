@@ -41,18 +41,23 @@ func (b *manager) parsePort(ctx pm.Context) (string, error) {
 	return body, nil
 }
 
-func (b *manager) exists(rule string) bool {
-	_, ok := b.api.Store().Get(rule)
-	return ok
-}
-
-func (b *manager) register(rule string) error {
-	if b.exists(rule) {
-		return fmt.Errorf("exists")
+func (b *manager) getInputRuleHandler(set nft.Nft, rule string) int {
+	filter, ok := set["filter"]
+	if !ok {
+		return -1
+	}
+	chain, ok := filter.Chains["input"]
+	if !ok {
+		return -1
 	}
 
-	b.api.Store().Set(rule, nil)
-	return nil
+	for _, r := range chain.Rules {
+		if r.Body == rule {
+			return r.Handle
+		}
+	}
+
+	return -1
 }
 
 func (b *manager) openPort(ctx pm.Context) (interface{}, error) {
@@ -64,7 +69,13 @@ func (b *manager) openPort(ctx pm.Context) (interface{}, error) {
 	b.m.Lock()
 	defer b.m.Unlock()
 
-	if err := b.register(rule); err != nil {
+	ruleset, err := b.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	handler := b.getInputRuleHandler(ruleset, rule)
+	if handler >= 0 {
 		return nil, fmt.Errorf("rule exists")
 	}
 
@@ -82,7 +93,6 @@ func (b *manager) openPort(ctx pm.Context) (interface{}, error) {
 	}
 
 	if err := b.Apply(n); err != nil {
-		b.api.Store().Del(rule)
 		return nil, err
 	}
 
@@ -98,29 +108,20 @@ func (b *manager) dropPort(ctx pm.Context) (interface{}, error) {
 	b.m.Lock()
 	defer b.m.Unlock()
 
-	if !b.exists(rule) {
-		// nothing to do, just return
+	ruleset, err := b.Get()
+	if err != nil {
+		return nil, err
+	}
+	handler := b.getInputRuleHandler(ruleset, rule)
+	if handler == -1 {
+		//nothing to do here
 		return nil, nil
 	}
 
-	n := nft.Nft{
-		"filter": nft.Table{
-			Family: nft.FamilyINET,
-			Chains: nft.Chains{
-				"input": nft.Chain{
-					Rules: []nft.Rule{
-						{Body: rule},
-					},
-				},
-			},
-		},
-	}
-
-	if err := b.DropRules(n); err != nil {
+	if err := b.Drop(nft.FamilyINET, "filter", "input", handler); err != nil {
 		return nil, err
 	}
 
-	b.api.Store().Del(rule)
 	return nil, nil
 }
 
@@ -128,11 +129,26 @@ func (b *manager) listPorts(ctx pm.Context) (interface{}, error) {
 	b.m.RLock()
 	defer b.m.RUnlock()
 
-	var ports []string
-	for port := range b.api.Store().List() {
-		ports = append(ports, port)
+	ruleset, err := b.Get()
+	if err != nil {
+		return nil, err
 	}
-	return ports, nil
+
+	filter, ok := ruleset["filter"]
+	if !ok {
+		return nil, nil
+	}
+	chain, ok := filter.Chains["input"]
+	if !ok {
+		return nil, nil
+	}
+
+	var rules []string
+	for _, rule := range chain.Rules {
+		rules = append(rules, rule.Body)
+	}
+
+	return rules, nil
 }
 
 func (b *manager) ruleExists(ctx pm.Context) (interface{}, error) {
@@ -141,8 +157,14 @@ func (b *manager) ruleExists(ctx pm.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	b.m.RLock()
-	defer b.m.RUnlock()
+	b.m.Lock()
+	defer b.m.Unlock()
 
-	return b.exists(rule), nil
+	ruleset, err := b.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	handler := b.getInputRuleHandler(ruleset, rule)
+	return handler >= 0, nil
 }
