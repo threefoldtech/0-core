@@ -8,12 +8,12 @@ The core of Zero-OS is 0-core, which is the Zero-OS replacement for systemd.
 
 ## Branches
 
-- [master](https://github.com/zero-os/0-core/tree/master) - production
-- [development](https://github.com/zero-os/0-core/tree/development)
+- [master](https://github.com/threefoldtech/0-core/tree/master) - production
+- [development](https://github.com/threefoldtech/0-core/tree/development)
 
 ## Releases
 
-See the release schedule in the [Zero-OS home repository](https://github.com/zero-os/home).
+See the release schedule in the [Threefold home repository](https://github.com/threefoldtech/home).
 
 ## Development setup
 
@@ -34,3 +34,6 @@ Check the [releases](RELEASES.md) for more details
 All documentation is in the [`/docs`](./docs) directory, including a [table of contents](/docs/SUMMARY.md).
 
 In [Getting Started with Core0](/docs/gettingstarted/README.md) you find the recommended path to quickly get up and running.
+
+# Owner
+[muhamadazmy](https://github.com/muhamadazmy)
