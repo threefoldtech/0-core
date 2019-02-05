@@ -139,6 +139,13 @@ func (c *Chain) marshal(name string, buf *bytes.Buffer) error {
 }
 
 type Rule struct {
+	Body string
+}
+
+type FilterRule struct {
+	Rule
 	Handle int
-	Body   string
+	Table  string
+	Chain  string
+	Family Family
 }
