@@ -64,10 +64,6 @@ func TestParse(t *testing.T) {
 		t.Fatal()
 	}
 
-	if ok := assert.NoError(t, err); !ok {
-		t.Fatal()
-	}
-
 	if ok := assert.Len(t, nft, 2); !ok {
 		t.Fatal()
 	}
@@ -92,11 +88,55 @@ func TestParse(t *testing.T) {
 		t.Error()
 	}
 
+	if ok := assert.Equal(t, "172.18.0.2", nat.Chains["pre"].Rules[0].Dnat.Address); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, int16(7999), nat.Chains["pre"].Rules[0].Dnat.Port); !ok {
+		t.Error()
+	}
+
 	if ok := assert.Equal(t, "iif \"kvm0\" udp dport { 53, 67, 68 } accept", filter.Chains["input"].Rules[7].Body); !ok {
 		t.Error()
 	}
 
 	if ok := assert.Equal(t, "tcp dport 5900 accept", filter.Chains["input"].Rules[8].Body); !ok {
+		t.Error()
+	}
+}
+
+const (
+	inputMeta = `{"nftables": [{"table": {"family": "ip", "name": "nat", "handle": 0}}, {"set": {"family": "ip", "name": "host", "table": "nat", "handle": 0, "type": "ipv4_addr", "elem": ["10.20.1.1", "172.18.0.1", "172.19.0.1"]}}, {"chain": {"family": "ip", "prio": 0, "table": "nat", "hook": "prerouting", "name": "pre", "type": "nat", "policy": "accept", "handle": 1}}, {"rule": {"family": "ip", "table": "nat", "chain": "pre", "handle": 7, "expr": [{"match": {"left": {"payload": {"name": "ip", "field": "daddr"}}, "right": "@host"}}, {"match": {"left": {"payload": {"name": "tcp", "field": "dport"}}, "right": 8000}}, {"mangle": {"left": {"meta": "mark"}, "right": 123}}, {"dnat": {"port": 7000, "addr": "172.18.0.3"}}]}}, {"chain": {"family": "ip", "prio": 0, "table": "nat", "hook": "postrouting", "name": "post", "type": "nat", "policy": "accept", "handle": 2}}, {"rule": {"family": "ip", "table": "nat", "chain": "post", "handle": 4, "expr": [{"match": {"left": {"payload": {"name": "ip", "field": "saddr"}}, "right": {"prefix": {"addr": "172.18.0.0", "len": 16}}}}, {"masquerade": null}]}}, {"rule": {"family": "ip", "table": "nat", "chain": "post", "handle": 5, "expr": [{"match": {"left": {"payload": {"name": "ip", "field": "saddr"}}, "right": {"prefix": {"addr": "172.19.0.0", "len": 16}}}}, {"masquerade": null}]}}, {"table": {"family": "inet", "name": "filter", "handle": 0}}, {"chain": {"family": "inet", "prio": 0, "table": "filter", "hook": "prerouting", "name": "pre", "type": "filter", "policy": "accept", "handle": 1}}, {"chain": {"family": "inet", "prio": 0, "table": "filter", "hook": "forward", "name": "forward", "type": "filter", "policy": "accept", "handle": 2}}, {"chain": {"family": "inet", "prio": 0, "table": "filter", "hook": "output", "name": "output", "type": "filter", "policy": "accept", "handle": 3}}, {"chain": {"family": "inet", "prio": 0, "table": "filter", "hook": "input", "name": "input", "type": "filter", "policy": "drop", "handle": 4}}, {"rule": {"family": "inet", "table": "filter", "chain": "input", "handle": 5, "expr": [{"match": {"left": {"ct": {"key": "state"}}, "right": {"set": ["established", "related"]}}}, {"accept": null}]}}, {"rule": {"family": "inet", "table": "filter", "chain": "input", "handle": 6, "expr": [{"match": {"left": {"meta": "iifname"}, "right": "lo"}}, {"accept": null}]}}, {"rule": {"family": "inet", "table": "filter", "chain": "input", "handle": 7, "expr": [{"match": {"left": {"meta": "iifname"}, "right": "vxbackend"}}, {"accept": null}]}}, {"rule": {"family": "inet", "table": "filter", "chain": "input", "handle": 8, "expr": [{"match": {"left": {"payload": {"name": "ip", "field": "protocol"}}, "right": 1}}, {"accept": null}]}}, {"rule": {"family": "inet", "table": "filter", "chain": "input", "handle": 9, "expr": [{"match": {"left": {"meta": "iif"}, "right": "core0"}}, {"match": {"left": {"payload": {"name": "udp", "field": "dport"}}, "right": {"set": [53, 67, 68]}}}, {"accept": null}]}}, {"rule": {"family": "inet", "table": "filter", "chain": "input", "handle": 10, "expr": [{"match": {"left": {"meta": "iif"}, "right": "kvm0"}}, {"match": {"left": {"payload": {"name": "udp", "field": "dport"}}, "right": {"set": [53, 67, 68]}}}, {"accept": null}]}}, {"rule": {"family": "inet", "table": "filter", "chain": "input", "handle": 11, "expr": [{"match": {"left": {"payload": {"name": "tcp", "field": "dport"}}, "right": 6379}}, {"accept": null}]}}, {"rule": {"family": "inet", "table": "filter", "chain": "input", "handle": 12, "expr": [{"match": {"left": {"payload": {"name": "tcp", "field": "dport"}}, "right": 22}}, {"accept": null}]}}]}`
+)
+
+func TestParseMark(t *testing.T) {
+	nft, err := Parse(inputMeta)
+	if ok := assert.NoError(t, err); !ok {
+		t.Fatal()
+	}
+
+	if ok := assert.Len(t, nft, 2); !ok {
+		t.Fatal()
+	}
+
+	nat, ok := nft["nat"]
+	if !ok {
+		t.Fatal("nat table not found")
+	}
+
+	if ok := assert.Equal(t, "172.18.0.3", nat.Chains["pre"].Rules[0].Dnat.Address); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, int16(7000), nat.Chains["pre"].Rules[0].Dnat.Port); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, uint32(123), nat.Chains["pre"].Rules[0].Mark); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, "ip daddr @host tcp dport 8000 mark set 0x0000007b dnat to 172.18.0.3:7000", nat.Chains["pre"].Rules[0].Body); !ok {
 		t.Error()
 	}
 }

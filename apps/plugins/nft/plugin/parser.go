@@ -129,18 +129,29 @@ func setChainBlock(set nft.Nft, msg json.RawMessage) error {
 	return nil
 }
 
-func renderDnat(buf *strings.Builder, msg json.RawMessage) error {
-	//{'port': 7999, 'addr': '172.18.0.2'}
-	var dnat struct {
-		Port    int    `json:"port"`
-		Address string `json:"addr"`
+func renderMangle(mark *uint32, buf *strings.Builder, msg json.RawMessage) error {
+	var mangle struct {
+		Left struct {
+			Meta string `json:"meta"`
+		} `json:"left"`
+		Right uint32 `json:"right"`
 	}
 
-	if err := json.Unmarshal(msg, &dnat); err != nil {
+	if err := json.Unmarshal(msg, &mangle); err != nil {
+		return err
+	}
+	*mark = mangle.Right
+	buf.WriteString(fmt.Sprintf("%s set 0x%08x", mangle.Left.Meta, mangle.Right))
+	return nil
+}
+
+func renderDnat(dnat **nft.Dnat, buf *strings.Builder, msg json.RawMessage) error {
+	//{'port': 7999, 'addr': '172.18.0.2'}
+	if err := json.Unmarshal(msg, dnat); err != nil {
 		return err
 	}
 
-	buf.WriteString(fmt.Sprintf("dnat to %s:%d", dnat.Address, dnat.Port))
+	buf.WriteString(fmt.Sprintf("dnat to %s:%d", (*dnat).Address, (*dnat).Port))
 
 	return nil
 }
@@ -251,12 +262,12 @@ func renderMatch(buf *strings.Builder, msg json.RawMessage) error {
 	return nil
 }
 
-func renderRule(expr []NftJsonBlock) (string, error) {
+func renderRule(rule *nft.Rule, expr []NftJsonBlock) error {
 	var buf strings.Builder
 
 	for _, exp := range expr {
 		if len(exp) != 1 {
-			return "", fmt.Errorf("invalid expression")
+			return fmt.Errorf("invalid expression")
 		}
 		for expType, message := range exp {
 			if buf.Len() != 0 {
@@ -266,25 +277,31 @@ func renderRule(expr []NftJsonBlock) (string, error) {
 			switch expType {
 			case "match":
 				if err := renderMatch(&buf, message); err != nil {
-					return "", err
+					return err
 				}
 			case "dnat":
-				if err := renderDnat(&buf, message); err != nil {
-					return "", err
+				if err := renderDnat(&rule.Dnat, &buf, message); err != nil {
+					return err
+				}
+			case "mangle":
+				if err := renderMangle(&rule.Mark, &buf, message); err != nil {
+					return err
 				}
 			case "masquerade":
 				fallthrough
 			case "accept":
 				fallthrough
 			case "drop":
+				rule.Target = expType
 				buf.WriteString(expType)
 			default:
-				return "", fmt.Errorf("unknown expr type '%s'", expType)
+				return fmt.Errorf("unknown expr type '%s'", expType)
 			}
 		}
 	}
 
-	return buf.String(), nil
+	rule.Body = buf.String()
+	return nil
 }
 
 func setRuleBlock(set nft.Nft, msg json.RawMessage) error {
@@ -302,14 +319,16 @@ func setRuleBlock(set nft.Nft, msg json.RawMessage) error {
 		return fmt.Errorf("unknown chain %s", rule.Chain)
 	}
 
-	body, err := renderRule(rule.Expresion)
+	r := nft.Rule{
+		Handle: rule.Handle,
+	}
+
+	err := renderRule(&r, rule.Expresion)
 	if err != nil {
 		return err
 	}
-	chain.Rules = append(chain.Rules, nft.Rule{
-		Handle: rule.Handle,
-		Body:   body,
-	})
+
+	chain.Rules = append(chain.Rules, r)
 
 	table.Chains[rule.Chain] = chain
 	set[rule.Table] = table
