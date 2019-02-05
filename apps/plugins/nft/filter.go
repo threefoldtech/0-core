@@ -286,6 +286,18 @@ func (f And) Match(rule *NftRuleBlock) bool {
 	return true
 }
 
+type Or []Filter
+
+func (f Or) Match(rule *NftRuleBlock) bool {
+	for _, filter := range f {
+		if filter.Match(rule) {
+			return true
+		}
+	}
+
+	return false
+}
+
 type TableFilter struct {
 	Table string
 }

@@ -87,13 +87,15 @@ func (s *socatManager) Resolve(address string) string {
 		return address
 	}
 
-	s.rm.Lock()
-	dst, ok := s.rules[src.port]
-	s.rm.Unlock()
+	var dst rule
+	panic("implement me")
+	//s.rm.Lock()
+	//dst, ok := s.rules[src.port]
+	//s.rm.Unlock()
 
-	if !ok {
-		return address
-	}
+	// if !ok {
+	// 	return address
+	// }
 
 	/*
 		the actual source ip can be as follows:

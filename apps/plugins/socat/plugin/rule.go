@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"net"
 	"strings"
+
+	"github.com/threefoldtech/0-core/apps/plugins/socat"
 )
 
 type source struct {
 	ip        string
-	port      int
+	port      uint64
 	protocols []string
 }
 
@@ -89,14 +91,14 @@ func getSource(src string) (source, error) {
 }
 
 type rule struct {
-	ns     string
+	ns     socat.NS
 	source source
 	port   int
 	ip     string
 }
 
 func (r rule) rule(match string) string {
-	return fmt.Sprintf("ip daddr @host %s dnat to %s:%d", match, r.ip, r.port)
+	return fmt.Sprintf("ip daddr @host %s meta mark set %d dnat to %s:%d", match, r.ns, r.ip, r.port)
 }
 
 func (r rule) Rules() []string {

@@ -114,18 +114,12 @@ func (b *manager) dropPort(ctx pm.Context) (interface{}, error) {
 }
 
 func (b *manager) listPorts(ctx pm.Context) (interface{}, error) {
-	args, err := b.getArgs(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	b.m.Lock()
 	defer b.m.Unlock()
 
 	matches, err := b.Find(nft.And{
 		&nft.TableFilter{Table: "filter"},
 		&nft.ChainFilter{Chain: "input"},
-		&nft.IntMatchFilter{Name: "tcp", Field: "dport", Value: uint64(args.Port)},
 	})
 
 	if err != nil {
