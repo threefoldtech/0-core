@@ -136,7 +136,186 @@ const (
 			  "chain": "pre",
 			  "handle": 8
 			}
-		  },
+			},{
+				"rule": {
+				 "family": "ip",
+				 "chain": "pre",
+				 "table": "nat",
+				 "handle": 10,
+				 "expr": [
+					{
+					 "match": {
+						"left": {
+						 "payload": {
+							"name": "ip",
+							"field": "daddr"
+						 }
+						},
+						"right": "@host"
+					 }
+					},
+					{
+					 "match": {
+						"left": {
+						 "payload": {
+							"name": "ip",
+							"field": "saddr"
+						 }
+						},
+						"right": {
+						 "prefix": {
+							"addr": "192.168.20.0",
+							"len": 24
+						 }
+						}
+					 }
+					},
+					{
+					 "match": {
+						"left": {
+						 "payload": {
+							"name": "tcp",
+							"field": "dport"
+						 }
+						},
+						"right": 2223
+					 }
+					},
+					{
+					 "mangle": {
+						"left": {
+						 "meta": "mark"
+						},
+						"right": 16777219
+					 }
+					},
+					{
+					 "dnat": {
+						"addr": "172.18.0.4",
+						"port": 22
+					 }
+					}
+				 ]
+				}
+			 },
+			{"rule": {
+				"family": "ip",
+				"chain": "pre",
+				"table": "nat",
+				"handle": 11,
+				"expr": [
+				 {
+					"match": {
+					 "left": {
+						"payload": {
+						 "name": "ip",
+						 "field": "daddr"
+						}
+					 },
+					 "right": "@host"
+					}
+				 },
+				 {
+					"match": {
+					 "left": {
+						"payload": {
+						 "name": "ip",
+						 "field": "saddr"
+						}
+					 },
+					 "right": {
+						"prefix": {
+						 "addr": "192.168.20.0",
+						 "len": 24
+						}
+					 }
+					}
+				 },
+				 {
+					"match": {
+					 "left": {
+						"payload": {
+						 "name": "udp",
+						 "field": "dport"
+						}
+					 },
+					 "right": 2223
+					}
+				 },
+				 {
+					"mangle": {
+					 "left": {
+						"meta": "mark"
+					 },
+					 "right": 16777219
+					}
+				 },
+				 {
+					"dnat": {
+					 "addr": "172.18.0.4",
+					 "port": 22
+					}
+				 }
+				]
+			 }
+			},
+			{
+			 "rule": {
+				"family": "ip",
+				"chain": "pre",
+				"table": "nat",
+				"handle": 12,
+				"expr": [
+				 {
+					"match": {
+					 "left": {
+						"payload": {
+						 "name": "ip",
+						 "field": "daddr"
+						}
+					 },
+					 "right": "@host"
+					}
+				 },
+				 {
+					"match": {
+					 "left": {
+						"payload": {
+						 "name": "ip",
+						 "field": "saddr"
+						}
+					 },
+					 "right": "192.168.21.10"
+					}
+				 },
+				 {
+					"match": {
+					 "left": {
+						"payload": {
+						 "name": "tcp",
+						 "field": "dport"
+						}
+					 },
+					 "right": 2224
+					}
+				 },
+				 {
+					"mangle": {
+					 "left": {
+						"meta": "mark"
+					 },
+					 "right": 16777219
+					}
+				 },
+				 {
+					"dnat": {
+					 "addr": "172.18.0.4",
+					 "port": 22
+					}
+				 }
+				]
+			 }
+			},
 		  {
 			"chain": {
 			  "family": "ip",
@@ -295,7 +474,7 @@ const (
 					"left": {
 					  "meta": "iifname"
 					},
-					"right": "vxbackend"
+					"right": "zt*"
 				  }
 				},
 				{
@@ -574,6 +753,51 @@ func TestFilterNetwork(t *testing.T) {
 	}
 }
 
+func TestFilterIP(t *testing.T) {
+	value := net.ParseIP("192.168.21.10")
+	rules, err := Filter(filterInput, &nft.IPMatchFilter{
+		Name:  "ip",
+		Field: "saddr",
+		Value: value,
+	})
+
+	if ok := assert.NoError(t, err); !ok {
+		t.Fatal()
+	}
+
+	if ok := assert.Len(t, rules, 1); !ok {
+		t.Fatal()
+	}
+
+	if ok := assert.Equal(t, 12, rules[0].Handle); !ok {
+		t.Error()
+	}
+
+	value = net.ParseIP("192.168.20.1")
+	rules, err = Filter(filterInput, &nft.IPMatchFilter{
+		Name:  "ip",
+		Field: "saddr",
+		Value: value,
+	})
+
+	if ok := assert.NoError(t, err); !ok {
+		t.Fatal()
+	}
+
+	if ok := assert.Len(t, rules, 2); !ok {
+		t.Fatal()
+	}
+
+	if ok := assert.Equal(t, 10, rules[0].Handle); !ok {
+		t.Error()
+	}
+
+	if ok := assert.Equal(t, 11, rules[1].Handle); !ok {
+		t.Error()
+	}
+
+}
+
 func TestFilterMeta(t *testing.T) {
 	rules, err := Filter(filterInput, &nft.MetaMatchFilter{
 		Name:  "iif",
@@ -589,6 +813,25 @@ func TestFilterMeta(t *testing.T) {
 	}
 
 	if ok := assert.Equal(t, 9, rules[0].Handle); !ok {
+		t.Error()
+	}
+}
+
+func TestFilterMetaPartial(t *testing.T) {
+	rules, err := Filter(filterInput, &nft.MetaMatchFilter{
+		Name:  "iifname",
+		Value: "ztabcdef",
+	})
+
+	if ok := assert.NoError(t, err); !ok {
+		t.Fatal()
+	}
+
+	if ok := assert.Len(t, rules, 1); !ok {
+		t.Fatal()
+	}
+
+	if ok := assert.Equal(t, 7, rules[0].Handle); !ok {
 		t.Error()
 	}
 }

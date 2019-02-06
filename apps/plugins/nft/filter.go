@@ -3,6 +3,7 @@ package nft
 import (
 	"encoding/json"
 	"net"
+	"strings"
 )
 
 //NftJsonBlock defines a nft json block
@@ -120,6 +121,14 @@ type MetaMatchFilter struct {
 	Value string
 }
 
+func (f *MetaMatchFilter) valueMatch(m string) bool {
+	if !strings.HasSuffix(m, "*") {
+		return m == f.Value
+	}
+
+	return strings.HasPrefix(f.Value, strings.TrimRight(m, "*"))
+}
+
 func (f *MetaMatchFilter) matchExp(exp json.RawMessage) bool {
 	/*
 		{"match": {
@@ -142,7 +151,7 @@ func (f *MetaMatchFilter) matchExp(exp json.RawMessage) bool {
 		return false
 	}
 
-	return data.Left.Meta == f.Name && data.Right == f.Value
+	return data.Left.Meta == f.Name && f.valueMatch(data.Right)
 }
 
 func (f *MetaMatchFilter) Match(rule *NftRuleBlock) bool {
@@ -238,7 +247,7 @@ func (f *NetworkMatchFilter) matchExp(exp json.RawMessage) bool {
 		} `json:"left"`
 		Right struct {
 			Prefix struct {
-				Addr string `json:"addr"`
+				Addr net.IP `json:"addr"`
 				Len  int    `json:"len"`
 			} `json:"prefix"`
 		} `json:"right"`
@@ -251,11 +260,97 @@ func (f *NetworkMatchFilter) matchExp(exp json.RawMessage) bool {
 	mask, _ := f.Value.Mask.Size()
 	return data.Left.Payload.Name == f.Name &&
 		data.Left.Payload.Field == f.Field &&
-		data.Right.Prefix.Addr == f.Value.IP.String() &&
+		data.Right.Prefix.Addr.Equal(f.Value.IP) &&
 		data.Right.Prefix.Len == mask
 }
 
 func (f *NetworkMatchFilter) Match(rule *NftRuleBlock) bool {
+	for _, exp := range rule.Expresion {
+		for expType, expMessage := range exp {
+			if expType == "match" {
+				if f.matchExp(expMessage) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+type IPMatchFilter struct {
+	Name  string
+	Field string
+	Value net.IP
+}
+
+func (f *IPMatchFilter) matchExp(exp json.RawMessage) bool {
+	/*
+		{
+			"match": {
+				"left": {
+					"payload": {
+					"name": "ip",
+					"field": "saddr"
+					}
+				},
+				"right": {
+					"prefix": {
+					"addr": "172.18.0.0",
+					"len": 16
+					}
+				}
+			}
+		}
+	*/
+
+	var data struct {
+		Left struct {
+			Payload struct {
+				Name  string `json:"name"`
+				Field string `json:"field"`
+			} `json:"payload"`
+		} `json:"left"`
+		Right json.RawMessage `json:"right"`
+	}
+
+	if err := json.Unmarshal(exp, &data); err != nil {
+		return false
+	}
+
+	if data.Left.Payload.Name != f.Name ||
+		data.Left.Payload.Field != f.Field {
+		return false
+	}
+
+	var right interface{}
+	if err := json.Unmarshal(data.Right, &right); err != nil {
+		return false
+	}
+	switch right := right.(type) {
+	case string:
+		return f.Value.String() == right
+	}
+	var prefix struct {
+		Prefix struct {
+			Addr net.IP `json:"addr"`
+			Len  int    `json:"len"`
+		} `json:"prefix"`
+	}
+
+	if err := json.Unmarshal(data.Right, &prefix); err != nil {
+		return false
+	}
+
+	network := net.IPNet{
+		IP:   prefix.Prefix.Addr,
+		Mask: net.CIDRMask(prefix.Prefix.Len, 32), //32 for a IPv4
+	}
+
+	return network.Contains(f.Value)
+}
+
+func (f *IPMatchFilter) Match(rule *NftRuleBlock) bool {
 	for _, exp := range rule.Expresion {
 		for expType, expMessage := range exp {
 			if expType == "match" {
