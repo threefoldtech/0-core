@@ -73,7 +73,7 @@ func TestRule(t *testing.T) {
 
 	if ok := assert.Equal(
 		t,
-		"ip daddr @host tcp dport 80 dnat to 1.2.3.4:8080",
+		"ip daddr @host tcp dport 80 meta mark set 0 dnat to 1.2.3.4:8080",
 		rules[0],
 	); !ok {
 		t.Error()
@@ -81,7 +81,7 @@ func TestRule(t *testing.T) {
 
 	if ok := assert.Equal(
 		t,
-		"ip daddr @host udp dport 80 dnat to 1.2.3.4:8080",
+		"ip daddr @host udp dport 80 meta mark set 0 dnat to 1.2.3.4:8080",
 		rules[1],
 	); !ok {
 		t.Error()

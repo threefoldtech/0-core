@@ -4,65 +4,41 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"strings"
+	"regexp"
+
+	"github.com/threefoldtech/0-core/apps/plugins/nft"
+)
+
+var (
+	dnatMatch = regexp.MustCompile(`dnat to ([^\s]+)`)
 )
 
 //getInterfaceMatch returns the first interface that has the given ip
 //as <name>, <address>, error
 //error return if no match is found
-func getInterfaceMatch(ip string) (name string, address net.IP, err error) {
+func getInterfaceMatch(ip string) (string, error) {
 	nics, err := net.Interfaces()
 	if err != nil {
-		return
+		return "", err
 	}
+
 	for _, nic := range nics {
 		var addrs []net.Addr
 		addrs, err = nic.Addrs()
 		if err != nil {
-			return
+			return "", err
 		}
 
 		for _, addr := range addrs {
 			if addr, ok := addr.(*net.IPNet); ok {
 				if addr.IP.String() == ip {
-					return nic.Name, addr.IP, nil
+					return nic.Name, nil
 				}
 			}
 		}
 	}
 
-	err = fmt.Errorf("no match found")
-	return
-}
-
-//getRoutingInterface returns the first interface that has the given ip reachable through
-//its network
-//as <name>, <address>, error
-//error return if no match is found
-func getRoutingInterface(ip string) (name string, network *net.IPNet, err error) {
-	_ip := net.ParseIP(ip)
-	nics, err := net.Interfaces()
-	if err != nil {
-		return
-	}
-	for _, nic := range nics {
-		var addrs []net.Addr
-		addrs, err = nic.Addrs()
-		if err != nil {
-			return
-		}
-
-		for _, addr := range addrs {
-			if addr, ok := addr.(*net.IPNet); ok {
-				if addr.Contains(_ip) {
-					return nic.Name, addr, nil
-				}
-			}
-		}
-	}
-
-	err = fmt.Errorf("no match found")
-	return
+	return "", fmt.Errorf("no match found")
 }
 
 //Resolve resolves an address of the form <ip>:<port> to a direct address to the endpoint
@@ -72,6 +48,10 @@ func getRoutingInterface(ip string) (name string, network *net.IPNet, err error)
 //ELSE
 // - return address unchanged
 func (s *socatManager) Resolve(address string) string {
+	return s.resolve(address, s.nft())
+}
+
+func (s *socatManager) resolve(address string, api nft.API) string {
 	src, err := getSource(address)
 	if err != nil {
 		return address
@@ -82,55 +62,67 @@ func (s *socatManager) Resolve(address string) string {
 		return address
 	}
 
-	nic, ip, err := getInterfaceMatch(src.ip)
+	nic, err := getInterfaceMatch(src.ip)
 	if err != nil {
 		return address
 	}
 
-	var dst rule
-	panic("implement me")
-	//s.rm.Lock()
-	//dst, ok := s.rules[src.port]
-	//s.rm.Unlock()
+	//address points to a local address, so it can be forwarded.
+	//we need to find the rule that matches this address.
+	//this can be done as follows
+	// the address should be rewritten if
+	// - dport is matched (tcp or udp)
+	//   AND
+	// - (ip network is matched
+	//     OR
+	// -  nic is matched)
 
-	// if !ok {
-	// 	return address
-	// }
-
-	/*
-		the actual source ip can be as follows:
-		  - empty/0.0.0.0
-		  - IP
-		  - IP/MASK (CIDR)
-		  - interface name
-		  - prefix* (partial match of interface name)
-	*/
-	rewritten := fmt.Sprintf("%s:%d", dst.ip, dst.port)
-	if len(dst.source.ip) == 0 || // empty
-		dst.source.ip == "0.0.0.0" || // 0.0.0.0 ip
-		dst.source.ip == nic || // exact nic match
-		dst.source.ip == ip.String() { // exac ip match
-
-		return rewritten
-	} else if _, network, err := net.ParseCIDR(dst.source.ip); err == nil {
-		if network.Contains(ip) {
-			//source ip is in network
-			return rewritten
-		}
-
-	} else if i := strings.Index(dst.source.ip, "*"); i > 0 {
-		if strings.HasPrefix(nic, dst.source.ip[:i]) {
-			return rewritten
-		}
+	filter := nft.And{
+		nft.Or{
+			&nft.IntMatchFilter{
+				Name:  "tcp",
+				Field: "dport",
+				Value: src.port,
+			},
+			&nft.IntMatchFilter{
+				Name:  "udp",
+				Field: "dport",
+				Value: src.port,
+			},
+		},
+		nft.Or{
+			&nft.IPMatchFilter{
+				Name:  "ip",
+				Field: "saddr",
+				Value: net.ParseIP(src.ip),
+			},
+			&nft.MetaMatchFilter{
+				Name:  "iifname",
+				Value: nic,
+			},
+		},
+	}
+	rules, _ := api.Find(filter)
+	if len(rules) == 0 {
+		return address
+	}
+	m := dnatMatch.FindStringSubmatch(rules[0].Body)
+	if len(m) != 2 {
+		//that should never happen
+		return address
 	}
 
-	return address
+	return m[1]
 }
 
 //ResolveURL rewrites a url to a direct address to the end point. Return original url
 //if no forwarding rule configured that matches the given address
 //note, the url host part must be an ip, can't use host names
 func (s *socatManager) ResolveURL(raw string) (string, error) {
+	return s.resolveURL(raw, s.nft())
+}
+
+func (s *socatManager) resolveURL(raw string, api nft.API) (string, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return raw, err
@@ -144,7 +136,7 @@ func (s *socatManager) ResolveURL(raw string) (string, error) {
 		host = fmt.Sprintf("%s:%d", host, port)
 	}
 
-	u.Host = s.Resolve(host)
+	u.Host = s.resolve(host, api)
 
 	return u.String(), nil
 }
