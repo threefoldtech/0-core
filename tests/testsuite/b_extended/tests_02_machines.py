@@ -78,7 +78,7 @@ class ExtendedMachines(BaseTest):
             self.client.kvm.add_nic(vm_uuid, 'bridge', id=bn2)
 
         self.lg('Deattach all these nics, should succeed')
-        time.sleep(2)
+        time.sleep(5)
         self.client.kvm.remove_nic(vm_uuid, 'vlan', id=str(t1))
         self.client.kvm.remove_nic(vm_uuid, 'vxlan', id=str(vx1_id))
         time.sleep(2)

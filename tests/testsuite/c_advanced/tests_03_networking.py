@@ -117,10 +117,16 @@ class AdvancedNetworking(BaseTest):
 
         dhcp_c = self.create_container(root_url=self.root_url, storage=self.storage, nics=nic,  privileged=True)
         dhcp_c_client = self.client.container.client(dhcp_c)
-        rs = dhcp_c_client.system('apt-get update').get()
-        self.assertEqual(rs.state, 'SUCCESS')
-        rs = dhcp_c_client.system('apt-get install -y dnsmasq-base').get()
-        self.assertEqual(rs.state, 'SUCCESS')
+        rs = dhcp_c_client.system('apt-get update').get(150)
+        self.assertEqual(rs.state, 'SUCCESS', "stdout: {}, stderr: {}".format(rs.stdout,rs.stderr))
+        rs =  dhcp_c_client.system('apt-get autoremove').get(150)
+        self.assertEqual(rs.state, 'SUCCESS', "stdout: {}, stderr: {}".format(rs.stdout,rs.stderr))
+        time.sleep(1)
+        for _ in range(3):
+           rs = dhcp_c_client.system('apt-get install -y dnsmasq-base').get(100)
+           if rs.state == "SUCCESS":
+               break
+        self.assertEqual(rs.state, 'SUCCESS', "stdout: {}, stderr: {}".format(rs.stdout,rs.stderr))
         dhcp_c_client.system('dnsmasq --no-hosts --keep-in-foreground --listen-address=192.168.1.1 --interface=eth0 --dhcp-range=192.168.1.2,192.168.1.3,255.255.0.0 --bind-interfaces --except-interface=lo')
         time.sleep(40)
 

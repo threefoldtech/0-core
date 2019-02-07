@@ -192,14 +192,20 @@ class BaseTest(unittest.TestCase):
         :param files_loc: abs path for the files (ex: /)
         :param deattach: if True, deattach all loop devices
         """
-        self.client.bash('modprobe loop')  # to make /dev/loop* available
         if deattach:
             self.deattach_all_loop_devices()
+            time.sleep(1)
+            self.client.bash('modprobe -r loop')
+        time.sleep(1)
+        self.client.bash('modprobe loop')  # to make /dev/loop* available
         loop_devs = []
         for f in files_names:
             self.client.bash('cd {}; truncate -s {} {}'.format(files_loc, file_size, f))
-            output = self.client.bash('losetup -f --show {}'.format(os.path.join(files_loc, f)))
-            free_l_dev = self.stdout(output)
+            for _ in range(5): # try 5 times since sometimes output is empty string
+                output = self.client.bash('losetup -f --show {}'.format(os.path.join(files_loc, f)))
+                free_l_dev = self.stdout(output)
+                if free_l_dev:
+                    break
             loop_devs.append(free_l_dev)
         return loop_devs
 

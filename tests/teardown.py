@@ -31,9 +31,7 @@ def teardown(options):
     zos_client.bash('rm -rf /var/cache/{}.qcow2'.format(os.environ['ubuntu_port']))
 
     # leave the zt-network
-    os.system('zerotier-cli leave {}'.format(os.environ['ZT_NET_ID']))
-
-
+    os.system('sudo zerotier-cli leave {}'.format(os.environ['ZT_NET_ID']))
 
 
 if __name__ == "__main__":
