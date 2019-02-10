@@ -52,10 +52,13 @@ func (s *socatManager) Resolve(address string) string {
 }
 
 func (s *socatManager) resolve(address string, api nft.API) string {
+	log.Debugf("resolving: %s", address)
 	src, err := getSource(address)
 	if err != nil {
 		return address
 	}
+
+	log.Debugf("source is: %v", src)
 
 	if len(src.ip) == 0 {
 		//we have this check here because getSource allows the <port> <ip>:<port> syntax as well
@@ -66,16 +69,11 @@ func (s *socatManager) resolve(address string, api nft.API) string {
 	if err != nil {
 		return address
 	}
-
+	log.Debugf("nic is: %v", nic)
 	//address points to a local address, so it can be forwarded.
 	//we need to find the rule that matches this address.
-	//this can be done as follows
-	// the address should be rewritten if
-	// - dport is matched (tcp or udp)
-	//   AND
-	// - (ip network is matched
-	//     OR
-	// -  nic is matched)
+	//this can be done by matching a rule in the nat table that
+	//uses those ports
 
 	filter := nft.And{
 		nft.Or{
@@ -90,18 +88,14 @@ func (s *socatManager) resolve(address string, api nft.API) string {
 				Value: src.port,
 			},
 		},
-		nft.Or{
-			&nft.IPMatchFilter{
-				Name:  "ip",
-				Field: "saddr",
-				Value: net.ParseIP(src.ip),
-			},
-			&nft.MetaMatchFilter{
-				Name:  "iifname",
-				Value: nic,
-			},
+		&nft.TableFilter{
+			Table: "nat",
+		},
+		&nft.ChainFilter{
+			Chain: "pre",
 		},
 	}
+
 	rules, _ := api.Find(filter)
 	if len(rules) == 0 {
 		return address

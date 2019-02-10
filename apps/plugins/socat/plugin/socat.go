@@ -42,8 +42,9 @@ var (
 			return &mgr
 		},
 		Actions: map[string]pm.Action{
-			"list":    mgr.list,
-			"reserve": mgr.reserve,
+			"list":     mgr.list,
+			"reserve":  mgr.reserve,
+			"_resolve": mgr.resolveAction,
 		},
 	}
 )

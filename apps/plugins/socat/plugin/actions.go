@@ -49,16 +49,28 @@ func (s *socatManager) list(ctx pm.Context) (interface{}, error) {
 
 func (s *socatManager) reserve(ctx pm.Context) (interface{}, error) {
 	var query struct {
-		Numer int `json:"number"`
+		Number int `json:"number"`
 	}
 	cmd := ctx.Command()
 	if err := json.Unmarshal(*cmd.Arguments, &query); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
 
-	if query.Numer == 0 {
+	if query.Number == 0 {
 		return nil, pm.BadRequestError("reseve number cannot be zero")
 	}
 
-	return s.Reserve(query.Numer)
+	return s.Reserve(query.Number)
+}
+
+func (s *socatManager) resolveAction(ctx pm.Context) (interface{}, error) {
+	var query struct {
+		URL string `json:"url"`
+	}
+	cmd := ctx.Command()
+	if err := json.Unmarshal(*cmd.Arguments, &query); err != nil {
+		return nil, pm.BadRequestError(err)
+	}
+
+	return s.ResolveURL(query.URL)
 }
