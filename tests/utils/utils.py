@@ -63,8 +63,12 @@ class BaseTest(unittest.TestCase):
 
     def execute_command(self, cmd, ip='', port=22):
         target = "ssh -o 'StrictHostKeyChecking no' -p {} root@{} '{}'".format(port, ip, cmd)
-        response = subprocess.run(target, shell=True, universal_newlines=True,
-                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        for _ in range(10):
+            response = subprocess.run(target, shell=True, universal_newlines=True,
+                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if response.returncode == 0:
+                break
+            time.sleep(5)
         # "response" has stderr, stdout and returncode(should be 0 in successful case)
         return response
 
