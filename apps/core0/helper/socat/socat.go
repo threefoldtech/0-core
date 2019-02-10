@@ -2,26 +2,32 @@ package socat
 
 import (
 	"fmt"
-	"net"
-	"strings"
+	"regexp"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/threefoldtech/0-core/base/nft"
 	"github.com/threefoldtech/0-core/base/pm"
 
-	"github.com/op/go-logging"
-	"github.com/patrickmn/go-cache"
+	logging "github.com/op/go-logging"
+	cache "github.com/patrickmn/go-cache"
 )
+
+func main() {} //silence error
 
 const (
 	addressAll = "0.0.0.0"
 )
 
 var (
-	log   = logging.MustGetLogger("socat")
-	socat socatAPI
+	log = logging.MustGetLogger("socat")
 
+	mgr socatManager
+)
+
+var (
+	portMatch        = regexp.MustCompile(`dport\s+(\d+)`)
 	defaultProtocols = []string{"tcp"}
 	validProtocols   = map[string]struct{}{
 		"tcp": struct{}{},
@@ -29,132 +35,28 @@ var (
 	}
 )
 
-type socatAPI struct {
-	rm    sync.Mutex
-	rules map[int]rule
+type socatManager struct {
+	rm sync.Mutex
 
 	sm       sync.Mutex
 	reserved *cache.Cache
 }
 
 func init() {
-	socat.rules = make(map[int]rule)
-	socat.reserved = cache.New(2*time.Minute, 1*time.Minute)
-}
-
-type source struct {
-	ip        string
-	port      int
-	protocols []string
-}
-
-func (s source) match(proto string) string {
-	if addr := net.ParseIP(s.ip); addr != nil {
-		if s.ip == "0.0.0.0" {
-			return fmt.Sprintf("%s dport %d", proto, s.port)
-		}
-		return fmt.Sprintf("ip saddr %s %s dport %d", s.ip, proto, s.port)
-	} else if _, _, err := net.ParseCIDR(s.ip); err == nil {
-		//NETWORK
-		return fmt.Sprintf("ip saddr %s %s dport %d", s.ip, proto, s.port)
-
-	}
-	//assume interface name
-	return fmt.Sprintf("iifname \"%s\" %s dport %d", s.ip, proto, s.port)
-}
-
-func (s source) Matches() []string {
-	var matches []string
-	for _, proto := range s.protocols {
-		matches = append(matches, s.match(proto))
-	}
-
-	return matches
-}
-
-/*
-getSource parse source port
-
-source = port
-source = address:port
-source = source|protocol
-protocol = tcp
-protocol = udp
-protocol = protocol(+protocol)?
-address = ip
-address = ip/mask
-address = nic
-address = nic*
-*/
-func getSource(src string) (source, error) {
-	parts := strings.SplitN(src, "|", 2)
-	if len(parts) > 2 {
-		return source{}, fmt.Errorf("invalid syntax")
-	}
-	var r = source{
-		ip:        addressAll,
-		protocols: defaultProtocols,
-	}
-
-	src = parts[0]
-	if len(parts) == 2 {
-		r.protocols = strings.Split(parts[1], "+")
-	}
-
-	for _, p := range r.protocols {
-		if _, ok := validProtocols[p]; !ok {
-			return source{}, fmt.Errorf("invalid protocol '%s'", p)
-		}
-	}
-
-	parts = strings.SplitN(src, ":", 2)
-
-	if _, err := fmt.Sscanf(parts[len(parts)-1], "%d", &r.port); err != nil {
-		return r, err
-	}
-
-	if r.port <= 0 || r.port >= 65536 {
-		return r, fmt.Errorf("invalid port number")
-	}
-
-	if len(parts) == 2 {
-		r.ip = parts[0]
-	}
-
-	return r, nil
+	mgr.reserved = cache.New(2*time.Minute, 1*time.Minute)
 }
 
 //ValidHost checks if the host string is valid
 //Valid hosts is (port, ip:port, or device:port)
-func ValidHost(host string) bool {
+func (m *socatManager) ValidHost(host string) bool {
 	_, err := getSource(host)
 	return err == nil
-}
-
-type rule struct {
-	ns     string
-	source source
-	port   int
-	ip     string
-}
-
-func (r rule) rule(match string) string {
-	return fmt.Sprintf("ip daddr @host %s dnat to %s:%d", match, r.ip, r.port)
-}
-
-func (r rule) Rules() []string {
-	var rules []string
-	for _, match := range r.source.Matches() {
-		rules = append(rules, r.rule(match))
-	}
-
-	return rules
 }
 
 //SetPortForward create a single port forward from host(port), to ip(addr) and dest(port) in this namespace
 //The namespace is used to group port forward rules so they all can get terminated
 //with one call later.
-func (s *socatAPI) SetPortForward(namespace string, ip string, host string, dest int) error {
+func (s *socatManager) SetPortForward(ns NS, ip string, host string, dest int) error {
 	s.rm.Lock()
 	defer s.rm.Unlock()
 
@@ -163,14 +65,39 @@ func (s *socatAPI) SetPortForward(namespace string, ip string, host string, dest
 		return err
 	}
 
+	matches, err := nft.Find(nft.And{
+		&nft.TableFilter{
+			Table: "nat",
+		},
+		&nft.ChainFilter{
+			Chain: "pre",
+		},
+		nft.Or{
+			&nft.IntMatchFilter{
+				Name:  "tcp",
+				Field: "dport",
+				Value: src.port,
+			},
+			&nft.IntMatchFilter{
+				Name:  "udp",
+				Field: "dport",
+				Value: src.port,
+			},
+		},
+	})
+
+	if err != nil {
+		return err
+	}
+
 	//NOTE: this will only check if the port is used for port forwarding
 	//if a port on the host is using this port it will get masked out
-	if _, exists := s.rules[src.port]; exists {
-		return fmt.Errorf("port already in use")
+	if len(matches) > 0 {
+		return fmt.Errorf("port %d already in use", src.port)
 	}
 
 	rule := rule{
-		ns:     forwardID(namespace, src.port, dest),
+		ns:     ns,
 		source: src,
 		port:   dest,
 		ip:     ip,
@@ -199,8 +126,6 @@ func (s *socatAPI) SetPortForward(namespace string, ip string, host string, dest
 		return err
 	}
 
-	s.rules[src.port] = rule
-
 	s.sm.Lock()
 	defer s.sm.Unlock()
 	s.reserved.Delete(fmt.Sprint(src.port))
@@ -213,7 +138,7 @@ func forwardID(namespace string, host int, dest int) string {
 }
 
 //RemovePortForward removes a single port forward
-func (s *socatAPI) RemovePortForward(namespace string, host string, dest int) error {
+func (s *socatManager) RemovePortForward(ns NS, host string, dest int) error {
 	s.rm.Lock()
 	defer s.rm.Unlock()
 	src, err := getSource(host)
@@ -221,94 +146,161 @@ func (s *socatAPI) RemovePortForward(namespace string, host string, dest int) er
 		return err
 	}
 
-	rule, ok := s.rules[src.port]
-	if !ok {
-		return fmt.Errorf("no port forward from host port: %d", src.port)
-	}
-
-	if rule.ns != forwardID(namespace, src.port, dest) {
-		return fmt.Errorf("permission denied")
-	}
-
-	var rs []nft.Rule
-	for _, r := range rule.Rules() {
-		rs = append(rs, nft.Rule{Body: r})
-	}
-
-	set := nft.Nft{
-		"nat": nft.Table{
-			Family: nft.FamilyIP,
-			Chains: nft.Chains{
-				"pre": nft.Chain{
-					Rules: rs,
-				},
+	matches, err := nft.Find(nft.And{
+		&nft.TableFilter{
+			Table: "nat",
+		},
+		&nft.ChainFilter{
+			Chain: "pre",
+		},
+		nft.Or{
+			&nft.IntMatchFilter{
+				Name:  "tcp",
+				Field: "dport",
+				Value: src.port,
+			},
+			&nft.IntMatchFilter{
+				Name:  "udp",
+				Field: "dport",
+				Value: src.port,
 			},
 		},
-	}
+		&nft.MarkFilter{
+			Mark: uint32(ns),
+		},
+	})
 
-	if err := nft.DropRules(set); err != nil {
+	if err != nil {
 		return err
 	}
 
-	delete(s.rules, src.port)
+	for _, rule := range matches {
+		if err := nft.Drop(rule.Family, rule.Table, rule.Chain, rule.Handle); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 //RemoveAll remove all port forwrards that were created in this namespace.
-func (s *socatAPI) RemoveAll(namespace string) error {
+func (s *socatManager) RemoveAll(ns NS) error {
 	s.rm.Lock()
 	defer s.rm.Unlock()
 
-	var toDelete []nft.Rule
-	var hostPorts []int
-
-	for host, r := range s.rules {
-		if !strings.HasPrefix(r.ns, fmt.Sprintf("socat-%s", namespace)) {
-			continue
-		}
-
-		for _, rs := range r.Rules() {
-			toDelete = append(toDelete, nft.Rule{Body: rs})
-		}
-
-		hostPorts = append(hostPorts, host)
-	}
-
-	if len(toDelete) == 0 {
-		return nil
-	}
-
-	set := nft.Nft{
-		"nat": nft.Table{
-			Family: nft.FamilyIP,
-			Chains: nft.Chains{
-				"pre": nft.Chain{
-					Rules: toDelete,
-				},
-			},
+	matches, err := nft.Find(nft.And{
+		&nft.TableFilter{
+			Table: "nat",
 		},
-	}
+		&nft.ChainFilter{
+			Chain: "pre",
+		},
+		&nft.MarkFilter{
+			Mark: uint32(ns),
+		},
+	})
 
-	if err := nft.DropRules(set); err != nil {
-		log.Errorf("failed to delete ruleset: %s", err)
+	if err != nil {
 		return err
 	}
 
-	for _, host := range hostPorts {
-		delete(s.rules, host)
+	for _, rule := range matches {
+		if err := nft.Drop(rule.Family, rule.Table, rule.Chain, rule.Handle); err != nil {
+			return err
+		}
 	}
 
 	return nil
+}
+
+func (s *socatManager) List(ns NS) (map[string]int, error) {
+	s.rm.Lock()
+	defer s.rm.Unlock()
+
+	matches, err := nft.Find(nft.And{
+		&nft.TableFilter{
+			Table: "nat",
+		},
+		&nft.ChainFilter{
+			Chain: "pre",
+		},
+		&nft.MarkFilter{
+			Mark: uint32(ns),
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	rules := make(map[uint64]*rule)
+
+	for _, ruleBody := range matches {
+		parsed, err := getRuleFromNFTRule(ruleBody.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		func(parsed rule) {
+			if r, ok := rules[parsed.source.port]; ok {
+				r.source.protocols = append(
+					r.source.protocols,
+					parsed.source.protocols...,
+				)
+			} else {
+				rules[parsed.source.port] = &parsed
+			}
+
+		}(parsed)
+	}
+
+	results := make(map[string]int)
+	for _, rule := range rules {
+		results[rule.source.String()] = rule.port
+	}
+
+	return results, nil
+}
+
+func (s *socatManager) getForwardedPorts() (map[uint16]struct{}, error) {
+	rules, err := nft.Find(nft.And{
+		&nft.TableFilter{
+			Table: "nat",
+		},
+		&nft.ChainFilter{
+			Chain: "pre",
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	ports := map[uint16]struct{}{}
+	for _, rule := range rules {
+		m := portMatch.FindStringSubmatch(rule.Body)
+		if len(m) != 2 {
+			continue
+		}
+
+		port, err := strconv.ParseUint(m[1], 10, 16)
+		if err != nil {
+			return nil, err
+		}
+
+		ports[uint16(port)] = struct{}{}
+	}
+
+	return ports, err
 }
 
 //Reserve reseves the first n number of ports, and return the reserved ports
 //reseved ports are reserved only for around 2 min, after that a new reserve
 //call can return the same ports.
-func (s *socatAPI) Reserve(n int) ([]int, error) {
+func (s *socatManager) Reserve(n int) ([]uint16, error) {
 	//get all listening tcp ports
 	type portInfo struct {
 		Network string `json:"network"`
-		Port    int    `json:"port"`
+		Port    uint16 `json:"port"`
 	}
 	var ports []portInfo
 
@@ -323,7 +315,7 @@ func (s *socatAPI) Reserve(n int) ([]int, error) {
 		return nil, err
 	}
 
-	used := make(map[int]struct{})
+	used := make(map[uint16]struct{})
 
 	for _, port := range ports {
 		if port.Network == "tcp" {
@@ -334,7 +326,12 @@ func (s *socatAPI) Reserve(n int) ([]int, error) {
 	s.rm.Lock()
 	defer s.rm.Unlock()
 
-	for port := range s.rules {
+	forwarded, err := s.getForwardedPorts()
+	if err != nil {
+		return nil, err
+	}
+
+	for port := range forwarded {
 		used[port] = struct{}{}
 	}
 
@@ -344,10 +341,10 @@ func (s *socatAPI) Reserve(n int) ([]int, error) {
 	//used is now filled with all assigned system ports (except reserved)
 	//we can safely find the first port that is not used, and not in reseved and add it to
 	//the result list
-	var result []int
-	p := 1024
+	var result []uint16
+	var p uint16 = 1024
 	for i := 0; i < n; i++ {
-		for ; p <= 65536; p++ { //i know last valid port is at 65535, but check code below
+		for ; p <= 65535; p++ { //i know last valid port is at 65535, but check code below
 			if _, ok := used[p]; ok {
 				continue
 			}
@@ -359,7 +356,7 @@ func (s *socatAPI) Reserve(n int) ([]int, error) {
 			break
 		}
 
-		if p == 65536 {
+		if p == 65535 {
 			return result, fmt.Errorf("pool is exhausted")
 		}
 
