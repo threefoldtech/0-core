@@ -33,9 +33,13 @@ func (m *kvmManager) handleStopped(uuid, name string, domain *libvirt.Domain) er
 		clean up. Or simply try to unmount the expected target by default, and hide unmount errors
 	*/
 	m.domainsInfoRWMutex.Lock()
+	info, ok := m.domainsInfo[uuid]
 	delete(m.domainsInfo, uuid)
 	m.domainsInfoRWMutex.Unlock()
-	m.socat().RemoveAll(m.forwardId(uuid))
+	if ok {
+		m.socat().RemoveAll(m.forwardId(info.Sequence))
+	}
+
 	return m.flistUnmount(uuid)
 }
 

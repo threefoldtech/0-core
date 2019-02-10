@@ -4,110 +4,85 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/threefoldtech/0-core/apps/plugins/nft"
 )
 
 func TestResolveInvalidSyntax(t *testing.T) {
+	api := testNFT{
+		rules: []nft.FilterRule{
+			{
+				Rule: nft.Rule{
+					Body: "dnat to 1.2.3.4:80",
+				},
+			},
+		},
+	}
 	address := "1234"
 	mgr := &socatManager{}
 
-	if ok := assert.Equal(t, address, mgr.Resolve(address)); !ok {
+	if ok := assert.Equal(t, address, mgr.resolve(address, &api)); !ok {
 		t.Error()
 	}
 
 	address = ":1234"
-	if ok := assert.Equal(t, address, mgr.Resolve(address)); !ok {
+	if ok := assert.Equal(t, address, mgr.resolve(address, &api)); !ok {
 		t.Error()
 	}
 }
 
-func TestResolveAny(t *testing.T) {
-	src, _ := getSource("8080")
-	mgr := &socatManager{}
-	mgr.rules = map[int]rule{
-		src.port: rule{
-			source: src,
-			port:   80,
-			ip:     "1.2.3.4",
-		},
-	}
-
-	if ok := assert.Equal(t, "1.2.3.4:80", mgr.Resolve("127.0.0.1:8080")); !ok {
-		t.Error()
-	}
+type testNFT struct {
+	rules []nft.FilterRule
 }
 
-func TestResolveNetwork(t *testing.T) {
-	src, _ := getSource("127.0.0.0/8:8080")
-	mgr := &socatManager{}
-	mgr.rules = map[int]rule{
-		src.port: rule{
-			source: src,
-			port:   80,
-			ip:     "1.2.3.4",
-		},
-	}
-
-	if ok := assert.Equal(t, "1.2.3.4:80", mgr.Resolve("127.0.0.1:8080")); !ok {
-		t.Error()
-	}
-
-	if ok := assert.Equal(t, "128.0.0.1:8080", mgr.Resolve("128.0.0.1:8080")); !ok {
-		t.Error()
-	}
+func (t *testNFT) Apply(nft nft.Nft) error {
+	panic("not implemented")
+}
+func (t *testNFT) Drop(family nft.Family, table, chain string, handle int) error {
+	panic("not implemented")
+}
+func (t *testNFT) Find(filter ...nft.Filter) ([]nft.FilterRule, error) {
+	return t.rules, nil
 }
 
-func TestResolveInf(t *testing.T) {
-	src, _ := getSource("lo:8080")
-	mgr := &socatManager{}
-	mgr.rules = map[int]rule{
-		src.port: rule{
-			source: src,
-			port:   80,
-			ip:     "1.2.3.4",
-		},
-	}
-
-	if ok := assert.Equal(t, "1.2.3.4:80", mgr.Resolve("127.0.0.1:8080")); !ok {
-		t.Error()
-	}
-
-	if ok := assert.Equal(t, "192.168.1.1:8080", mgr.Resolve("192.168.1.1:8080")); !ok {
-		t.Error()
-	}
+func (t *testNFT) IPv4Set(family nft.Family, table string, name string, ips ...string) error {
+	panic("not implemented")
+}
+func (t *testNFT) IPv4SetDel(family nft.Family, table, name string, ips ...string) error {
+	panic("not implemented")
 }
 
-func TestResolveInfParital(t *testing.T) {
-	src, _ := getSource("l*:8080")
-	mgr := &socatManager{}
-	mgr.rules = map[int]rule{
-		src.port: rule{
-			source: src,
-			port:   80,
-			ip:     "1.2.3.4",
+func TestResolve(t *testing.T) {
+	api := testNFT{
+		rules: []nft.FilterRule{
+			{
+				Rule: nft.Rule{
+					Body: "dnat to 1.2.3.4:80",
+				},
+			},
 		},
 	}
 
-	if ok := assert.Equal(t, "1.2.3.4:80", mgr.Resolve("127.0.0.1:8080")); !ok {
-		t.Error()
-	}
+	mgr := &socatManager{}
 
-	if ok := assert.Equal(t, "192.168.1.1:8080", mgr.Resolve("192.168.1.1:8080")); !ok {
+	if ok := assert.Equal(t, "1.2.3.4:80", mgr.resolve("127.0.0.1:8080", &api)); !ok {
 		t.Error()
 	}
 }
 
 func TestResolveURL(t *testing.T) {
-	src, _ := getSource(":80")
-	mgr := &socatManager{}
-	mgr.rules = map[int]rule{
-		src.port: rule{
-			source: src,
-			port:   8080,
-			ip:     "1.2.3.4",
+	api := testNFT{
+		rules: []nft.FilterRule{
+			{
+				Rule: nft.Rule{
+					Body: "dnat to 1.2.3.4:8080",
+				},
+			},
 		},
 	}
 
-	url, err := mgr.ResolveURL("http://127.0.0.1/")
+	mgr := &socatManager{}
+
+	url, err := mgr.resolveURL("http://127.0.0.1/", &api)
 
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
@@ -117,17 +92,7 @@ func TestResolveURL(t *testing.T) {
 		t.Error()
 	}
 
-	url, err = mgr.ResolveURL("http://127.0.0.1:9000/")
-
-	if ok := assert.NoError(t, err); !ok {
-		t.Fatal()
-	}
-
-	if ok := assert.Equal(t, "http://127.0.0.1:9000/", url); !ok {
-		t.Error()
-	}
-
-	url, err = mgr.ResolveURL("http://localhost/")
+	url, err = mgr.resolveURL("http://localhost/", &api)
 
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
@@ -137,7 +102,7 @@ func TestResolveURL(t *testing.T) {
 		t.Error()
 	}
 
-	url, err = mgr.ResolveURL("zdb://127.0.0.1:80/")
+	url, err = mgr.resolveURL("zdb://127.0.0.1:80/", &api)
 
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()

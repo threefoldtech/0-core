@@ -703,11 +703,6 @@ func (m *Manager) portforwardAdd(ctx pm.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	if container.Args.Port == nil {
-		container.Args.Port = make(map[string]int)
-	}
-
-	container.Args.Port[args.HostPort] = args.ContainerPort
 	return nil, nil
 }
 
@@ -729,7 +724,7 @@ func (m *Manager) portforwardRemove(ctx pm.Context) (interface{}, error) {
 	if err := m.socat().RemovePortForward(container.forwardId(), args.HostPort, args.ContainerPort); err != nil {
 		return nil, err
 	}
-	delete(container.Args.Port, args.HostPort)
+
 	return nil, nil
 }
 

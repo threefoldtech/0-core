@@ -12,7 +12,6 @@ import (
 
 	"github.com/threefoldtech/0-core/apps/plugins/nft"
 	"github.com/threefoldtech/0-core/base/pm"
-	"github.com/threefoldtech/0-core/base/utils"
 	"github.com/vishvananda/netlink"
 )
 
@@ -439,25 +438,47 @@ func (b *Manager) setNAT(addr *netlink.Addr) error {
 }
 
 func (b *Manager) unsetNAT(addr []netlink.Addr) error {
-	//enable nat-ting
-	job, err := b.api.System("nft", "list", "ruleset", "-a")
-	if err != nil {
-		return err
+	if len(addr) == 0 {
+		return nil
 	}
 
-	var ips []string
+	var filters []nft.Filter
+
 	for _, ip := range addr {
 		//this trick to get the corred network ID from netlink addresses
 		_, n, _ := net.ParseCIDR(ip.IPNet.String())
-		ips = append(ips, n.String())
+		filters = append(
+			filters,
+			nft.And{
+				&nft.TableFilter{
+					Table: "nat",
+				},
+				&nft.ChainFilter{
+					Chain: "post",
+				},
+				&nft.NetworkMatchFilter{
+					Name:  "ip",
+					Field: "saddr",
+					Value: n,
+				},
+			},
+		)
 	}
 
-	for _, line := range ruleHandlerP.FindAllStringSubmatch(job.Streams.Stdout(), -1) {
-		ip := line[1]
-		handle := line[2]
-		if utils.InString(ips, ip) {
-			b.api.System("nft", "delete", "rule", "nat", "post", "handle", handle)
+	matches, err := b.nft().Find(filters...)
+	if err != nil {
+		return err
+	}
+	errored := false
+	for _, rule := range matches {
+		if err := b.nft().Drop(rule.Family, rule.Table, rule.Chain, rule.Handle); err != nil {
+			log.Errorf("failed to remove natting rule(%s): %s", rule.Body, err)
+			errored = true
 		}
+	}
+
+	if errored {
+		return fmt.Errorf("error cleaning natting rules for %v", addr)
 	}
 
 	return nil
@@ -565,27 +586,21 @@ func (b *Manager) nftAllow(br string) error {
 }
 
 func (b *Manager) unNFT(idx int) error {
-	ruleset, err := b.nft().Get()
-	if err != nil {
-		return err
-	}
+	rules, err := b.nft().Find(nft.And{
+		&nft.TableFilter{Table: "filter"},
+		&nft.ChainFilter{Chain: "input"},
+		&nft.MetaMatchFilter{Name: "iif", Value: fmt.Sprint(idx)},
+	})
 
-	pat, err := regexp.Compile(fmt.Sprintf(`[io]if %d\s+`, idx))
 	if err != nil {
 		return err
 	}
 
 	var errored bool
-	for tname, table := range ruleset {
-		for cname, chain := range table.Chains {
-			for _, rule := range chain.Rules {
-				if ok := pat.MatchString(rule.Body); ok {
-					if err := b.nft().Drop(table.Family, tname, cname, rule.Handle); err != nil {
-						log.Errorf("nft delete rule: %s", err)
-						errored = true
-					}
-				}
-			}
+	for _, rule := range rules {
+		if err := b.nft().Drop(rule.Family, rule.Table, rule.Chain, rule.Handle); err != nil {
+			log.Errorf("nft delete rule: %s", err)
+			errored = true
 		}
 	}
 
@@ -650,6 +665,7 @@ func (b *Manager) delete(ctx pm.Context) (interface{}, error) {
 	}
 
 	//we remove the bridge first before we remove the nft rules
+	//but this means we can't use the name anymore
 	if err := b.unNFT(link.Attrs().Index); err != nil {
 		log.Errorf("error cleaning up nft rules for bridge %s: %s", args.Name, err)
 	}

@@ -10,25 +10,26 @@ import (
 )
 
 type Port struct {
-	Port      int    `json:"port"`
+	Port      uint16 `json:"port"`
 	Interface string `json:"interface,omitempty"`
 	Subnet    string `json:"subnet,omitempty"`
 }
 
-func (b *manager) parsePort(ctx pm.Context) (string, error) {
-	var args Port
+func (b *manager) getArgs(ctx pm.Context) (args Port, err error) {
 	cmd := ctx.Command()
-	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
-		return "", err
+	err = json.Unmarshal(*cmd.Arguments, &args)
+	return
+}
+
+func (p *Port) getRule() string {
+	body := ""
+	if p.Interface != "" {
+		body += fmt.Sprintf(`iifname "%s" `, p.Interface)
 	}
 
-	body := ""
-	if args.Interface != "" {
-		body += fmt.Sprintf(`iifname "%s" `, args.Interface)
-	}
-	if args.Subnet != "" {
-		subnet := args.Subnet
-		_, net, err := net.ParseCIDR(args.Subnet)
+	if p.Subnet != "" {
+		subnet := p.Subnet
+		_, net, err := net.ParseCIDR(p.Subnet)
 		if err == nil {
 			subnet = net.String()
 		}
@@ -36,27 +37,13 @@ func (b *manager) parsePort(ctx pm.Context) (string, error) {
 		body += fmt.Sprintf(`ip saddr %s `, subnet)
 	}
 
-	body += fmt.Sprintf(`tcp dport %d accept`, args.Port)
+	body += fmt.Sprintf(`tcp dport %d accept`, p.Port)
 
-	return body, nil
-}
-
-func (b *manager) exists(rule string) bool {
-	_, ok := b.api.Store().Get(rule)
-	return ok
-}
-
-func (b *manager) register(rule string) error {
-	if b.exists(rule) {
-		return fmt.Errorf("exists")
-	}
-
-	b.api.Store().Set(rule, nil)
-	return nil
+	return body
 }
 
 func (b *manager) openPort(ctx pm.Context) (interface{}, error) {
-	rule, err := b.parsePort(ctx)
+	args, err := b.getArgs(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -64,8 +51,18 @@ func (b *manager) openPort(ctx pm.Context) (interface{}, error) {
 	b.m.Lock()
 	defer b.m.Unlock()
 
-	if err := b.register(rule); err != nil {
-		return nil, fmt.Errorf("rule exists")
+	matches, err := b.Find(nft.And{
+		&nft.TableFilter{Table: "filter"},
+		&nft.ChainFilter{Chain: "input"},
+		&nft.IntMatchFilter{Name: "tcp", Field: "dport", Value: uint64(args.Port)},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(matches) != 0 {
+		return nil, fmt.Errorf("rule already exists for port: %d", args.Port)
 	}
 
 	n := nft.Nft{
@@ -74,7 +71,7 @@ func (b *manager) openPort(ctx pm.Context) (interface{}, error) {
 			Chains: nft.Chains{
 				"input": nft.Chain{
 					Rules: []nft.Rule{
-						{Body: rule},
+						{Body: args.getRule()},
 					},
 				},
 			},
@@ -82,7 +79,6 @@ func (b *manager) openPort(ctx pm.Context) (interface{}, error) {
 	}
 
 	if err := b.Apply(n); err != nil {
-		b.api.Store().Del(rule)
 		return nil, err
 	}
 
@@ -90,7 +86,7 @@ func (b *manager) openPort(ctx pm.Context) (interface{}, error) {
 }
 
 func (b *manager) dropPort(ctx pm.Context) (interface{}, error) {
-	rule, err := b.parsePort(ctx)
+	args, err := b.getArgs(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -98,51 +94,64 @@ func (b *manager) dropPort(ctx pm.Context) (interface{}, error) {
 	b.m.Lock()
 	defer b.m.Unlock()
 
-	if !b.exists(rule) {
-		// nothing to do, just return
-		return nil, nil
-	}
+	matches, err := b.Find(nft.And{
+		&nft.TableFilter{Table: "filter"},
+		&nft.ChainFilter{Chain: "input"},
+		&nft.IntMatchFilter{Name: "tcp", Field: "dport", Value: uint64(args.Port)},
+	})
 
-	n := nft.Nft{
-		"filter": nft.Table{
-			Family: nft.FamilyINET,
-			Chains: nft.Chains{
-				"input": nft.Chain{
-					Rules: []nft.Rule{
-						{Body: rule},
-					},
-				},
-			},
-		},
-	}
-
-	if err := b.DropRules(n); err != nil {
-		return nil, err
-	}
-
-	b.api.Store().Del(rule)
-	return nil, nil
-}
-
-func (b *manager) listPorts(ctx pm.Context) (interface{}, error) {
-	b.m.RLock()
-	defer b.m.RUnlock()
-
-	var ports []string
-	for port := range b.api.Store().List() {
-		ports = append(ports, port)
-	}
-	return ports, nil
-}
-
-func (b *manager) ruleExists(ctx pm.Context) (interface{}, error) {
-	rule, err := b.parsePort(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	b.m.RLock()
-	defer b.m.RUnlock()
+	for _, rule := range matches {
+		if err := b.Drop(nft.FamilyINET, "filter", "input", rule.Handle); err != nil {
+			return nil, err
+		}
+	}
 
-	return b.exists(rule), nil
+	return nil, nil
+}
+
+func (b *manager) listPorts(ctx pm.Context) (interface{}, error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	matches, err := b.Find(nft.And{
+		&nft.TableFilter{Table: "filter"},
+		&nft.ChainFilter{Chain: "input"},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	var rules []string
+	for _, rule := range matches {
+		rules = append(rules, rule.Body)
+	}
+
+	return rules, nil
+}
+
+func (b *manager) ruleExists(ctx pm.Context) (interface{}, error) {
+	args, err := b.getArgs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	matches, err := b.Find(nft.And{
+		&nft.TableFilter{Table: "filter"},
+		&nft.ChainFilter{Chain: "input"},
+		&nft.IntMatchFilter{Name: "tcp", Field: "dport", Value: uint64(args.Port)},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return len(matches) > 0, nil
 }
