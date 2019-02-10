@@ -8,21 +8,6 @@ import (
 	"github.com/threefoldtech/0-core/apps/plugins/nft"
 )
 
-func setTableBlock(set nft.Nft, msg json.RawMessage) error {
-	var table nft.NftTableBlock
-	if err := json.Unmarshal(msg, &table); err != nil {
-		return err
-	}
-
-	set[table.Name] = nft.Table{
-		Chains: nft.Chains{},
-		Sets:   nft.Sets{},
-		Family: table.Family,
-	}
-
-	return nil
-}
-
 func renderMangle(buf *strings.Builder, msg json.RawMessage) error {
 	var mangle struct {
 		Left struct {

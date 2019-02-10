@@ -13,6 +13,7 @@ type API interface {
 	SetPortForward(ns NS, ip string, host string, dest int) error
 	RemovePortForward(ns NS, host string, dest int) error
 	RemoveAll(ns NS) error
+	List(ns NS) (map[string]int, error)
 	Resolve(address string) string
 	ResolveURL(raw string) (string, error)
 	ValidHost(host string) bool

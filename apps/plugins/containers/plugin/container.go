@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -9,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/threefoldtech/0-core/apps/plugins/socat"
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
@@ -37,6 +39,24 @@ type container struct {
 	forwardChan chan *pm.Command
 
 	terminating bool
+}
+
+func (c *container) MarshalJSON() ([]byte, error) {
+	//override how a container serializes itself to show actual
+	//ports in nft instead of the values passed in the container creation
+	ports, err := c.mgr.socat().List(socat.Namespace(socat.Container, c.id))
+	if err != nil {
+		return nil, err
+	}
+
+	c.Args.Port = ports
+	var obj = map[string]interface{}{
+		"arguments": c.Args,
+		"root":      c.Root,
+		"pid":       c.PID,
+	}
+
+	return json.Marshal(obj)
 }
 
 func newContainer(mgr *Manager, id uint16, args ContainerCreateArguments) *container {

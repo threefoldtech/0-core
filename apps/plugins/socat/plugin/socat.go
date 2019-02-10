@@ -249,6 +249,55 @@ func (s *socatManager) RemoveAll(ns socat.NS) error {
 	return nil
 }
 
+func (s *socatManager) List(ns socat.NS) (map[string]int, error) {
+	s.rm.Lock()
+	defer s.rm.Unlock()
+
+	matches, err := s.nft().Find(nft.And{
+		&nft.TableFilter{
+			Table: "nat",
+		},
+		&nft.ChainFilter{
+			Chain: "pre",
+		},
+		&nft.MarkFilter{
+			Mark: uint32(ns),
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	rules := make(map[uint64]*rule)
+
+	for _, ruleBody := range matches {
+		parsed, err := getRuleFromNFTRule(ruleBody.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		func(parsed rule) {
+			if r, ok := rules[parsed.source.port]; ok {
+				r.source.protocols = append(
+					r.source.protocols,
+					parsed.source.protocols...,
+				)
+			} else {
+				rules[parsed.source.port] = &parsed
+			}
+
+		}(parsed)
+	}
+
+	results := make(map[string]int)
+	for _, rule := range rules {
+		results[rule.source.String()] = rule.port
+	}
+
+	return results, nil
+}
+
 func (s *socatManager) getForwardedPorts() (map[uint16]struct{}, error) {
 	rules, err := s.nft().Find(nft.And{
 		&nft.TableFilter{
