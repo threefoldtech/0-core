@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/threefoldtech/0-core/apps/plugins/socat"
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
@@ -44,7 +43,7 @@ type container struct {
 func (c *container) MarshalJSON() ([]byte, error) {
 	//override how a container serializes itself to show actual
 	//ports in nft instead of the values passed in the container creation
-	ports, err := c.mgr.socat().List(socat.Namespace(socat.Container, c.id))
+	ports, err := c.mgr.socat().List(c.forwardId())
 	if err != nil {
 		return nil, err
 	}

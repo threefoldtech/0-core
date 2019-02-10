@@ -790,11 +790,6 @@ func (m *kvmManager) setPortForward(uuid string, seq uint16, host string, contai
 		return err
 	}
 
-	domaininfo, err := m.getDomainInfo(uuid)
-	if err != nil {
-		return err
-	}
-	domaininfo.Port[host] = container
 	return err
 }
 
@@ -1649,6 +1644,13 @@ func (m *kvmManager) getMachine(domain *libvirt.Domain) (Machine, error) {
 		return Machine{}, err
 	}
 
+	ports, err := m.socat().List(m.forwardId(domainInfo.Sequence))
+	if err != nil {
+		return Machine{}, err
+	}
+
+	domainInfo.Port = ports
+
 	return Machine{
 		ID:         int(id),
 		UUID:       uuid,
@@ -1974,12 +1976,6 @@ func (m *kvmManager) portforwardRemove(ctx pm.Context) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	domainInfo, err := m.getDomainInfo(params.UUID)
-	if err != nil {
-		return nil, err
-	}
-	delete(domainInfo.Port, params.HostPort)
 
 	return nil, err
-
 }
