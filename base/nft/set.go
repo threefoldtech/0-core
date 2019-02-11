@@ -21,8 +21,8 @@ func IPv4Set(family Family, table string, name string, ips ...string) error {
 		return nil
 	}
 
-	m := strings.Join(ips, ", ")
-	_, err = pm.System("nft", "add", "element", string(family), table, name, "{", m, "}")
+	s := strings.Join(ips, ", ")
+	_, err = pm.System("nft", "add", "element", string(family), table, name, "{", s, "}")
 
 	return err
 }
@@ -33,8 +33,8 @@ func IPv4SetDel(family Family, table, name string, ips ...string) error {
 		return nil
 	}
 
-	m := strings.Join(ips, ", ")
-	_, err := pm.System("nft", "delete", "element", string(family), table, name, "{", m, "}")
+	s := strings.Join(ips, ", ")
+	_, err := pm.System("nft", "delete", "element", string(family), table, name, "{", s, "}")
 
 	return err
 }

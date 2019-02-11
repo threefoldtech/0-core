@@ -1,25 +1,12 @@
-package builtin
+package nft
 
 import (
 	"encoding/json"
 	"fmt"
 	"net"
 
-	"github.com/threefoldtech/0-core/base/nft"
 	"github.com/threefoldtech/0-core/base/pm"
 )
-
-type nftMgr struct{}
-
-func init() {
-	b := &nftMgr{}
-
-	pm.RegisterBuiltIn("nft.open_port", b.openPort)
-	pm.RegisterBuiltIn("nft.drop_port", b.dropPort)
-	pm.RegisterBuiltIn("nft.list", b.listPorts)
-	pm.RegisterBuiltIn("nft.rule_exists", b.ruleExists)
-
-}
 
 type Port struct {
 	Port      uint16 `json:"port"`
@@ -53,16 +40,16 @@ func (p *Port) getRule() string {
 	return body
 }
 
-func (b *nftMgr) openPort(cmd *pm.Command) (interface{}, error) {
+func openPort(cmd *pm.Command) (interface{}, error) {
 	args, err := getArgs(cmd)
 	if err != nil {
 		return nil, err
 	}
 
-	matches, err := nft.Find(nft.And{
-		&nft.TableFilter{Table: "filter"},
-		&nft.ChainFilter{Chain: "input"},
-		&nft.IntMatchFilter{Name: "tcp", Field: "dport", Value: uint64(args.Port)},
+	matches, err := Find(And{
+		&TableFilter{Table: "filter"},
+		&ChainFilter{Chain: "input"},
+		&IntMatchFilter{Name: "tcp", Field: "dport", Value: uint64(args.Port)},
 	})
 
 	if err != nil {
@@ -73,12 +60,12 @@ func (b *nftMgr) openPort(cmd *pm.Command) (interface{}, error) {
 		return nil, fmt.Errorf("rule already exists for port: %d", args.Port)
 	}
 
-	n := nft.Nft{
-		"filter": nft.Table{
-			Family: nft.FamilyINET,
-			Chains: nft.Chains{
-				"input": nft.Chain{
-					Rules: []nft.Rule{
+	n := Nft{
+		"filter": Table{
+			Family: FamilyINET,
+			Chains: Chains{
+				"input": Chain{
+					Rules: []Rule{
 						{Body: args.getRule()},
 					},
 				},
@@ -86,23 +73,23 @@ func (b *nftMgr) openPort(cmd *pm.Command) (interface{}, error) {
 		},
 	}
 
-	if err := nft.Apply(n); err != nil {
+	if err := Apply(n); err != nil {
 		return nil, err
 	}
 
 	return nil, nil
 }
 
-func (b *nftMgr) dropPort(cmd *pm.Command) (interface{}, error) {
+func dropPort(cmd *pm.Command) (interface{}, error) {
 	args, err := getArgs(cmd)
 	if err != nil {
 		return nil, err
 	}
 
-	matches, err := nft.Find(nft.And{
-		&nft.TableFilter{Table: "filter"},
-		&nft.ChainFilter{Chain: "input"},
-		&nft.IntMatchFilter{Name: "tcp", Field: "dport", Value: uint64(args.Port)},
+	matches, err := Find(And{
+		&TableFilter{Table: "filter"},
+		&ChainFilter{Chain: "input"},
+		&IntMatchFilter{Name: "tcp", Field: "dport", Value: uint64(args.Port)},
 	})
 
 	if err != nil {
@@ -110,7 +97,7 @@ func (b *nftMgr) dropPort(cmd *pm.Command) (interface{}, error) {
 	}
 
 	for _, rule := range matches {
-		if err := nft.Drop(nft.FamilyINET, "filter", "input", rule.Handle); err != nil {
+		if err := Drop(FamilyINET, "filter", "input", rule.Handle); err != nil {
 			return nil, err
 		}
 	}
@@ -118,10 +105,10 @@ func (b *nftMgr) dropPort(cmd *pm.Command) (interface{}, error) {
 	return nil, nil
 }
 
-func (b *nftMgr) listPorts(cmd *pm.Command) (interface{}, error) {
-	matches, err := nft.Find(nft.And{
-		&nft.TableFilter{Table: "filter"},
-		&nft.ChainFilter{Chain: "input"},
+func listPorts(cmd *pm.Command) (interface{}, error) {
+	matches, err := Find(And{
+		&TableFilter{Table: "filter"},
+		&ChainFilter{Chain: "input"},
 	})
 
 	if err != nil {
@@ -136,16 +123,16 @@ func (b *nftMgr) listPorts(cmd *pm.Command) (interface{}, error) {
 	return rules, nil
 }
 
-func (b *nftMgr) ruleExists(cmd *pm.Command) (interface{}, error) {
+func ruleExists(cmd *pm.Command) (interface{}, error) {
 	args, err := getArgs(cmd)
 	if err != nil {
 		return nil, err
 	}
 
-	matches, err := nft.Find(nft.And{
-		&nft.TableFilter{Table: "filter"},
-		&nft.ChainFilter{Chain: "input"},
-		&nft.IntMatchFilter{Name: "tcp", Field: "dport", Value: uint64(args.Port)},
+	matches, err := Find(And{
+		&TableFilter{Table: "filter"},
+		&ChainFilter{Chain: "input"},
+		&IntMatchFilter{Name: "tcp", Field: "dport", Value: uint64(args.Port)},
 	})
 
 	if err != nil {
