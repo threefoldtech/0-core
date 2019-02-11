@@ -48,7 +48,7 @@ func init() {
 
 //ValidHost checks if the host string is valid
 //Valid hosts is (port, ip:port, or device:port)
-func (m *socatManager) ValidHost(host string) bool {
+func ValidHost(host string) bool {
 	_, err := getSource(host)
 	return err == nil
 }

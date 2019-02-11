@@ -442,8 +442,8 @@ func (c *container) setDNS(dns string) error {
 	return err
 }
 
-func (c *container) forwardId() string {
-	return fmt.Sprintf("container-%d", c.id)
+func (c *container) forwardId() socat.NS {
+	return socat.Namespace(socat.Container, c.id)
 }
 
 func (c *container) setPortForward(host string, dest int) error {

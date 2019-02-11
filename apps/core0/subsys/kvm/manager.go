@@ -857,7 +857,7 @@ func (m *kvmManager) mkDomain(seq uint16, params *CreateParams) (*Domain, error)
 
 func (m *kvmManager) setPortForward(uuid string, seq uint16, host string, container int) error {
 	ip := m.ipAddr(seq)
-	id := m.forwardId(uuid)
+	id := m.forwardId(seq)
 	var err error
 
 	if err = socat.SetPortForward(id, ip, host, container); err != nil {
@@ -2035,7 +2035,12 @@ func (m *kvmManager) portforwardRemove(cmd *pm.Command) (interface{}, error) {
 	if _, err := conn.LookupDomainByUUIDString(params.UUID); err != nil {
 		return nil, fmt.Errorf("couldn't find domain with the uuid %s", params.UUID)
 	}
-	err = socat.RemovePortForward(m.forwardId(params.UUID), params.HostPort, params.ContainerPort)
+	info, err := m.getDomainInfo(params.UUID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = socat.RemovePortForward(m.forwardId(info.Sequence), params.HostPort, params.ContainerPort)
 	if err != nil {
 		return nil, err
 	}
