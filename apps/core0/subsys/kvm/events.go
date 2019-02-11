@@ -36,9 +36,13 @@ func (m *kvmManager) handleStopped(uuid, name string, domain *libvirt.Domain) er
 	*/
 	defer m.updateView()
 	m.domainsInfoRWMutex.Lock()
+	info, ok := m.domainsInfo[uuid]
 	delete(m.domainsInfo, uuid)
 	m.domainsInfoRWMutex.Unlock()
-	socat.RemoveAll(m.forwardId(uuid))
+	if ok {
+		socat.RemoveAll(m.forwardId(info.Sequence))
+	}
+
 	return m.flistUnmount(uuid)
 }
 

@@ -11,8 +11,9 @@ import (
 
 	"github.com/libvirt/libvirt-go"
 	"github.com/pborman/uuid"
-	"github.com/vishvananda/netlink"
+	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
 	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/vishvananda/netlink"
 )
 
 const (
@@ -299,6 +300,6 @@ func (m *kvmManager) setDHCPHost(seq uint16) error {
 	return nil
 }
 
-func (m *kvmManager) forwardId(uuid string) string {
-	return fmt.Sprintf("kvm-%v", uuid)
+func (m *kvmManager) forwardId(seq uint16) socat.NS {
+	return socat.Namespace(socat.KVM, seq)
 }
