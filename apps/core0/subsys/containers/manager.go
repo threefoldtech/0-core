@@ -765,11 +765,6 @@ func (m *containerManager) portforwardAdd(cmd *pm.Command) (interface{}, error) 
 		return nil, err
 	}
 
-	if container.Args.Port == nil {
-		container.Args.Port = make(map[string]int)
-	}
-
-	container.Args.Port[args.HostPort] = args.ContainerPort
 	return nil, nil
 }
 
@@ -790,7 +785,7 @@ func (m *containerManager) portforwardRemove(cmd *pm.Command) (interface{}, erro
 	if err := socat.RemovePortForward(container.forwardId(), args.HostPort, args.ContainerPort); err != nil {
 		return nil, err
 	}
-	delete(container.Args.Port, args.HostPort)
+
 	return nil, nil
 }
 

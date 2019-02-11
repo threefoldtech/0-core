@@ -33,3 +33,7 @@ func Resolve(address string) string {
 func ResolveURL(raw string) (string, error) {
 	return mgr.ResolveURL(raw)
 }
+
+func List(ns NS) (map[string]int, error) {
+	return mgr.List(ns)
+}
