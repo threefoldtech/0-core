@@ -41,7 +41,7 @@ var (
 
 	n        sync.Once
 	s        sync.Once
-	jobs     map[string]Job
+	jobs     map[string]*jobImb
 	jobsM    sync.RWMutex
 	jobsCond *sync.Cond
 
@@ -59,7 +59,7 @@ var (
 func New() {
 	n.Do(func() {
 		log.Debugf("initializing manager")
-		jobs = make(map[string]Job)
+		jobs = make(map[string]*jobImb)
 		jobsCond = sync.NewCond(&sync.Mutex{})
 		pids = make(map[int]chan syscall.WaitStatus)
 
@@ -124,8 +124,12 @@ func loop() {
 		for len(jobs) >= MaxJobs {
 			jobsCond.Wait()
 		}
+
 		jobsCond.L.Unlock()
 		job := <-ch
+		if job == nil {
+			break
+		}
 		log.Debugf("starting job: %s", job.Command())
 		go job.start(unprivileged)
 	}
@@ -355,7 +359,7 @@ func RunSlice(slice settings.StartupSlice) {
 	state.WaitAll()
 }
 
-func cleanUp(runner Job) {
+func cleanUp(runner *jobImb) {
 	jobsM.Lock()
 	delete(jobs, runner.Command().ID)
 	jobsM.Unlock()
@@ -496,6 +500,27 @@ func callback(cmd *Command, result *JobResult) {
 			handler.Result(cmd, result)
 		}
 	}
+}
+
+func terminateAll(sig syscall.Signal, except ...string) {
+	jobsM.RLock()
+	defer jobsM.RUnlock()
+	for _, v := range jobs {
+		if utils.InString(except, v.Command().ID) {
+			continue
+		}
+
+		v.Terminate(sig)
+	}
+}
+
+//Shutdown kills all running processes.
+func Shutdown(except ...string) {
+	queue.Close()
+
+	terminateAll(syscall.SIGTERM, except...)
+	<-time.After(5 * time.Second)
+	terminateAll(syscall.SIGKILL, except...)
 }
 
 //System is a wrapper around core.system
