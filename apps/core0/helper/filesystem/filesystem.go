@@ -166,6 +166,9 @@ func getMetaDB(location, src string) (string, error) {
 
 	return db, nil
 }
+func getNSID(ns string) string {
+	return fmt.Sprintf("zfs:%s", ns)
+}
 
 func MountFList(namespace, storage, src string, target string, hooks ...pm.RunnerHook) error {
 	//check
@@ -216,7 +219,7 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 
 	g8ufs = append(g8ufs, target)
 	cmd := &pm.Command{
-		ID:      path.Join(namespace, target),
+		ID:      path.Join(getNSID(namespace), target),
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(pm.SystemCommandArguments{
 			Name: "g8ufs",
@@ -264,7 +267,7 @@ func MountFList(namespace, storage, src string, target string, hooks ...pm.Runne
 // the namespace, targe, and base are needed to identify the g8ufs process, the flist is the one to layer, where base
 // is the original flist used on the call to MountFlist
 func MergeFList(namespace, target, base, flist string) error {
-	id := path.Join(namespace, target)
+	id := path.Join(getNSID(namespace), target)
 	job, ok := pm.JobOf(id)
 	if !ok {
 		return fmt.Errorf("no filesystem running for the provided namespace and target (%s/%s)", namespace, target)

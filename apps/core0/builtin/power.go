@@ -14,6 +14,7 @@ const (
 	//RedisJobID avoid terminating this process
 	RedisJobID      = "redis"
 	RedisProxyJobID = "redis-proxy"
+	ZeroFSID        = "zfs:*"
 )
 
 func init() {
@@ -23,6 +24,10 @@ func init() {
 
 func restart(ctx *pm.Context) (interface{}, error) {
 	log.Info("rebooting")
+	//we do shutdown over 2 stages
+	// on first stage, we don't kill zfs processes
+	// then later kill all
+	pm.Shutdown(RedisJobID, RedisProxyJobID, ZeroFSID)
 	pm.Shutdown(RedisJobID, RedisProxyJobID)
 	syscall.Sync()
 
@@ -39,6 +44,10 @@ func restart(ctx *pm.Context) (interface{}, error) {
 
 func poweroff(ctx *pm.Context) (interface{}, error) {
 	log.Info("shutting down")
+	//we do shutdown over 2 stages
+	// on first stage, we don't kill zfs processes
+	// then later kill all
+	pm.Shutdown(RedisJobID, RedisProxyJobID, ZeroFSID)
 	pm.Shutdown(RedisJobID, RedisProxyJobID)
 	syscall.Sync()
 
