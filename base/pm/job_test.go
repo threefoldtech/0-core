@@ -1,6 +1,7 @@
 package pm
 
 import (
+	"context"
 	"fmt"
 	"syscall"
 	"testing"
@@ -35,6 +36,36 @@ func TestJob(t *testing.T) {
 	}
 
 	if ok := assert.Equal(t, stdin, result.Streams.Stdout()); !ok {
+		t.Error()
+	}
+}
+
+func TestJobWaitContext(t *testing.T) {
+	New()
+
+	cmd := Command{
+		Command: CommandSystem,
+		Arguments: MustArguments(
+			SystemCommandArguments{
+				Name: "sleep",
+				Args: []string{"10s"},
+			},
+		),
+	}
+
+	job := newTestJob(&cmd, NewSystemProcess)
+
+	go job.start(false)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	now := time.Now()
+	result := job.WaitContext(ctx)
+	if ok := assert.Nil(t, result); !ok {
+		t.Error()
+	}
+
+	if ok := assert.InDelta(t, float64(2*time.Second), float64(time.Since(now)), float64(1*time.Second)); !ok {
 		t.Error()
 	}
 }

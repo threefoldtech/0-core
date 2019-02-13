@@ -245,13 +245,17 @@ func (b *Bootstrap) watchers() {
 	screen.Push(zerotier)
 	screen.Push(uptime)
 
+	wait := func() {
+		<-time.After(30 * time.Second)
+	}
 	go func() {
 		for {
 			result, err := pm.System("zerotier-cli", "-D/tmp/zt", "info")
-			ztstatus := result.Streams.Stdout()
 			if err != nil {
-				ztstatus = result.Streams.Stderr()
+				wait()
+				continue
 			}
+			ztstatus := result.Streams.Stdout()
 
 			ztstatus = strings.TrimSpace(ztstatus)
 			zerotier.Text = fmt.Sprintf(screenStateLine, "Zerotier", ztstatus, "")
@@ -259,7 +263,8 @@ func (b *Bootstrap) watchers() {
 			result, err = pm.System("uptime")
 			uptimestatus := result.Streams.Stdout()
 			if err != nil {
-				uptimestatus = result.Streams.Stderr()
+				wait()
+				continue
 			}
 
 			uptime.Text = fmt.Sprintf(screenStateLine, "Uptime", uptimestatus, "")
