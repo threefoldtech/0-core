@@ -1,6 +1,7 @@
 package pm
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -102,7 +103,10 @@ func RunFactory(cmd *Command, factory ProcessFactory, hooks ...RunnerHook) (Job,
 	job := newJob(cmd, factory, hooks...)
 	jobs[cmd.ID] = job
 
-	queue.Push(job)
+	if err := queue.Push(job); err != nil {
+		return nil, err
+	}
+
 	return job, nil
 }
 
@@ -502,24 +506,43 @@ func callback(cmd *Command, result *JobResult) {
 	}
 }
 
-func terminateAll(sig syscall.Signal, except ...string) {
+func terminateAll(sig syscall.Signal, except ...string) []*jobImb {
 	jobsM.RLock()
 	defer jobsM.RUnlock()
+	var jobs []*jobImb
 	for _, v := range jobs {
 		if utils.InString(except, v.Command().ID) {
 			continue
 		}
 
+		jobs = append(jobs, v)
+		log.Info("Signal %s: %s", v.command.ID, sig)
 		v.Terminate(sig)
 	}
+
+	return jobs
 }
 
 //Shutdown kills all running processes.
 func Shutdown(except ...string) {
 	queue.Close()
 
-	terminateAll(syscall.SIGTERM, except...)
-	<-time.After(5 * time.Second)
+	jobs := terminateAll(syscall.SIGTERM, except...)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	wg.Add(len(jobs))
+
+	for _, job := range jobs {
+		go func(job *jobImb) {
+			job.WaitContext(ctx)
+			log.Info("Job %s exited", job.command.ID)
+			wg.Done()
+		}(job)
+	}
+
+	wg.Wait()
 	terminateAll(syscall.SIGKILL, except...)
 }
 
