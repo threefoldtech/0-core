@@ -45,7 +45,7 @@ func (p *Port) getRule() string {
 func (b *manager) openPort(ctx pm.Context) (interface{}, error) {
 	args, err := b.getArgs(ctx)
 	if err != nil {
-		return nil, err
+		return nil, pm.BadRequestError("invalid port specs")
 	}
 
 	b.m.Lock()
@@ -88,7 +88,7 @@ func (b *manager) openPort(ctx pm.Context) (interface{}, error) {
 func (b *manager) dropPort(ctx pm.Context) (interface{}, error) {
 	args, err := b.getArgs(ctx)
 	if err != nil {
-		return nil, err
+		return nil, pm.BadRequestError("invalid port specs")
 	}
 
 	b.m.Lock()
@@ -137,7 +137,7 @@ func (b *manager) listPorts(ctx pm.Context) (interface{}, error) {
 func (b *manager) ruleExists(ctx pm.Context) (interface{}, error) {
 	args, err := b.getArgs(ctx)
 	if err != nil {
-		return nil, err
+		return nil, pm.BadRequestError("invalid port specs")
 	}
 
 	b.m.Lock()

@@ -1,6 +1,7 @@
 package pm
 
 import (
+	"context"
 	"syscall"
 
 	"github.com/threefoldtech/0-core/base/stream"
@@ -16,6 +17,7 @@ type Job interface {
 	Signal(sig syscall.Signal) error
 	Process() Process
 	Wait() *JobResult
+	WaitContext(ctx context.Context) *JobResult
 	StartTime() int64
 	Subscribe(stream.MessageHandler)
 	Unschedule()

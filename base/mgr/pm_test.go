@@ -1,6 +1,7 @@
 package mgr
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/naoina/toml"
@@ -152,5 +153,26 @@ host_network = false
 
 	if ok := assert.Equal(t, expected, args["args"]); !ok {
 		t.Error()
+	}
+}
+
+func TestMatchID(t *testing.T) {
+	var tests = []struct {
+		id       string
+		expected []string
+		result   bool
+	}{
+		{id: "test1", expected: []string{"test1", "test2"}, result: true},
+		{id: "test1", expected: []string{"test", "test2"}, result: false},
+		{id: "test100", expected: []string{"test*", "test2"}, result: true},
+		{id: "test100", expected: []string{"test*", "test100"}, result: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s in %v", tc.id, tc.expected), func(t *testing.T) {
+			if ok := assert.Equal(t, tc.result, matchID(tc.id, tc.expected)); !ok {
+				t.Error()
+			}
+		})
 	}
 }
