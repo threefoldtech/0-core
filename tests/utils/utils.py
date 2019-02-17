@@ -9,6 +9,7 @@ import json
 import os
 import socket
 import subprocess
+import random
 
 
 class BaseTest(unittest.TestCase):
@@ -50,6 +51,11 @@ class BaseTest(unittest.TestCase):
 
     def rand_str(self):
         return str(uuid.uuid4()).replace('-', '')[1:10]
+
+    def random_mac(self):
+        return "52:54:00:%02x:%02x:%02x" % (random.randint(0, 255),
+                                            random.randint(0, 255),
+                                            random.randint(0, 255))
 
     def create_ssh_key(self):
         # create sshkey and return the public key
