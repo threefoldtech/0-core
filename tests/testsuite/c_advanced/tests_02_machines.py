@@ -121,7 +121,6 @@ class AdvancedMachines(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
 
-    @unittest.skip('https://github.com/threefoldtech/jumpscale_prefab/issues/31')
     def test004_create_kvm_with_params_mount(self):
         """ zos-057
 
@@ -141,6 +140,7 @@ class AdvancedMachines(BaseTest):
         dir_path = '/{}'.format(self.rand_str())
         file_name = self.rand_str()
         data = self.rand_str()
+        target = self.rand_str()
         self.client.filesystem.mkdir(dir_path)
         self.client.bash('echo {} > {}/{}'.format(data, dir_path, file_name))
 
@@ -149,14 +149,19 @@ class AdvancedMachines(BaseTest):
         pub_key = self.create_ssh_key()
         nics = [{'type': 'default'}]
         pub_port = randint(4000, 5000)
-        config = {'/root/.ssh/authorized_keys': pub_key}
+        config = {'/root/.ssh/authorized_keys': pub_key, 
+                  '/etc/network/interfaces.d/eth0': 'auto eth0\n iface eth0 inet dhcp'}
+        cmdline='net.ifnames=0 biosdevname=0'
+
         vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist, config=config, nics=nics,
-                                 port={pub_port: 22}, mount=[{'source': dir_path, 'target': '/mnt'}])
-        self.assertTrue(self.vm_uuid)
+                                 port={pub_port: 22}, mount=[{'source': dir_path, 'target': target}], cmdline=cmdline)
+        self.assertTrue(vm_uuid)
 
         self.lg('Try to access VM1 and get F1, should be found')
         flag = self.vm_reachable(self.target_ip, pub_port)
         self.assertTrue(flag, "vm is not reachable")
+        cmd = 'mount -t 9p {} /mnt/'.format(target)
+        resposne = self.execute_command(cmd=cmd, ip=self.target_ip, port=pub_port)
         cmd = 'cat /mnt/{}'.format(file_name)           
         resposne = self.execute_command(cmd=cmd, ip=self.target_ip, port=pub_port)
 
