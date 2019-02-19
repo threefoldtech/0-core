@@ -161,7 +161,7 @@ func main() {
 	var config = settings.Settings
 	mgr.MaxJobs = config.Main.MaxJobs
 	mgr.AddHandle((*console)(nil))
-	pluginMgr, err := plugin.New(settings.Settings.Main.Modules...)
+	pluginMgr, err := plugin.NewDynamic(settings.Settings.Main.Modules...)
 	if err != nil {
 		log.Fatalf("failed to initialize plugin manager: %s", err)
 	}
