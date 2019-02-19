@@ -3258,13 +3258,13 @@ class PowerManager():
         """
         full reboot of the node
         """
-        self._client.raw('core.reboot', {}, stream=True).stream()
+        self._client.raw('power.reboot', {}, stream=True).stream()
 
     def poweroff(self):
         """
         full power off of the node
         """
-        self._client.raw('core.poweroff', {}, stream=True).stream()
+        self._client.raw('power.poweroff', {}, stream=True).stream()
 
     def update(self, image):
         """
@@ -3280,7 +3280,7 @@ class PowerManager():
         }
 
         self._image_chk.check(args)
-        self._client.raw('core.update', args, stream=True).stream()
+        self._client.raw('power.update', args, stream=True).stream()
 
 
 class Client(BaseClient):

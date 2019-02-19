@@ -4,6 +4,7 @@ package mgr
 // #include <sys/capability.h>
 import "C"
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"sync"
@@ -384,6 +385,28 @@ func (r *jobImb) Process() pm.Process {
 func (r *jobImb) Wait() *pm.JobResult {
 	r.wg.Wait()
 	return r.result
+}
+
+func (r *jobImb) WaitContext(ctx context.Context) *pm.JobResult {
+	ch := make(chan struct{})
+	cleanup := func() {
+		close(ch)
+	}
+
+	var once sync.Once
+	defer once.Do(cleanup)
+
+	go func() {
+		r.Wait()
+		once.Do(cleanup)
+	}()
+
+	select {
+	case <-ch:
+		return r.Wait()
+	case <-ctx.Done():
+		return nil
+	}
 }
 
 func (r *jobImb) Terminate(sig syscall.Signal) error {

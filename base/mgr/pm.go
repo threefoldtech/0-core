@@ -1,6 +1,7 @@
 package mgr
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -396,24 +397,66 @@ func JobOf(id string) (pm.Job, bool) {
 	return r, ok
 }
 
-func terminateAll(sig syscall.Signal, except ...string) {
+func matchID(id string, ids []string) bool {
+	if len(ids) == 0 {
+		return true
+	}
+
+	for _, m := range ids {
+		if strings.HasSuffix(m, "*") {
+			if strings.HasPrefix(id, strings.TrimRight(m, "*")) {
+				return true
+			}
+		} else if id == m {
+			return true
+		}
+	}
+
+	return false
+}
+
+func terminateAll(sig syscall.Signal, except ...string) []*jobImb {
 	jobsM.RLock()
 	defer jobsM.RUnlock()
+	var killed []*jobImb
 	for _, v := range jobs {
-		if utils.InString(except, v.Command().ID) {
+		if matchID(v.Command().ID, except) {
 			continue
 		}
 
+		if _, ok := v.process.(pm.PIDer); !ok {
+			// if process doesn't have PID it's probably an internal
+			// process, those are not killable.
+			continue
+		}
+
+		killed = append(killed, v)
 		v.Terminate(sig)
 	}
+
+	return killed
 }
 
 //Shutdown kills all running processes.
 func Shutdown(except ...string) {
-	queue.Close()
+	jobs := terminateAll(syscall.SIGTERM, except...)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
 
-	terminateAll(syscall.SIGTERM, except...)
-	<-time.After(5 * time.Second)
+	log.Infof("stopping %d jobs", len(jobs))
+	var wg sync.WaitGroup
+
+	for _, job := range jobs {
+		log.Infof("stopping %s", job.command.ID)
+		wg.Add(1)
+		go func(job *jobImb) {
+			job.WaitContext(ctx)
+			log.Infof("job %s exited", job.command.ID)
+			wg.Done()
+		}(job)
+	}
+
+	wg.Wait()
 	terminateAll(syscall.SIGKILL, except...)
 }
 

@@ -23,6 +23,7 @@ const (
 	//RedisJobID avoid terminating this process
 	RedisJobID      = "redis"
 	RedisProxyJobID = "redis-proxy"
+	ZeroFSID        = "zfs:*"
 
 	//BaseUpdateURL location to download update image
 	BaseUpdateURL = "https://bootstrap.grid.tf/kernel"
@@ -32,6 +33,7 @@ const (
 
 func (m *Manager) restart(ctx pm.Context) (interface{}, error) {
 	log.Info("rebooting")
+	m.api.Shutdown(RedisJobID, RedisProxyJobID, ZeroFSID)
 	m.api.Shutdown(RedisJobID, RedisProxyJobID)
 	syscall.Sync()
 
@@ -48,6 +50,7 @@ func (m *Manager) restart(ctx pm.Context) (interface{}, error) {
 
 func (m *Manager) poweroff(ctx pm.Context) (interface{}, error) {
 	log.Info("shutting down")
+	m.api.Shutdown(RedisJobID, RedisProxyJobID, ZeroFSID)
 	m.api.Shutdown(RedisJobID, RedisProxyJobID)
 	syscall.Sync()
 
@@ -146,6 +149,7 @@ func (m *Manager) update(ctx pm.Context) (interface{}, error) {
 
 	ctx.Log("terminating all running process. point of no return...")
 
+	m.api.Shutdown(RedisJobID, RedisProxyJobID, ZeroFSID)
 	m.api.Shutdown(RedisJobID, RedisProxyJobID)
 	syscall.Sync()
 

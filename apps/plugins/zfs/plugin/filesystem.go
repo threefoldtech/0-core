@@ -38,6 +38,10 @@ func (m *Manager) mount(ctx pm.Context) (interface{}, error) {
 	return nil, m.MountFList(args.Namespace, args.Storage, args.Source, args.Target)
 }
 
+func getNSID(ns string) string {
+	return fmt.Sprintf("zfs:%s", ns)
+}
+
 func (m *Manager) MountFList(namespace, storage, src string, target string, hooks ...pm.RunnerHook) error {
 	//check
 	if err := os.MkdirAll(target, 0755); err != nil {
@@ -73,7 +77,7 @@ func (m *Manager) MountFList(namespace, storage, src string, target string, hook
 
 	g8ufs = append(g8ufs, target)
 	cmd := &pm.Command{
-		ID:      path.Join(namespace, target),
+		ID:      path.Join(getNSID(namespace), target),
 		Command: pm.CommandSystem,
 		Arguments: pm.MustArguments(pm.SystemCommandArguments{
 			Name: "g8ufs",
@@ -120,7 +124,7 @@ func (m *Manager) MountFList(namespace, storage, src string, target string, hook
 // the namespace, targe, and base are needed to identify the g8ufs process, the flist is the one to layer, where base
 // is the original flist used on the call to MountFlist
 func (m *Manager) MergeFList(namespace, target, base, flist string) error {
-	id := path.Join(namespace, target)
+	id := path.Join(getNSID(namespace), target)
 	job, ok := m.api.JobOf(id)
 	if !ok {
 		return fmt.Errorf("no filesystem running for the provided namespace and target (%s/%s)", namespace, target)

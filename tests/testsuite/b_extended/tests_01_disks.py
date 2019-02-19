@@ -110,9 +110,12 @@ class DisksTests(BaseTest):
         self.destroy_btrfs()
 
         self.lg("List the btrfs filesystems , Bfs1 shouldn't be there")
-        btr_list = self.client.btrfs.list()
-        btr = [i for i in btr_list if i['label'] == self.label]
-        time.sleep(1)
+        for _ in range(10):
+            btr_list = self.client.btrfs.list()
+            btr = [i for i in btr_list if i['label'] == self.label]
+            if btr == []:
+                break
+            time.sleep(5)
         self.assertEqual(btr, [])
         self.client.bash('rm -rf {}'.format(self.mount_point))
 

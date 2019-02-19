@@ -943,7 +943,8 @@ class SystemTests(BaseTest):
 
         self.lg('List the ports and make sure the fake port is not there, should succeed')
         self.assertNotIn('tcp dport {} accept'.format(port), self.client.nft.list())
-        self.assertEqual(self.client.nft.rule_exists(port), False)
+        with self.assertRaises(RuntimeError):
+            self.client.nft.rule_exists(port)
 
         self.lg('{} ENDED'.format(self._testID))
 

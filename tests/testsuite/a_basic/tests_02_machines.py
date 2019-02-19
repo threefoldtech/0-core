@@ -200,7 +200,6 @@ class Machinetests(BaseTest):
         self.lg('- Destroy VM {}'.format(vm_name))
         self.client.kvm.destroy(vm_uuid)
 
-    @unittest.skip('https://github.com/threefoldtech/0-core/issues/35')
     def test005_reset_reboot_shutdown_kvm(self):
         """ zos-053
 
@@ -232,10 +231,11 @@ class Machinetests(BaseTest):
         # check that reset has been done
         res = self.execute_command(cmd=cmd, ip=self.target_ip, port=pub_port)
         self.assertEqual(int(res.stdout.split()[2]), 0)
-        time.sleep(50)
+        time.sleep(60)
 
         self.lg('Reboot VM1 make sure it is working after rebooting')
         self.client.kvm.reboot(vm_uuid)
+        time.sleep(5)
         # check that reboot has been done
         res = self.execute_command(cmd=cmd, ip=self.target_ip, port=pub_port)
         self.assertEqual(int(res.stdout.split()[2]), 0)

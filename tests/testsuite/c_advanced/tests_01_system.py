@@ -4,6 +4,7 @@ import unittest
 import time
 from zeroos.core0 import client
 from random import randint
+import random
 
 
 class SystemTests(BaseTest):
@@ -11,7 +12,6 @@ class SystemTests(BaseTest):
     def setUp(self):
         super(SystemTests, self).setUp()
         self.check_zos_connection(SystemTests)
-        # Assuming development has client.power.update()
         self.zos_flist = 'https://hub.grid.tf/tf-autobuilder/zero-os-development.flist'
 
     def ping_zos(self, client, timeout=60):
@@ -24,7 +24,6 @@ class SystemTests(BaseTest):
                 continue
         return False
 
-    @unittest.skip('connection to the nested vm is not stable')
     def test001_update_zos_versoin(self):
         """ zos-052
         *Test case for updating zeroos version
@@ -36,12 +35,23 @@ class SystemTests(BaseTest):
         """
         self.lg('Create a vm, should succeed')
         vm_name = self.rand_str()
-        nics = [{'id': 'None', 'type': 'default'}]
+        bridge = self.rand_str()
+        vm_zos_mac = self.random_mac()
+        rand_num = random.randint(100,200)
+        cidr = '20.201.{}.1/24'.format(rand_num)
+        start = '20.201.{}.2'.format(rand_num)
+        end = '20.201.{}.254'.format(rand_num)
+        vm_zos_ip = '20.201.{}.21'.format(rand_num)
+        self.client.bridge.create(bridge, network='dnsmasq', nat=True,
+                                  settings={'cidr': cidr, 'start': start, 'end': end})
+        self.client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_zos_ip, 'mac': vm_zos_mac})
+        nics = [{'type': 'bridge', 'id': bridge, 'hwaddr': vm_zos_mac}]
         pub_port = randint(4000,5000)
-        ports = {pub_port:6379}
         vm_uuid = self.create_vm(name=vm_name, flist=self.zos_flist,
-                                 memory=2048, port=ports, nics=nics)
-        time.sleep(20)
+                                 memory=2048, nics=nics)
+        res = self.client.system('nft add rule ip nat pre ip daddr @host tcp dport {} dnat to {}:6379'.format(pub_port, vm_zos_ip)).get() 
+        self.assertEqual(res.state, 'SUCCESS')
+        time.sleep(60)
         vm_cl = client.Client(self.target_ip, port=pub_port)
 
         self.lg('Update zos node')
