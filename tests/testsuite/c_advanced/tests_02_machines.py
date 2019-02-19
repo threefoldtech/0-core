@@ -153,9 +153,9 @@ class AdvancedMachines(BaseTest):
                   '/etc/network/interfaces.d/eth0': 'auto eth0\n iface eth0 inet dhcp'}
         cmdline='net.ifnames=0 biosdevname=0'
 
-        vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist, config=config, nics=nics,
+        self.vm_uuid = self.create_vm(name=vm_name, flist=self.ubuntu_flist, config=config, nics=nics,
                                  port={pub_port: 22}, mount=[{'source': dir_path, 'target': target}], cmdline=cmdline)
-        self.assertTrue(vm_uuid)
+        self.assertTrue(self.vm_uuid)
 
         self.lg('Try to access VM1 and get F1, should be found')
         flag = self.vm_reachable(self.target_ip, pub_port)
@@ -175,8 +175,8 @@ class AdvancedMachines(BaseTest):
 
         self.lg('{} ENDED'.format(self._testID))
     
-    def test004_create_kvm_with_params_share_cache(self):
-        """ zos-056
+    def test005_create_kvm_with_params_share_cache(self):
+        """ zos-058
 
         *Test case for creating kvm with parameter share_cache*
 
@@ -210,9 +210,9 @@ class AdvancedMachines(BaseTest):
         self.client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_zos_ip, 'mac': vm_zos_mac})
         nics = [{'type': 'bridge', 'id': bridge, 'hwaddr': vm_zos_mac}]
         pub_port = randint(4000,5000)
-        vm_uuid = self.create_vm(name=vm_name, flist=self.zos_flist,
+        self.vm_uuid = self.create_vm(name=vm_name, flist=self.zos_flist,
                                  memory=2048, nics=nics, share_cache=True)
-        self.assertTrue(vm_uuid)
+        self.assertTrue(self.vm_uuid)
         res = self.client.system('nft add rule ip nat pre ip daddr @host tcp dport {} dnat to {}:6379'.format(pub_port, vm_zos_ip)).get()
         self.assertEqual(res.state, 'SUCCESS')
         time.sleep(60)
