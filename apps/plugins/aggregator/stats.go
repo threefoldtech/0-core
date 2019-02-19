@@ -1,4 +1,4 @@
-package main
+package aggregator
 
 import (
 	"encoding/json"
