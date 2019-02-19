@@ -30,8 +30,30 @@ const (
 	screenStateLine = "->%25s: %s %s"
 )
 
+type Site struct {
+	Address string
+	Port    int
+}
+
+type Sites []Site
+
+func (s Sites) Copy() Sites {
+	sites := make(Sites, len(s))
+	copy(sites, s)
+	return sites
+}
+
+func (s Site) String() string {
+	return fmt.Sprintf("%s:%d", s.Address, s.Port)
+}
+
 var (
-	log = logging.MustGetLogger("bootstrap")
+	log        = logging.MustGetLogger("bootstrap")
+	checkSites = Sites{
+		{"google.com", 80},
+		{"1.1.1.1", 80},
+		{"facebook.com", 80},
+	}
 )
 
 type Bootstrap struct {
@@ -99,18 +121,35 @@ func (b *Bootstrap) resolve(host string) (string, error) {
 	return addresses[0], nil
 }
 
-func (b *Bootstrap) canReachInternet() bool {
-	addr, err := b.resolve(InternetTestAddress)
+func (b *Bootstrap) testConnectivity(address string, port int) bool {
+	addr, err := b.resolve(address)
 	if err != nil {
-		log.Debugf("failed to resolve '%s': %s", InternetTestAddress, err)
+		log.Debugf("failed to resolve '%s': %s", address, err)
 		return false
 	}
-	con, err := net.Dial("tcp", addr+":"+InternetTestPort)
+
+	con, err := net.Dial("tcp", fmt.Sprintf("%s:%d", addr, port))
 	if err != nil {
 		return false
 	}
 	con.Close()
 	return true
+}
+
+func (b *Bootstrap) canReachInternet(sites Sites) bool {
+	for i, site := range sites {
+		log.Debugf("testing connectivity to: %s", site)
+		if b.testConnectivity(site.Address, site.Port) {
+			if i != 0 {
+				//push to top
+				sites[0], sites[i] = sites[i], sites[0]
+			}
+
+			return true
+		}
+	}
+
+	return false
 }
 
 func (b *Bootstrap) ipsAsString(ips []netlink.Addr) string {
@@ -164,9 +203,11 @@ func (b *Bootstrap) setupNetworking() error {
 	}
 
 	log.Debugf("waiting for internet reachability")
+	sites := checkSites.Copy()
+
 	now := time.Now()
 	for time.Since(now) < 2*time.Minute {
-		if b.canReachInternet() {
+		if b.canReachInternet(sites) {
 			log.Info("can reach the internet")
 			return nil
 		}
@@ -195,6 +236,8 @@ func (b *Bootstrap) screen() {
 	const refreshEvery = 5
 	const refreshNetStateEvery = 10 * 60 / refreshEvery //10min
 	netUpdate := refreshNetStateEvery
+	sites := checkSites.Copy()
+
 	for {
 		links, err := netlink.LinkList()
 		if err != nil {
@@ -223,7 +266,7 @@ func (b *Bootstrap) screen() {
 		if netUpdate >= refreshNetStateEvery {
 			progress.Enter()
 			progress.Text = fmt.Sprintf(screenStateLine, "Internet Connectivity", "", "")
-			if b.canReachInternet() {
+			if b.canReachInternet(sites) {
 				progress.Text = fmt.Sprintf(screenStateLine, "Internet Connectivity", "OK", "")
 				netUpdate = 0 //reset counter
 			} else {
