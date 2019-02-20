@@ -27,6 +27,7 @@ const (
 	cmdContainerCreate            = "corex.create"
 	cmdContainerCreateSync        = "corex.create-sync"
 	cmdContainerList              = "corex.list"
+	cmdContainerGet               = "corex.get"
 	cmdContainerDispatch          = "corex.dispatch"
 	cmdContainerTerminate         = "corex.terminate"
 	cmdContainerFind              = "corex.find"
@@ -293,6 +294,7 @@ func ContainerSubsystem(sink *transport.Sink, cell *screen.RowCell) (ContainerMa
 	pm.RegisterBuiltIn(cmdContainerCreate, containerMgr.create)
 	pm.RegisterBuiltIn(cmdContainerCreateSync, containerMgr.createSync)
 	pm.RegisterBuiltIn(cmdContainerList, containerMgr.list)
+	pm.RegisterBuiltIn(cmdContainerGet, containerMgr.get)
 	pm.RegisterBuiltIn(cmdContainerDispatch, containerMgr.dispatch)
 	pm.RegisterBuiltIn(cmdContainerTerminate, containerMgr.terminate)
 	pm.RegisterBuiltIn(cmdContainerFind, containerMgr.find)
@@ -564,12 +566,80 @@ type ContainerInfo struct {
 	Container Container `json:"container"`
 }
 
+func (m *containerManager) getByName(name string) *container {
+	m.conM.RLock()
+	defer m.conM.RUnlock()
+
+	for _, c := range m.containers {
+		if strings.EqualFold(c.Args.Name, name) {
+			return c
+		}
+	}
+
+	return nil
+}
+
+func (m *containerManager) getByID(id uint16) *container {
+	m.conM.RLock()
+	defer m.conM.RUnlock()
+
+	c, _ := m.containers[id]
+
+	return c
+}
+
+func (m *containerManager) get(cmd *pm.Command) (interface{}, error) {
+	var args struct {
+		Query interface{} `json:"query"`
+	}
+
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, pm.BadRequestError(err)
+	}
+	var cont *container
+
+	switch query := args.Query.(type) {
+	case string:
+		cont = m.getByName(query)
+	case float64:
+		if query < 0 || query > math.MaxUint16 {
+			return nil, pm.BadRequestError("query out of range")
+		}
+
+		cont = m.getByID(uint16(query))
+	default:
+		return nil, pm.BadRequestError("invalid query")
+	}
+
+	//not found
+	if cont == nil {
+		return nil, nil
+	}
+
+	ports, err := socat.List(cont.forwardId())
+	if err != nil {
+		return nil, err
+	}
+
+	cont.Args.Port = ports
+	return cont, nil
+}
+
 func (m *containerManager) list(cmd *pm.Command) (interface{}, error) {
 	containers := make(map[uint16]ContainerInfo)
+
+	rules, err := socat.ListAll(socat.Container)
+	if err != nil {
+		return nil, err
+	}
 
 	m.conM.RLock()
 	defer m.conM.RUnlock()
 	for id, c := range m.containers {
+		if containerRules, ok := rules[c.forwardId()]; ok {
+			c.Args.Port = containerRules
+		}
+
 		name := fmt.Sprintf("core-%d", id)
 		job, ok := pm.JobOf(name)
 		if !ok {
