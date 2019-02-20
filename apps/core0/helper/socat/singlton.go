@@ -34,6 +34,10 @@ func ResolveURL(raw string) (string, error) {
 	return mgr.ResolveURL(raw)
 }
 
-func List(ns NS) (map[string]int, error) {
+func List(ns NS) (PortMap, error) {
 	return mgr.List(ns)
+}
+
+func ListAll(system uint8) (map[NS]PortMap, error) {
+	return mgr.ListAll(system)
 }

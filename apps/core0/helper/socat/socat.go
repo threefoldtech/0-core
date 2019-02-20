@@ -213,7 +213,70 @@ func (s *socatManager) RemoveAll(ns NS) error {
 	return nil
 }
 
-func (s *socatManager) List(ns NS) (map[string]int, error) {
+func (s *socatManager) rulesFromMatches(matches []nft.FilterRule) (map[uint64]*rule, error) {
+
+	rules := make(map[uint64]*rule)
+
+	for _, ruleBody := range matches {
+		parsed, err := getRuleFromNFTRule(ruleBody.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		func(parsed rule) {
+			if r, ok := rules[parsed.source.port]; ok {
+				r.source.protocols = append(
+					r.source.protocols,
+					parsed.source.protocols...,
+				)
+			} else {
+				rules[parsed.source.port] = &parsed
+			}
+		}(parsed)
+	}
+
+	return rules, nil
+}
+
+func (s *socatManager) ListAll(system uint8) (map[NS]PortMap, error) {
+	s.rm.Lock()
+	defer s.rm.Unlock()
+
+	matches, err := nft.Find(nft.And{
+		&nft.TableFilter{
+			Table: "nat",
+		},
+		&nft.ChainFilter{
+			Chain: "pre",
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	rules, err := s.rulesFromMatches(matches)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make(map[NS]PortMap)
+	for _, rule := range rules {
+		if uint8(rule.ns>>(8*3)) != system {
+			continue
+		}
+		m, ok := results[rule.ns]
+		if !ok {
+			m = make(PortMap)
+			results[rule.ns] = m
+		}
+		m[rule.source.String()] = rule.port
+	}
+
+	return results, nil
+}
+
+func (s *socatManager) List(ns NS) (PortMap, error) {
 	s.rm.Lock()
 	defer s.rm.Unlock()
 
@@ -233,25 +296,9 @@ func (s *socatManager) List(ns NS) (map[string]int, error) {
 		return nil, err
 	}
 
-	rules := make(map[uint64]*rule)
-
-	for _, ruleBody := range matches {
-		parsed, err := getRuleFromNFTRule(ruleBody.Body)
-		if err != nil {
-			return nil, err
-		}
-
-		func(parsed rule) {
-			if r, ok := rules[parsed.source.port]; ok {
-				r.source.protocols = append(
-					r.source.protocols,
-					parsed.source.protocols...,
-				)
-			} else {
-				rules[parsed.source.port] = &parsed
-			}
-
-		}(parsed)
+	rules, err := s.rulesFromMatches(matches)
+	if err != nil {
+		return nil, err
 	}
 
 	results := make(map[string]int)

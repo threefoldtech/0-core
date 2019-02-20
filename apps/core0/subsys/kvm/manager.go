@@ -1675,7 +1675,7 @@ type Machine struct {
 	Params     CreateParams `json:"params"`
 }
 
-func (m *kvmManager) getMachine(domain *libvirt.Domain) (Machine, error) {
+func (m *kvmManager) getMachine(domain *libvirt.Domain, ruleset map[socat.NS]socat.PortMap) (Machine, error) {
 	uuid, err := domain.GetUUIDString()
 	if err != nil {
 		return Machine{}, err
@@ -1715,12 +1715,16 @@ func (m *kvmManager) getMachine(domain *libvirt.Domain) (Machine, error) {
 		return Machine{}, err
 	}
 
-	ports, err := socat.List(m.forwardId(domainInfo.Sequence))
-	if err != nil {
-		return Machine{}, err
-	}
+	if ruleset == nil {
+		ports, err := socat.List(m.forwardId(domainInfo.Sequence))
+		if err != nil {
+			return Machine{}, err
+		}
 
-	domainInfo.Port = ports
+		domainInfo.Port = ports
+	} else if ports, ok := ruleset[m.forwardId(domainInfo.Sequence)]; ok {
+		domainInfo.Port = ports
+	}
 
 	return Machine{
 		ID:         int(id),
@@ -1747,8 +1751,13 @@ func (m *kvmManager) list(cmd *pm.Command) (interface{}, error) {
 
 	machines := make([]Machine, 0)
 
+	ruleset, err := socat.ListAll(socat.KVM)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, domain := range domains {
-		machine, err := m.getMachine(&domain)
+		machine, err := m.getMachine(&domain, ruleset)
 		if err != nil {
 			return nil, err
 		}
@@ -1790,7 +1799,7 @@ func (m *kvmManager) get(cmd *pm.Command) (interface{}, error) {
 		}
 	}
 
-	machine, err := m.getMachine(domain)
+	machine, err := m.getMachine(domain, nil)
 	if err != nil {
 		return nil, err
 	}
