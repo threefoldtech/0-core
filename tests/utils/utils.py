@@ -9,6 +9,7 @@ import json
 import os
 import socket
 import subprocess
+import random
 
 
 class BaseTest(unittest.TestCase):
@@ -51,6 +52,11 @@ class BaseTest(unittest.TestCase):
     def rand_str(self):
         return str(uuid.uuid4()).replace('-', '')[1:10]
 
+    def random_mac(self):
+        return "52:54:00:%02x:%02x:%02x" % (random.randint(0, 255),
+                                            random.randint(0, 255),
+                                            random.randint(0, 255))
+
     def create_ssh_key(self):
         # create sshkey and return the public key
         keypath = '/root/.ssh/id_rsa.pub'
@@ -78,7 +84,7 @@ class BaseTest(unittest.TestCase):
             if res.stderr == '':
                 return True
             time.sleep(1)
-            timeout -= 1
+            timeout -= 5
         return False
 
     def get_process_id(self, cmdline):
@@ -219,8 +225,7 @@ class BaseTest(unittest.TestCase):
 
     def create_vm(self, name, flist, media=None, cpu=2, memory=512,
                   share_cache=False, nics=None, port=None, mount=None,
-                  tags=None, config=None):
-        cmdline = None
+                  tags=None, config=None, cmdline=None):
         if flist and not media:
             if 'zero-os' in flist:
                 cmdline = 'development'
