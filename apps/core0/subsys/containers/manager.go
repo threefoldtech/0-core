@@ -596,28 +596,50 @@ func (m *containerManager) get(cmd *pm.Command) (interface{}, error) {
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
+	var cont *container
 
 	switch query := args.Query.(type) {
-
 	case string:
-		return m.getByName(query), nil
+		cont = m.getByName(query)
 	case float64:
 		if query < 0 || query > math.MaxUint16 {
 			return nil, pm.BadRequestError("query out of range")
 		}
 
-		return m.getByID(uint16(query)), nil
+		cont = m.getByID(uint16(query))
+	default:
+		return nil, pm.BadRequestError("invalid query")
 	}
 
-	return nil, pm.BadRequestError("invalid query")
+	//not found
+	if cont == nil {
+		return nil, nil
+	}
+
+	ports, err := socat.List(cont.forwardId())
+	if err != nil {
+		return nil, err
+	}
+
+	cont.Args.Port = ports
+	return cont, nil
 }
 
 func (m *containerManager) list(cmd *pm.Command) (interface{}, error) {
 	containers := make(map[uint16]ContainerInfo)
 
+	rules, err := socat.ListAll(socat.Container)
+	if err != nil {
+		return nil, err
+	}
+
 	m.conM.RLock()
 	defer m.conM.RUnlock()
 	for id, c := range m.containers {
+		if containerRules, ok := rules[c.forwardId()]; ok {
+			c.Args.Port = containerRules
+		}
+
 		name := fmt.Sprintf("core-%d", id)
 		job, ok := pm.JobOf(name)
 		if !ok {

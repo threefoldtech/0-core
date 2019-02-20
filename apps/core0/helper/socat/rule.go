@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	ruleRegex = regexp.MustCompile(`(?:ip saddr ([^\s]+)|iifname "([^"]+)")? (tcp|udp) dport (\d+).+?dnat to ([^:]+):(\d+)`)
+	ruleRegex = regexp.MustCompile(`(?:ip saddr ([^\s]+)|iifname "([^"]+)")? (tcp|udp) dport (\d+) mark set (0x[\da-fA-F]+) dnat to ([^:]+):(\d+)`)
 )
 
 type source struct {
@@ -119,19 +119,20 @@ func getRuleFromNFTRule(body string) (r rule, err error) {
 
 	match := ruleRegex.FindStringSubmatch(body)
 	if len(match) == 0 {
-		return r, fmt.Errorf("invalid rule string")
+		return r, fmt.Errorf("invalid rule string: %s", body)
 	}
 
-	r.ip = match[5]
-	fmt.Sscanf(match[6], "%d", &r.port)
 	if len(match[1]) != 0 {
 		r.source.ip = match[1]
 	} else {
 		r.source.ip = match[2]
 	}
-
 	r.source.protocols = append(r.source.protocols, match[3])
+
 	fmt.Sscanf(match[4], "%d", &r.source.port)
+	fmt.Sscanf(match[5], "0x%08x", &r.ns)
+	r.ip = match[6]
+	fmt.Sscanf(match[7], "%d", &r.port)
 
 	return
 }
