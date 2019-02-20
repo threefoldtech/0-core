@@ -1,4 +1,3 @@
-
 [![Build Status](https://travis-ci.com/threefoldtech/0-core.svg?branch=development)](https://travis-ci.com/threefoldtech/0-core)
 [![codecov](https://codecov.io/gh/threefoldtech/0-core/branch/development/graph/badge.svg)](https://codecov.io/gh/threefoldtech/0-core)
 
