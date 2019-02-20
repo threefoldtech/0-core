@@ -27,6 +27,7 @@ const (
 	cmdContainerCreate            = "corex.create"
 	cmdContainerCreateSync        = "corex.create-sync"
 	cmdContainerList              = "corex.list"
+	cmdContainerGet               = "corex.get"
 	cmdContainerDispatch          = "corex.dispatch"
 	cmdContainerTerminate         = "corex.terminate"
 	cmdContainerFind              = "corex.find"
@@ -293,6 +294,7 @@ func ContainerSubsystem(sink *transport.Sink, cell *screen.RowCell) (ContainerMa
 	pm.RegisterBuiltIn(cmdContainerCreate, containerMgr.create)
 	pm.RegisterBuiltIn(cmdContainerCreateSync, containerMgr.createSync)
 	pm.RegisterBuiltIn(cmdContainerList, containerMgr.list)
+	pm.RegisterBuiltIn(cmdContainerGet, containerMgr.get)
 	pm.RegisterBuiltIn(cmdContainerDispatch, containerMgr.dispatch)
 	pm.RegisterBuiltIn(cmdContainerTerminate, containerMgr.terminate)
 	pm.RegisterBuiltIn(cmdContainerFind, containerMgr.find)
@@ -562,6 +564,52 @@ func (m *containerManager) create(cmd *pm.Command) (interface{}, error) {
 type ContainerInfo struct {
 	pm.ProcessStats
 	Container Container `json:"container"`
+}
+
+func (m *containerManager) getByName(name string) *container {
+	m.conM.RLock()
+	defer m.conM.RUnlock()
+
+	for _, c := range m.containers {
+		if strings.EqualFold(c.Args.Name, name) {
+			return c
+		}
+	}
+
+	return nil
+}
+
+func (m *containerManager) getByID(id uint16) *container {
+	m.conM.RLock()
+	defer m.conM.RUnlock()
+
+	c, _ := m.containers[id]
+
+	return c
+}
+
+func (m *containerManager) get(cmd *pm.Command) (interface{}, error) {
+	var args struct {
+		Query interface{} `json:"query"`
+	}
+
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, pm.BadRequestError(err)
+	}
+
+	switch query := args.Query.(type) {
+
+	case string:
+		return m.getByName(query), nil
+	case float64:
+		if query < 0 || query > math.MaxUint16 {
+			return nil, pm.BadRequestError("query out of range")
+		}
+
+		return m.getByID(uint16(query)), nil
+	}
+
+	return nil, pm.BadRequestError("invalid query")
 }
 
 func (m *containerManager) list(cmd *pm.Command) (interface{}, error) {

@@ -1033,6 +1033,10 @@ class ContainerManager:
         )
     })
 
+    _get_chk = typchk.Checker({
+        'query': typchk.Or(int, str),
+    })
+
     _layer_chk = typchk.Checker({
         'container': int,
         'flist': str,
@@ -1155,6 +1159,19 @@ class ContainerManager:
         :return: a dict with {container_id: <container info object>}
         """
         return self._client.json('corex.list', {})
+
+    def get(self, query):
+        """
+        Get a container with query, if query is an `int` is treated as an ID
+        if it's a string, it's treated as a name
+        :return: container info or None
+        """
+        args = {
+            'query': query
+        }
+        self._get_chk.check(args)
+
+        return self._client.json('corex.get', args)
 
     def find(self, *tags):
         """
