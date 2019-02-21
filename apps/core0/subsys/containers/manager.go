@@ -636,10 +636,7 @@ func (m *containerManager) list(cmd *pm.Command) (interface{}, error) {
 	m.conM.RLock()
 	defer m.conM.RUnlock()
 	for id, c := range m.containers {
-		if containerRules, ok := rules[c.forwardId()]; ok {
-			c.Args.Port = containerRules
-		}
-
+		c.Args.Port, _ = rules[c.forwardId()]
 		name := fmt.Sprintf("core-%d", id)
 		job, ok := pm.JobOf(name)
 		if !ok {
