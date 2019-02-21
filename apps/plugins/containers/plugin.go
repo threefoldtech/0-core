@@ -36,6 +36,7 @@ var (
 			"create":             manager.create,
 			"create-sync":        manager.createSync,
 			"terminate":          manager.terminate,
+			"get":                manager.get,
 			"list":               manager.list,
 			"find":               manager.find,
 			"dispatch":           manager.dispatch,

@@ -125,6 +125,7 @@ func TestRuleFromNFT(t *testing.T) {
 
 	var tests = map[string]rule{
 		"ip daddr @host iifname \"zt*\" tcp dport 1028 mark set 0x01000002 dnat to 172.18.0.3:6379": rule{
+			ns:   0x01000002,
 			ip:   "172.18.0.3",
 			port: 6379,
 			source: source{
@@ -134,6 +135,7 @@ func TestRuleFromNFT(t *testing.T) {
 			},
 		},
 		"ip daddr @host iifname \"zt*\" udp dport 1028 mark set 0x01000002 dnat to 172.18.0.3:6379": rule{
+			ns:   0x01000002,
 			ip:   "172.18.0.3",
 			port: 6379,
 			source: source{
@@ -142,7 +144,8 @@ func TestRuleFromNFT(t *testing.T) {
 				protocols: []string{"udp"},
 			},
 		},
-		"ip daddr @host ip saddr 10.20.100.100 tcp dport 1029 mark set 0x01000002 dnat to 172.18.0.3:6379": rule{
+		"ip daddr @host ip saddr 10.20.100.100 tcp dport 1029 mark set 0x010000A2 dnat to 172.18.0.3:6379": rule{
+			ns:   0x010000a2,
 			ip:   "172.18.0.3",
 			port: 6379,
 			source: source{
@@ -151,7 +154,8 @@ func TestRuleFromNFT(t *testing.T) {
 				protocols: []string{"tcp"},
 			},
 		},
-		"ip daddr @host ip saddr 192.168.0.0/16 udp dport 6378 mark set 0x01000002 dnat to 172.18.0.3:6379": rule{
+		"ip daddr @host ip saddr 192.168.0.0/16 udp dport 6378 mark set 0x010000B2 dnat to 172.18.0.3:6379": rule{
+			ns:   0x010000b2,
 			ip:   "172.18.0.3",
 			port: 6379,
 			source: source{

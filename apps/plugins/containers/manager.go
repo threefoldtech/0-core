@@ -496,12 +496,77 @@ type ContainerInfo struct {
 	Container Container `json:"container"`
 }
 
+func (m *Manager) getByName(name string) *container {
+	m.conM.RLock()
+	defer m.conM.RUnlock()
+
+	for _, c := range m.containers {
+		if strings.EqualFold(c.Args.Name, name) {
+			return c
+		}
+	}
+
+	return nil
+}
+
+func (m *Manager) getByID(id uint16) *container {
+	m.conM.RLock()
+	defer m.conM.RUnlock()
+
+	c, _ := m.containers[id]
+
+	return c
+}
+
+func (m *Manager) get(ctx pm.Context) (interface{}, error) {
+	var args struct {
+		Query interface{} `json:"query"`
+	}
+	cmd := ctx.Command()
+	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
+		return nil, pm.BadRequestError(err)
+	}
+	var cont *container
+
+	switch query := args.Query.(type) {
+	case string:
+		cont = m.getByName(query)
+	case float64:
+		if query < 0 || query > math.MaxUint16 {
+			return nil, pm.BadRequestError("query out of range")
+		}
+
+		cont = m.getByID(uint16(query))
+	default:
+		return nil, pm.BadRequestError("invalid query")
+	}
+
+	//not found
+	if cont == nil {
+		return nil, nil
+	}
+
+	ports, err := m.socat().List(cont.forwardId())
+	if err != nil {
+		return nil, err
+	}
+
+	cont.Args.Port = ports
+	return cont, nil
+}
+
 func (m *Manager) list(ctx pm.Context) (interface{}, error) {
 	containers := make(map[uint16]ContainerInfo)
+
+	rules, err := m.socat().ListAll(socat.Container)
+	if err != nil {
+		return nil, err
+	}
 
 	m.conM.RLock()
 	defer m.conM.RUnlock()
 	for id, c := range m.containers {
+		c.Args.Port, _ = rules[c.forwardId()]
 		name := fmt.Sprintf("core-%d", id)
 		job, ok := m.api.JobOf(name)
 		if !ok {
