@@ -10,36 +10,36 @@ import (
 )
 
 //Version return version of base core0
-func (m *Manager) Version() base.Ver {
+func (m *BaseManager) Version() base.Ver {
 	return base.Version()
 }
 
 //Run proxy function for mgr.Run
-func (m *Manager) Run(cmd *pm.Command, hooks ...pm.RunnerHook) (pm.Job, error) {
+func (m *BaseManager) Run(cmd *pm.Command, hooks ...pm.RunnerHook) (pm.Job, error) {
 	return mgr.Run(cmd, hooks...)
 }
 
 //System proxy method for mgr.System
-func (m *Manager) System(bin string, args ...string) (*pm.JobResult, error) {
+func (m *BaseManager) System(bin string, args ...string) (*pm.JobResult, error) {
 	return mgr.System(bin, args...)
 }
 
 //Internal proxy method for mgr.Internal
-func (m *Manager) Internal(cmd string, args pm.M, out interface{}) error {
+func (m *BaseManager) Internal(cmd string, args pm.M, out interface{}) error {
 	return mgr.Internal(cmd, args, out)
 }
 
 //JobOf proxy method for mgr.JobOf
-func (m *Manager) JobOf(id string) (pm.Job, bool) {
+func (m *BaseManager) JobOf(id string) (pm.Job, bool) {
 	return mgr.JobOf(id)
 }
 
-func (m *Manager) Jobs() map[string]pm.Job {
+func (m *BaseManager) Jobs() map[string]pm.Job {
 	return mgr.Jobs()
 }
 
 //Plugin plugin API getter
-func (m *Manager) Plugin(name string) (interface{}, error) {
+func (m *BaseManager) Plugin(name string) (interface{}, error) {
 	m.l.RLock()
 	defer m.l.RUnlock()
 	plg, ok := m.plugins[name]
@@ -53,7 +53,7 @@ func (m *Manager) Plugin(name string) (interface{}, error) {
 	return plg.API(), nil
 }
 
-func (m *Manager) MustPlugin(name string) interface{} {
+func (m *BaseManager) MustPlugin(name string) interface{} {
 	plugin, err := m.Plugin(name)
 	if err != nil {
 		panic(fmt.Sprintf("plugin %v not found", name))
@@ -62,15 +62,15 @@ func (m *Manager) MustPlugin(name string) interface{} {
 	return plugin
 }
 
-func (m *Manager) Shutdown(except ...string) {
+func (m *BaseManager) Shutdown(except ...string) {
 	mgr.Shutdown(except...)
 }
 
-func (m *Manager) Aggregate(op, key string, value float64, id string, tags ...pm.Tag) {
+func (m *BaseManager) Aggregate(op, key string, value float64, id string, tags ...pm.Tag) {
 	mgr.Aggregate(op, key, value, id, tags...)
 }
 
-func (m *Manager) Store(scope string) plg.Store {
+func (m *BaseManager) Store(scope string) plg.Store {
 	m.sm.Lock()
 	defer m.sm.Unlock()
 

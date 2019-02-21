@@ -14,7 +14,7 @@ type info struct {
 	Requires  []string `json:"requires,omitempty"`
 }
 
-func (m *Manager) list(ctx pm.Context) (interface{}, error) {
+func (m *DynamicManager) list(ctx pm.Context) (interface{}, error) {
 	m.l.RLock()
 	defer m.l.RUnlock()
 
@@ -31,7 +31,7 @@ func (m *Manager) list(ctx pm.Context) (interface{}, error) {
 	return l, nil
 }
 
-func (m *Manager) load(ctx pm.Context) (interface{}, error) {
+func (m *DynamicManager) load(ctx pm.Context) (interface{}, error) {
 	var args struct {
 		Path string `json:"path"`
 	}

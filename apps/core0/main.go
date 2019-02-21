@@ -12,7 +12,6 @@ import (
 	"github.com/threefoldtech/0-core/apps/core0/assets"
 	"github.com/threefoldtech/0-core/apps/core0/bootstrap"
 	"github.com/threefoldtech/0-core/apps/core0/options"
-	"github.com/threefoldtech/0-core/apps/core0/plugin"
 	"github.com/threefoldtech/0-core/apps/core0/screen"
 	"github.com/threefoldtech/0-core/base"
 	"github.com/threefoldtech/0-core/base/mgr"
@@ -161,7 +160,7 @@ func main() {
 	var config = settings.Settings
 	mgr.MaxJobs = config.Main.MaxJobs
 	mgr.AddHandle((*console)(nil))
-	pluginMgr, err := plugin.New(settings.Settings.Main.Modules...)
+	pluginMgr, err := GetPluginsManager()
 	if err != nil {
 		log.Fatalf("failed to initialize plugin manager: %s", err)
 	}
