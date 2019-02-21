@@ -663,7 +663,7 @@ const (
 )
 
 func TestFilter(t *testing.T) {
-	rules, err := Filter(filterInput, &IntMatchFilter{
+	rules, err := runFilter(filterInput, &IntMatchFilter{
 		Name:  "tcp",
 		Field: "dport",
 		Value: 8000,
@@ -677,7 +677,7 @@ func TestFilter(t *testing.T) {
 		t.Error()
 	}
 
-	rules, err = Filter(filterInput, &MarkFilter{
+	rules, err = runFilter(filterInput, &MarkFilter{
 		Mark: 123,
 	})
 
@@ -694,7 +694,7 @@ func TestFilter(t *testing.T) {
 	}
 
 	//test OR
-	rules, err = Filter(filterInput, &MarkFilter{
+	rules, err = runFilter(filterInput, &MarkFilter{
 		Mark: 123,
 	}, &IntMatchFilter{
 		Name:  "tcp",
@@ -711,7 +711,7 @@ func TestFilter(t *testing.T) {
 	}
 
 	//test And
-	rules, err = Filter(
+	rules, err = runFilter(
 		filterInput,
 		And{&MarkFilter{
 			Mark: 123,
@@ -732,7 +732,7 @@ func TestFilter(t *testing.T) {
 
 func TestFilterNetwork(t *testing.T) {
 	_, value, _ := net.ParseCIDR("172.19.0.0/16")
-	rules, err := Filter(filterInput, &NetworkMatchFilter{
+	rules, err := runFilter(filterInput, &NetworkMatchFilter{
 		Name:  "ip",
 		Field: "saddr",
 		Value: value,
@@ -753,7 +753,7 @@ func TestFilterNetwork(t *testing.T) {
 
 func TestFilterIP(t *testing.T) {
 	value := net.ParseIP("192.168.21.10")
-	rules, err := Filter(filterInput, &IPMatchFilter{
+	rules, err := runFilter(filterInput, &IPMatchFilter{
 		Name:  "ip",
 		Field: "saddr",
 		Value: value,
@@ -772,7 +772,7 @@ func TestFilterIP(t *testing.T) {
 	}
 
 	value = net.ParseIP("192.168.20.1")
-	rules, err = Filter(filterInput, &IPMatchFilter{
+	rules, err = runFilter(filterInput, &IPMatchFilter{
 		Name:  "ip",
 		Field: "saddr",
 		Value: value,
@@ -797,7 +797,7 @@ func TestFilterIP(t *testing.T) {
 }
 
 func TestFilterMeta(t *testing.T) {
-	rules, err := Filter(filterInput, &MetaMatchFilter{
+	rules, err := runFilter(filterInput, &MetaMatchFilter{
 		Name:  "iif",
 		Value: "core0",
 	})
@@ -816,7 +816,7 @@ func TestFilterMeta(t *testing.T) {
 }
 
 func TestFilterMetaPartial(t *testing.T) {
-	rules, err := Filter(filterInput, &MetaMatchFilter{
+	rules, err := runFilter(filterInput, &MetaMatchFilter{
 		Name:  "iifname",
 		Value: "ztabcdef",
 	})

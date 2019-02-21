@@ -21,7 +21,7 @@ func TestMarshal(t *testing.T) {
 		},
 	}
 
-	data, err := MarshalText()
+	data, err := nft.MarshalText()
 
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
