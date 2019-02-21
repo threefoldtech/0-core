@@ -1,7 +1,6 @@
 package containers
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -38,24 +37,6 @@ type container struct {
 	forwardChan chan *pm.Command
 
 	terminating bool
-}
-
-func (c *container) MarshalJSON() ([]byte, error) {
-	//override how a container serializes itself to show actual
-	//ports in nft instead of the values passed in the container creation
-	ports, err := c.mgr.socat().List(c.forwardId())
-	if err != nil {
-		return nil, err
-	}
-
-	c.Args.Port = ports
-	var obj = map[string]interface{}{
-		"arguments": c.Args,
-		"root":      c.Root,
-		"pid":       c.PID,
-	}
-
-	return json.Marshal(obj)
 }
 
 func newContainer(mgr *Manager, id uint16, args ContainerCreateArguments) *container {

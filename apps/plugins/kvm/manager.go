@@ -1604,7 +1604,7 @@ type Machine struct {
 	Params     CreateParams `json:"params"`
 }
 
-func (m *kvmManager) getMachine(domain *libvirt.Domain) (Machine, error) {
+func (m *kvmManager) getMachine(domain *libvirt.Domain, ruleset map[socat.NS]socat.PortMap) (Machine, error) {
 	uuid, err := domain.GetUUIDString()
 	if err != nil {
 		return Machine{}, err
@@ -1644,12 +1644,16 @@ func (m *kvmManager) getMachine(domain *libvirt.Domain) (Machine, error) {
 		return Machine{}, err
 	}
 
-	ports, err := m.socat().List(m.forwardId(domainInfo.Sequence))
-	if err != nil {
-		return Machine{}, err
-	}
+	if ruleset == nil {
+		ports, err := m.socat().List(m.forwardId(domainInfo.Sequence))
+		if err != nil {
+			return Machine{}, err
+		}
 
-	domainInfo.Port = ports
+		domainInfo.Port = ports
+	} else if ports, ok := ruleset[m.forwardId(domainInfo.Sequence)]; ok {
+		domainInfo.Port = ports
+	}
 
 	return Machine{
 		ID:         int(id),
@@ -1663,7 +1667,6 @@ func (m *kvmManager) getMachine(domain *libvirt.Domain) (Machine, error) {
 		Params:     domainInfo.CreateParams,
 	}, nil
 }
-
 func (m *kvmManager) list(ctx pm.Context) (interface{}, error) {
 	conn, err := m.libvirt.getConnection()
 	if err != nil {
@@ -1674,10 +1677,15 @@ func (m *kvmManager) list(ctx pm.Context) (interface{}, error) {
 		return nil, fmt.Errorf("failed to list machines: %s", err)
 	}
 
+	ruleset, err := m.socat().ListAll(socat.KVM)
+	if err != nil {
+		return nil, err
+	}
+
 	machines := make([]Machine, 0)
 
 	for _, domain := range domains {
-		machine, err := m.getMachine(&domain)
+		machine, err := m.getMachine(&domain, ruleset)
 		if err != nil {
 			return nil, err
 		}
@@ -1720,7 +1728,7 @@ func (m *kvmManager) get(ctx pm.Context) (interface{}, error) {
 		}
 	}
 
-	machine, err := m.getMachine(domain)
+	machine, err := m.getMachine(domain, nil)
 	if err != nil {
 		return nil, err
 	}
