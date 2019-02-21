@@ -566,26 +566,26 @@ type ContainerInfo struct {
 	Container Container `json:"container"`
 }
 
-func (m *containerManager) getByName(name string) *container {
+func (m *containerManager) getByName(name string) (uint16, *container) {
 	m.conM.RLock()
 	defer m.conM.RUnlock()
 
-	for _, c := range m.containers {
+	for id, c := range m.containers {
 		if strings.EqualFold(c.Args.Name, name) {
-			return c
+			return id, c
 		}
 	}
 
-	return nil
+	return 0, nil
 }
 
-func (m *containerManager) getByID(id uint16) *container {
+func (m *containerManager) getByID(id uint16) (uint16, *container) {
 	m.conM.RLock()
 	defer m.conM.RUnlock()
 
 	c, _ := m.containers[id]
 
-	return c
+	return id, c
 }
 
 func (m *containerManager) get(cmd *pm.Command) (interface{}, error) {
@@ -596,17 +596,19 @@ func (m *containerManager) get(cmd *pm.Command) (interface{}, error) {
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
+
+	var id uint16
 	var cont *container
 
 	switch query := args.Query.(type) {
 	case string:
-		cont = m.getByName(query)
+		id, cont = m.getByName(query)
 	case float64:
 		if query < 0 || query > math.MaxUint16 {
 			return nil, pm.BadRequestError("query out of range")
 		}
 
-		cont = m.getByID(uint16(query))
+		id, cont = m.getByID(uint16(query))
 	default:
 		return nil, pm.BadRequestError("invalid query")
 	}
@@ -620,9 +622,17 @@ func (m *containerManager) get(cmd *pm.Command) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	cont.Args.Port = ports
-	return cont, nil
+
+	response := struct {
+		Container *container `json:"container"`
+		ID        uint16     `json:"id"`
+	}{
+		Container: cont,
+		ID:        id,
+	}
+
+	return response, nil
 }
 
 func (m *containerManager) list(cmd *pm.Command) (interface{}, error) {
@@ -636,10 +646,7 @@ func (m *containerManager) list(cmd *pm.Command) (interface{}, error) {
 	m.conM.RLock()
 	defer m.conM.RUnlock()
 	for id, c := range m.containers {
-		if containerRules, ok := rules[c.forwardId()]; ok {
-			c.Args.Port = containerRules
-		}
-
+		c.Args.Port, _ = rules[c.forwardId()]
 		name := fmt.Sprintf("core-%d", id)
 		job, ok := pm.JobOf(name)
 		if !ok {
