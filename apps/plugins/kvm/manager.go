@@ -1651,8 +1651,8 @@ func (m *kvmManager) getMachine(domain *libvirt.Domain, ruleset map[socat.NS]soc
 		}
 
 		domainInfo.Port = ports
-	} else if ports, ok := ruleset[m.forwardId(domainInfo.Sequence)]; ok {
-		domainInfo.Port = ports
+	} else {
+		domainInfo.Port, _ = ruleset[m.forwardId(domainInfo.Sequence)]
 	}
 
 	return Machine{
