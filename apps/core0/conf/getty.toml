@@ -1,0 +1,22 @@
+# NOTICE:
+# This file will give any user with physical access to the node
+# full access to the system, include in the image on your own risk
+# 
+# busybox setsid  getty -I -n -l /sbin/login.sh 0 /dev/tty3
+
+[startup.getty]
+name = 'core.system'
+after = ['init']
+condition = 'development'
+# the job is not marked as protected, instead we respawn the shell
+# from the direct-login.sh script, because busybox setsid doesn't 
+# support the -w flag (wait for process to exit), it means with protected=true
+# the system will keep spawning gettys infinitely.
+
+[startup.getty.args]
+name = "busybox"
+args = [
+    'setsid',
+    'getty', '-l', '/usr/bin/direct-login.sh',
+    '0', '/dev/tty3'
+]
