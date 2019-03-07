@@ -7,7 +7,7 @@ running_delay = -1
 
 [startup."zerotier-init".args]
 "not(ztid)|script" = """
-ztid -out /tmp/zt
+ztid -debug -out /tmp/zt
 """
 
 "ztid|script" = """
