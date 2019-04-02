@@ -526,8 +526,16 @@ func (d *diskMgr) list(cmd *pm.Command) (interface{}, error) {
 		return nil, err
 	}
 
+	// If lsblk didn't returned an error and stdout is empty,
+	// then no disks was found, but we won't be able to Unmarshal the response
+	// We returns an empty list directly
+	var response = []byte(result.Streams.Stdout())
+	if len(response) == 0 {
+		return []*DiskInfoResult{}, nil
+	}
+
 	var disks lsblkListResult
-	if err := json.Unmarshal([]byte(result.Streams.Stdout()), &disks); err != nil {
+	if err := json.Unmarshal(response, &disks); err != nil {
 		return nil, err
 	}
 
