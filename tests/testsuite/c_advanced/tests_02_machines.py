@@ -213,7 +213,7 @@ class AdvancedMachines(BaseTest):
         self.vm_uuid = self.create_vm(name=vm_name, flist=self.zos_flist,
                                  memory=2048, nics=nics, share_cache=True)
         self.assertTrue(self.vm_uuid)
-        res = self.client.system('nft add rule ip nat pre ip daddr @host tcp dport {} dnat to {}:6379'.format(pub_port, vm_zos_ip)).get()
+        res = self.client.system('nft add rule ip nat pre ip daddr @host tcp dport {} mark set 0xff000000 dnat to {}:6379'.format(pub_port, vm_zos_ip)).get()
         self.assertEqual(res.state, 'SUCCESS')
         time.sleep(60)
 
