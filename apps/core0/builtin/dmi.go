@@ -222,16 +222,18 @@ type PropertyData struct {
 
 // DMISection represents a complete section like BIOS or Baseboard
 type DMISection struct {
-	HandleLine string                  `json:"handleline"`
-	Title      string                  `json:"title"`
-	TypeStr    string                  `json:"typestr,omitempty"`
-	Type       DMIType                 `json:"typenum"`
-	Properties map[string]PropertyData `json:"properties,omitempty"`
+	HandleLine  string                   `json:"handleline"`
+	TypeStr     string                   `json:"typestr,omitempty"`
+	Type        DMIType                  `json:"typenum"`
+	SubSections map[string]DMISubSection `json:"subsections"`
 }
+
+// DMISubSection represents part of a section, identified by a title
+type DMISubSection map[string]PropertyData
 
 func newSection() DMISection {
 	return DMISection{
-		Properties: make(map[string]PropertyData),
+		SubSections: make(map[string]DMISubSection),
 	}
 }
 
@@ -242,8 +244,6 @@ func readSection(section *DMISection, lines []string, start int) (int, error) {
 
 	section.HandleLine = lines[start]
 	start++
-	section.Title = lines[start]
-	start++
 	dmitype, err := getDMITypeFromHandleLine(section.HandleLine)
 
 	if err != nil {
@@ -253,10 +253,22 @@ func readSection(section *DMISection, lines []string, start int) (int, error) {
 	section.Type = dmitype
 	section.TypeStr = DMITypeToString(dmitype)
 
+	subSection := make(DMISubSection)
+	subSectionTitle := lines[start]
+	start++
+
 	for start < len(lines) {
 		line := lines[start]
 		if strings.TrimSpace(line) == "" {
+			section.SubSections[subSectionTitle] = subSection
 			return start, nil
+		}
+		if !unicode.IsSpace([]rune(line)[0]) {
+			section.SubSections[subSectionTitle] = subSection
+			subSection = make(DMISubSection)
+			subSectionTitle = line
+			start++
+			continue
 		}
 		indentLevel := getLineLevel(line)
 		key, propertyData, err := propertyFromLine(line)
@@ -273,8 +285,9 @@ func readSection(section *DMISection, lines []string, start int) (int, error) {
 		}
 
 		start++
-		section.Properties[key] = propertyData
+		subSection[key] = propertyData
 	}
+	section.SubSections[subSectionTitle] = subSection
 	return start, nil
 }
 
@@ -308,7 +321,7 @@ func ParseDMI(input string) (DMI, error) {
 			if err != nil {
 				return DMI{}, err
 			}
-			secs[section.Title] = section
+			secs[section.TypeStr] = section
 		}
 	}
 	return secs, nil
