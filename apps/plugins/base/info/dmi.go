@@ -176,7 +176,11 @@ func getDMIInfo(ctx pm.Context) (interface{}, error) {
 
 // DMITypeToString returns string representation of DMIType t
 func DMITypeToString(t DMIType) string {
-	return dmitypeToString[t]
+	str, _ := dmitypeToString[t]
+	if str == "" {
+		return fmt.Sprintf("Custom Type %d", t)
+	}
+	return str
 }
 
 // Extract the DMI type from the handleline.
@@ -294,7 +298,7 @@ func readList(propertyData *PropertyData, lines []string, start int) int {
 		line := lines[start]
 		indentLevel := getLineLevel(line)
 
-		if indentLevel == startIndentLevel {
+		if indentLevel >= startIndentLevel {
 			propertyData.Items = append(propertyData.Items, strings.TrimSpace(line))
 		} else {
 			return start - 1
