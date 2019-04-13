@@ -11,7 +11,8 @@ import (
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
-const DMIDecoderVersion = `0-core dmi decoder v0.1.0`
+// DMIDecoderVersion is the information about the decoder in this package
+const DMIDecoderVersion = `0-core Go dmi decoder v0.1.0`
 
 //DMIType (allowed types 0 -> 42)
 type DMIType int
@@ -29,14 +30,13 @@ k: [v]
 	]
 */
 type DMI struct {
-	Tool     DMITool               `json:"tool"`
+	Tooling  DMITooling            `json:"tooling"`
 	Sections map[string]DMISection `json:"sections"`
 }
 
-type DMITool struct {
-	Name    string `json:"name"`
-	Version string `json:"version,omitempty"`
-	Decoder string `json:"decoder"`
+type DMITooling struct {
+	Aggregator string `json:"aggregator"`
+	Decoder    string `json:"decoder"`
 }
 
 const (
@@ -325,8 +325,8 @@ func ParseDMI(input string) (DMI, error) {
 	secs := make(map[string]DMISection)
 
 	var (
-		start int
-		tool  DMITool
+		start   int
+		tooling DMITooling
 	)
 
 	for ; start < len(lines); start++ {
@@ -336,18 +336,15 @@ func ParseDMI(input string) (DMI, error) {
 			break
 		}
 		if strings.HasPrefix(lines[start], "#") {
-			_, err := fmt.Sscanf(lines[start], "# %s %s", &tool.Name, &tool.Version)
-			if err != nil {
-				return DMI{}, fmt.Errorf("error while scanning tool version line %q: %v", lines[start], err)
-			}
+			tooling.Aggregator = strings.TrimSpace(strings.TrimPrefix(lines[start], "#"))
 			start++ // skip line, we already consumed it
 			break
 		}
 	}
-	if tool.Name == "" {
-		tool.Name = "unknown"
+	if tooling.Aggregator == "" {
+		tooling.Aggregator = "unknown"
 	}
-	tool.Decoder = DMIDecoderVersion // include decoder tool
+	tooling.Decoder = DMIDecoderVersion // include decoder tool information
 
 	for ; start < len(lines); start++ {
 		line := lines[start]
@@ -363,7 +360,7 @@ func ParseDMI(input string) (DMI, error) {
 	}
 
 	return DMI{
-		Tool:     tool,
+		Tooling:  tooling,
 		Sections: secs,
 	}, nil
 }

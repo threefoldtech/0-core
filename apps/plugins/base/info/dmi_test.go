@@ -438,13 +438,10 @@ func TestParseSectionSimple(t *testing.T) {
 	if ok := assert.Len(t, dmi.Sections, 1); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Name, "dmidecode"); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Aggregator, "dmidecode 3.1"); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Version, "3.1"); !ok {
-		t.Fatal()
-	}
-	if ok := assert.Equal(t, dmi.Tool.Decoder, DMIDecoderVersion); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Decoder, DMIDecoderVersion); !ok {
 		t.Fatal()
 	}
 	if ok := assert.Len(t, dmi.Sections["System"].SubSections["System Information"], 8); !ok {
@@ -462,13 +459,10 @@ func TestParseSectionWithListProperty(t *testing.T) {
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Name, "unknown"); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Aggregator, "unknown"); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Version, ""); !ok {
-		t.Fatal()
-	}
-	if ok := assert.Equal(t, dmi.Tool.Decoder, DMIDecoderVersion); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Decoder, DMIDecoderVersion); !ok {
 		t.Fatal()
 	}
 
@@ -498,13 +492,10 @@ func TestParseMultipleSectionsSimple(t *testing.T) {
 	if ok := assert.Len(t, dmi.Sections, 4); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Name, "dmidecode"); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Aggregator, "dmidecode 3.1"); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Version, "3.1"); !ok {
-		t.Fatal()
-	}
-	if ok := assert.Equal(t, dmi.Tool.Decoder, DMIDecoderVersion); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Decoder, DMIDecoderVersion); !ok {
 		t.Fatal()
 	}
 
@@ -548,13 +539,10 @@ func TestParseMultipleSectionsWithListProperties(t *testing.T) {
 	if ok := assert.Len(t, dmi.Sections, 2); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Name, "dmidecode"); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Aggregator, "dmidecode 3.1"); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Version, "3.1"); !ok {
-		t.Fatal()
-	}
-	if ok := assert.Equal(t, dmi.Tool.Decoder, DMIDecoderVersion); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Decoder, DMIDecoderVersion); !ok {
 		t.Fatal()
 	}
 
@@ -594,13 +582,10 @@ func TestParseTestOnBoardDevices(t *testing.T) {
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Name, "dmidecode"); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Aggregator, "dmidecode 3.1"); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Version, "3.1"); !ok {
-		t.Fatal()
-	}
-	if ok := assert.Equal(t, dmi.Tool.Decoder, DMIDecoderVersion); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Decoder, DMIDecoderVersion); !ok {
 		t.Fatal()
 	}
 	if ok := assert.Len(t, dmi.Sections, 1); !ok {
@@ -645,13 +630,10 @@ func TestParseTestOEMSpecificTypeWithIndentedListItem(t *testing.T) {
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Name, "dmidecode"); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Aggregator, "dmidecode 3.1"); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Version, "3.1"); !ok {
-		t.Fatal()
-	}
-	if ok := assert.Equal(t, dmi.Tool.Decoder, DMIDecoderVersion); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Decoder, DMIDecoderVersion); !ok {
 		t.Fatal()
 	}
 	if ok := assert.Len(t, dmi.Sections, 1); !ok {
@@ -693,13 +675,10 @@ func TestFullDmiDecodeOutputSample(t *testing.T) {
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Name, "dmidecode"); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Aggregator, "dmidecode 3.1"); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Version, "3.1"); !ok {
-		t.Fatal()
-	}
-	if ok := assert.Equal(t, dmi.Tool.Decoder, DMIDecoderVersion); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Decoder, DMIDecoderVersion); !ok {
 		t.Fatal()
 	}
 }
@@ -709,13 +688,10 @@ func TestFullDmiDecodeOutputSample2(t *testing.T) {
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Name, "dmidecode"); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Aggregator, "dmidecode 3.1"); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Tool.Version, "3.1"); !ok {
-		t.Fatal()
-	}
-	if ok := assert.Equal(t, dmi.Tool.Decoder, DMIDecoderVersion); !ok {
+	if ok := assert.Equal(t, dmi.Tooling.Decoder, DMIDecoderVersion); !ok {
 		t.Fatal()
 	}
 }
