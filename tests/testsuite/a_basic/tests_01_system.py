@@ -1060,7 +1060,7 @@ class SystemTests(BaseTest):
         dmi_bios_info = self.get_dmi_bios_info(self.client)
 
         self.lg('get dmi_bios info using zos client')
-        bios_info = self.client.info.dmi('bios')['BIOS Information']['properties']
+        bios_info = self.client.info.dmi('bios')['BIOS']['subsections']['BIOS Information']
 
         for k in dmi_bios_info:
             self.assertEqual(dmi_bios_info[k],bios_info[k]['value'])
