@@ -2,7 +2,6 @@ package pm
 
 import (
 	"fmt"
-	"io"
 	"syscall"
 
 	"github.com/threefoldtech/0-core/base/stream"
@@ -33,6 +32,7 @@ type ContainerCommandArguments struct {
 	Dir         string            `json:"dir"`
 	Args        []string          `json:"args"`
 	Env         map[string]string `json:"env"`
+	Files       []string          `json:"files"` //extra files (fd >= 3)
 	HostNetwork bool              `json:"host_network"`
 	Chroot      string            `json:"chroot"`
 	Log         string            `json:"log"`
@@ -54,18 +54,6 @@ type ProcessStats struct {
 type Process interface {
 	Command() *Command
 	Run() (<-chan *stream.Message, error)
-}
-
-//Channel is a 2 way communication channel that is mainly used
-//to talk to the main containerd process `coreX`
-type Channel interface {
-	io.ReadWriteCloser
-}
-
-//ContainerProcess interface
-type ContainerProcess interface {
-	Process
-	Channel() Channel
 }
 
 //Signaler a process that supports signals

@@ -1,13 +1,13 @@
 package containers
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/threefoldtech/0-core/base/pm"
 )
@@ -30,21 +30,16 @@ type container struct {
 	Root   string                   `json:"root"`
 	PID    int                      `json:"pid"`
 
-	zterr error
-	zto   sync.Once
-
-	channel     pm.Channel
-	forwardChan chan *pm.Command
-
+	zterr       error
+	zto         sync.Once
 	terminating bool
 }
 
 func newContainer(mgr *Manager, id uint16, args ContainerCreateArguments) *container {
 	c := &container{
-		mgr:         mgr,
-		id:          id,
-		Args:        args,
-		forwardChan: make(chan *pm.Command),
+		mgr:  mgr,
+		id:   id,
+		Args: args,
 	}
 	c.Root = c.root()
 	return c
@@ -55,12 +50,14 @@ func (c *container) ID() uint16 {
 }
 
 func (c *container) dispatch(cmd *pm.Command) error {
-	select {
-	case c.forwardChan <- cmd:
-	case <-time.After(5 * time.Second):
-		return fmt.Errorf("failed to dispatch command to container, check system logs for errors")
+	input, err := os.OpenFile(c.pipeIn(), os.O_WRONLY, 0644)
+	if err != nil {
+		return err
 	}
-	return nil
+
+	defer input.Close()
+	enc := json.NewEncoder(input)
+	return enc.Encode(cmd)
 }
 
 func (c *container) Arguments() ContainerCreateArguments {
@@ -81,6 +78,13 @@ func (c *container) Start() (runner pm.Job, err error) {
 		return
 	}
 
+	for _, pipe := range []string{c.pipeIn(), c.pipeOut()} {
+		if err := syscall.Mkfifo(pipe, 0644); err != nil {
+			return nil, err
+		}
+	}
+
+	//if err := syscall.Mkfifo()
 	if err = c.preStart(); err != nil {
 		log.Errorf("error in container prestart: %s", err)
 		return
@@ -114,6 +118,7 @@ func (c *container) Start() (runner pm.Job, err error) {
 				HostNetwork: c.Args.HostNetwork,
 				Args:        args,
 				Env:         env,
+				Files:       []string{c.pipeIn(), c.pipeOut()},
 				Log:         path.Join(BackendBaseDir, c.name(), "container.log"),
 			},
 		),
@@ -159,16 +164,6 @@ func (c *container) preStart() error {
 }
 
 func (c *container) onStart(pid int) {
-	//get channel
-	ps := c.runner.Process()
-	if ps, ok := ps.(pm.ContainerProcess); !ok {
-		log.Errorf("not a valid container process")
-		c.runner.Signal(syscall.SIGTERM)
-		return
-	} else {
-		c.channel = ps.Channel()
-	}
-
 	c.PID = pid
 	if !c.Args.Privileged {
 		c.Args.CGroups = append(c.Args.CGroups, DevicesCGroup)
@@ -189,8 +184,12 @@ func (c *container) onStart(pid int) {
 		//TODO. Should we shut the container down?
 	}
 
+	if err := c.unlock(); err != nil {
+		log.Errorf("failed to send unlock magic", err)
+	}
+
 	go c.rewind()
-	go c.forward()
+	//go c.forward()
 }
 
 func (c *container) onExit(state bool) {
@@ -212,11 +211,6 @@ func (c *container) onExit(state bool) {
 func (c *container) cleanup() {
 	log.Debugf("cleaning up container-%d", c.id)
 	defer c.mgr.unsetContainer(c.id)
-
-	close(c.forwardChan)
-	if c.channel != nil {
-		c.channel.Close()
-	}
 
 	c.destroyNetwork()
 

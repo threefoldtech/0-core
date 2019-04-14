@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/threefoldtech/0-core/base/pm"
 	"github.com/threefoldtech/0-core/base/stream"
@@ -19,23 +20,27 @@ type Message struct {
 	Payload json.RawMessage `json:"payload"`
 }
 
-func (c *container) forward() {
-	log.Debugf("start commands forwarder for '%s'", c.name())
-	enc := json.NewEncoder(c.channel)
-	//unlock coreX process by sending proper magic number
-	if err := enc.Encode(UnlockMagic); err != nil {
-		log.Errorf("failed to send magic number: %s", err)
+func (c *container) unlock() error {
+	pipe, err := os.OpenFile(c.pipeIn(), os.O_WRONLY, 0644)
+	if err != nil {
+		return err
 	}
 
-	for cmd := range c.forwardChan {
-		if err := enc.Encode(cmd); err != nil {
-			log.Errorf("failed to forward command (%s) to container (%d)", cmd.ID, c.id)
-		}
-	}
+	enc := json.NewEncoder(pipe)
+	//unlock coreX process by sending proper magic number
+	return enc.Encode(UnlockMagic)
 }
 
 func (c *container) rewind() {
-	decoder := json.NewDecoder(c.channel)
+	out, err := os.Open(c.pipeOut())
+	if err != nil {
+		log.Errorf("failed to open container pipe", err)
+		return
+	}
+
+	defer out.Close()
+
+	decoder := json.NewDecoder(out)
 	for {
 
 		var message Message

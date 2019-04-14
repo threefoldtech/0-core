@@ -40,7 +40,6 @@ type containerProcessImpl struct {
 	args    pm.ContainerCommandArguments
 	pid     int
 	process *psutils.Process
-	ch      *channel
 
 	table PIDTable
 }
@@ -61,10 +60,6 @@ func newContainerProcess(table PIDTable, cmd *pm.Command) pm.Process {
 
 func (p *containerProcessImpl) Command() *pm.Command {
 	return p.cmd
-}
-
-func (p *containerProcessImpl) Channel() pm.Channel {
-	return p.ch
 }
 
 func (p *containerProcessImpl) Signal(sig syscall.Signal) error {
@@ -114,25 +109,6 @@ func (p *containerProcessImpl) GetPID() int32 {
 	return ps.Pid
 }
 
-func (p *containerProcessImpl) setupChannel() (*os.File, *os.File, error) {
-	lr, lw, err := os.Pipe()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	rr, rw, err := os.Pipe()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	p.ch = &channel{
-		r: lr,
-		w: rw,
-	}
-
-	return rr, lw, nil
-}
-
 func (p *containerProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 	//we don't do lookup on the name because the name
 	//is only available under the chroot
@@ -162,10 +138,6 @@ func (p *containerProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 		flags |= syscall.CLONE_NEWNET
 	}
 
-	r, w, err := p.setupChannel()
-	if err != nil {
-		return nil, err
-	}
 	var logf *os.File
 	if len(p.args.Log) != 0 {
 		logf, err = os.OpenFile(p.args.Log, os.O_WRONLY|os.O_CREATE, 0644)
@@ -174,12 +146,23 @@ func (p *containerProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 		}
 	}
 
+	files := []*os.File{
+		nil, logf, logf,
+	}
+
+	for _, fname := range p.args.Files {
+		f, err := os.OpenFile(fname, os.O_RDWR, 0644)
+		if err != nil {
+			return nil, err
+		}
+
+		files = append(files, f)
+	}
+
 	attrs := os.ProcAttr{
-		Dir: p.args.Dir,
-		Env: env,
-		Files: []*os.File{
-			nil, logf, logf, r, w,
-		},
+		Dir:   p.args.Dir,
+		Env:   env,
+		Files: files,
 		Sys: &syscall.SysProcAttr{
 			Chroot:     p.args.Chroot,
 			Cloneflags: flags,
@@ -199,8 +182,10 @@ func (p *containerProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 		return ps.Pid, nil
 	})
 
-	if logf != nil {
-		logf.Close()
+	for _, fd := range files {
+		if fd != nil {
+			fd.Close()
+		}
 	}
 
 	if err != nil {
@@ -218,9 +203,6 @@ func (p *containerProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 		//wait for all streams to finish copying
 		wg.Wait()
 		ps.Release()
-		if err := p.ch.Close(); err != nil {
-			log.Errorf("failed to close container channel: %s", err)
-		}
 
 		code := state.ExitStatus()
 		log.Debugf("Process %s exited with state: %d", p.cmd, code)

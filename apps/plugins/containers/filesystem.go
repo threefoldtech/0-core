@@ -49,7 +49,7 @@ func (c *container) mergeFList(src string) error {
 
 func (c *container) mountFList(src string, target string, cfg map[string]string, hooks ...pm.RunnerHook) error {
 	//check
-	namespace := fmt.Sprintf("containers/%s", c.name())
+	namespace := fmt.Sprintf("containers/%s/fs", c.name())
 	storage := c.Args.Storage
 	if storage == "" {
 		storage = settings.Settings.Globals.Get("storage", "zdb://hub.grid.tf:9900")
@@ -68,8 +68,24 @@ func (c *container) mountFList(src string, target string, cfg map[string]string,
 	return nil
 }
 
+func (c *container) workingDir() string {
+	return path.Join(BackendBaseDir, c.name())
+}
+
+func (c *container) fsDir() string {
+	return path.Join(c.workingDir(), "fs")
+}
+
 func (c *container) root() string {
 	return path.Join(ContainerBaseRootDir, c.name())
+}
+
+func (c *container) pipeIn() string {
+	return path.Join(c.workingDir(), "in")
+}
+
+func (c *container) pipeOut() string {
+	return path.Join(c.workingDir(), "out")
 }
 
 type SortableDisks []disk.PartitionStat
@@ -131,18 +147,18 @@ func (c *container) touch(p string) error {
 func (c *container) sandbox() error {
 	//mount root flist.
 	//prepare root folder.
-
 	//make sure we remove the directory
-	os.RemoveAll(path.Join(BackendBaseDir, c.name()))
+	workDir := c.workingDir()
+	os.RemoveAll(workDir)
 	fstype := c.getFSType(BackendBaseDir)
 	log.Debugf("Sandbox fileystem type: %s", fstype)
 
 	if fstype == "btrfs" {
 		//make sure we delete it if sub volume exists
-		if utils.Exists(path.Join(BackendBaseDir, c.name())) {
-			c.mgr.api.System("btrfs", "subvolume", "delete", path.Join(BackendBaseDir, c.name()))
+		if utils.Exists(workDir) {
+			c.mgr.api.System("btrfs", "subvolume", "delete", workDir)
 		}
-		c.mgr.api.System("btrfs", "subvolume", "create", path.Join(BackendBaseDir, c.name()))
+		c.mgr.api.System("btrfs", "subvolume", "create", workDir)
 	}
 
 	root := c.root()
