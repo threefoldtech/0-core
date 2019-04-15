@@ -11,11 +11,14 @@ import (
 	"github.com/threefoldtech/0-core/base/pm"
 )
 
+// DMIDecoderVersion is the information about the decoder in this package
+const DMIDecoderVersion = `0-core Go dmi decoder v0.1.0`
+
 //DMIType (allowed types 0 -> 42)
 type DMIType int
 
-// DMI represents a map of DMISectionName to DMISection parsed from dmidecode output.
-
+// DMI represents a map of DMISectionTypeStr to DMISection parsed from dmidecode output,
+// as well as information about the tool used to get these sections/
 /*
 Property in section is in the form of key value pairs where values are optional
 and may include a list of items as well.
@@ -26,7 +29,15 @@ k: [v]
 		...
 	]
 */
-type DMI map[string]DMISection
+type DMI struct {
+	Tooling  DMITooling            `json:"tooling"`
+	Sections map[string]DMISection `json:"sections"`
+}
+
+type DMITooling struct {
+	Aggregator string `json:"aggregator"`
+	Decoder    string `json:"decoder"`
+}
 
 const (
 	DMITypeBIOS DMIType = iota
@@ -313,7 +324,29 @@ func ParseDMI(input string) (DMI, error) {
 	lines := strings.Split(input, "\n")
 	secs := make(map[string]DMISection)
 
-	for start := 0; start < len(lines); start++ {
+	var (
+		start   int
+		tooling DMITooling
+	)
+
+	for ; start < len(lines); start++ {
+		if strings.HasPrefix(lines[start], "Handle") {
+			// do not skip line, we want to start at this one,
+			// in our next loop
+			break
+		}
+		if strings.HasPrefix(lines[start], "#") {
+			tooling.Aggregator = strings.TrimSpace(strings.TrimPrefix(lines[start], "#"))
+			start++ // skip line, we already consumed it
+			break
+		}
+	}
+	if tooling.Aggregator == "" {
+		tooling.Aggregator = "unknown"
+	}
+	tooling.Decoder = DMIDecoderVersion // include decoder tool information
+
+	for ; start < len(lines); start++ {
 		line := lines[start]
 		if strings.HasPrefix(line, "Handle") {
 			section := newSection()
@@ -325,5 +358,9 @@ func ParseDMI(input string) (DMI, error) {
 			secs[section.TypeStr] = section
 		}
 	}
-	return secs, nil
+
+	return DMI{
+		Tooling:  tooling,
+		Sections: secs,
+	}, nil
 }
