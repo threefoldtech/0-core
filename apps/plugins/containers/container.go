@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -23,26 +22,42 @@ var (
 )
 
 type container struct {
-	id     uint16
+	id  uint16
+	mgr *Manager
+
 	runner pm.Job
-	mgr    *Manager
-	Args   ContainerCreateArguments `json:"arguments"`
-	Root   string                   `json:"root"`
-	PID    int                      `json:"pid"`
+	//Args   ContainerCreateArguments `json:"arguments"`
+	Root string `json:"root"`
+	PID  int    `json:"pid"`
 
 	zterr       error
 	zto         sync.Once
 	terminating bool
 }
 
-func newContainer(mgr *Manager, id uint16, args ContainerCreateArguments) *container {
+func newContainer(mgr *Manager, id uint16, args ContainerCreateArguments) (*container, error) {
+
 	c := &container{
-		mgr:  mgr,
-		id:   id,
-		Args: args,
+		mgr: mgr,
+		id:  id,
+		//Args: args,
 	}
-	c.Root = c.root()
-	return c
+
+	if err := os.MkdirAll(c.workingDir(), 0755); err != nil {
+		return nil, err
+	}
+
+	config, err := NewConfig(c.configFile(), args)
+	if err != nil {
+		return nil, err
+	}
+
+	defer config.Release()
+	return c, nil
+}
+
+func (c *container) config() (*ContainerConfig, error) {
+	return LoadConfig(c.configFile())
 }
 
 func (c *container) ID() uint16 {
@@ -60,8 +75,14 @@ func (c *container) dispatch(cmd *pm.Command) error {
 	return enc.Encode(cmd)
 }
 
-func (c *container) Arguments() ContainerCreateArguments {
-	return c.Args
+func (c *container) Arguments() (args ContainerCreateArguments, err error) {
+	conf, err := c.config()
+	if err != nil {
+		return args, err
+	}
+
+	defer conf.Release()
+	return conf.ContainerCreateArguments, nil
 }
 
 func (c *container) Start() (runner pm.Job, err error) {
@@ -73,7 +94,20 @@ func (c *container) Start() (runner pm.Job, err error) {
 		}
 	}()
 
-	if err = c.sandbox(); err != nil {
+	config, err := c.config()
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err := config.Write(); err != nil {
+			log.Errorf("failed to write container config: %s", err)
+		}
+
+		config.Release()
+	}()
+
+	if err = c.sandbox(&config.ContainerCreateArguments); err != nil {
 		log.Errorf("error in container mount: %s", err)
 		return
 	}
@@ -90,11 +124,13 @@ func (c *container) Start() (runner pm.Job, err error) {
 		return
 	}
 
+	arguments := &config.ContainerCreateArguments
+
 	args := []string{
-		"-hostname", c.Args.Hostname,
+		"-hostname", arguments.Hostname,
 	}
 
-	if !c.Args.Privileged {
+	if !arguments.Privileged {
 		args = append(args, "-unprivileged")
 	}
 
@@ -103,7 +139,7 @@ func (c *container) Start() (runner pm.Job, err error) {
 		"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		"HOME": "/",
 	}
-	for key, value := range c.Args.Env {
+	for key, value := range arguments.Env {
 		env[key] = value
 	}
 
@@ -115,7 +151,7 @@ func (c *container) Start() (runner pm.Job, err error) {
 				Name:        "/coreX",
 				Chroot:      c.root(),
 				Dir:         "/",
-				HostNetwork: c.Args.HostNetwork,
+				HostNetwork: arguments.HostNetwork,
 				Args:        args,
 				Env:         env,
 				Files:       []string{c.pipeIn(), c.pipeOut()},
@@ -152,7 +188,12 @@ func (c *container) Terminate() error {
 }
 
 func (c *container) preStart() error {
-	if c.Args.HostNetwork {
+	arguments, err := c.Arguments()
+	if err != nil {
+		return err
+	}
+
+	if arguments.HostNetwork {
 		return c.preStartHostNetworking()
 	}
 
@@ -164,12 +205,17 @@ func (c *container) preStart() error {
 }
 
 func (c *container) onStart(pid int) {
+	arguments, err := c.Arguments()
+	if err != nil {
+		log.Error("failed to load container (%d) arguments: %s", c.id, err)
+		return
+	}
 	c.PID = pid
-	if !c.Args.Privileged {
-		c.Args.CGroups = append(c.Args.CGroups, DevicesCGroup)
+	if !arguments.Privileged {
+		arguments.CGroups = append(arguments.CGroups, DevicesCGroup)
 	}
 
-	for _, cgroup := range c.Args.CGroups {
+	for _, cgroup := range arguments.CGroups {
 		group, err := c.mgr.cgroup().Get(cgroup.Subsystem(), cgroup.Name())
 		if err != nil {
 			log.Errorf("can't find cgroup %s", err)
@@ -179,7 +225,7 @@ func (c *container) onStart(pid int) {
 		group.Task(pid)
 	}
 
-	if err := c.postStart(); err != nil {
+	if err := c.postStart(arguments); err != nil {
 		log.Errorf("container post start error: %s", err)
 		//TODO. Should we shut the container down?
 	}
@@ -195,17 +241,7 @@ func (c *container) onStart(pid int) {
 func (c *container) onExit(state bool) {
 	c.terminating = true
 	log.Debugf("Container %v exited with state %v", c.id, state)
-	tags := strings.Join(c.Args.Tags, ".")
 	defer c.cleanup()
-	if len(tags) == 0 {
-		return
-	}
-	// logger.Current.LogRecord(&logger.LogRecord{
-	// 	Command: fmt.Sprintf("container.%s", tags),
-	// 	Message: &stream.Message{
-	// 		Meta: stream.NewMeta(0, stream.ExitSuccessFlag),
-	// 	},
-	// })
 }
 
 func (c *container) cleanup() {
@@ -235,8 +271,8 @@ func (c *container) namespace() error {
 	return nil
 }
 
-func (c *container) postStart() error {
-	if c.Args.HostNetwork {
+func (c *container) postStart(arguments ContainerCreateArguments) error {
+	if arguments.HostNetwork {
 		return nil
 	}
 

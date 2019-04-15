@@ -219,18 +219,25 @@ func (m *Manager) nicAdd(ctx pm.Context) (interface{}, error) {
 		return nil, pm.NotFoundError(fmt.Errorf("container does not exist"))
 	}
 
-	if container.Args.HostNetwork {
+	config, err := container.config()
+	if err != nil {
+		return nil, err
+	}
+
+	defer config.WriteRelease()
+
+	if config.HostNetwork {
 		return nil, pm.BadRequestError(fmt.Errorf("cannot add a nic in host network mode"))
 	}
 
 	args.Nic.State = NicStateUnknown
 
-	idx := len(container.Args.Nics)
-	container.Args.Nics = append(container.Args.Nics, &args.Nic)
+	idx := len(config.Nics)
+	config.Nics = append(config.Nics, &args.Nic)
 
-	if err := container.Args.Validate(m); err != nil {
-		l := container.Args.Nics
-		container.Args.Nics = l[:len(l)-1]
+	if err := config.Validate(m); err != nil {
+		l := config.Nics
+		config.Nics = l[:len(l)-1]
 		return nil, pm.BadRequestError(err)
 	}
 
@@ -262,10 +269,17 @@ func (m *Manager) nicRemove(ctx pm.Context) (interface{}, error) {
 		return nil, pm.NotFoundError(fmt.Errorf("container does not exist"))
 	}
 
-	if args.Index < 0 || args.Index >= len(container.Args.Nics) {
+	config, err := container.config()
+	if err != nil {
+		return nil, err
+	}
+
+	defer config.WriteRelease()
+
+	if args.Index < 0 || args.Index >= len(config.Nics) {
 		return nil, pm.BadRequestError(fmt.Errorf("nic index out of range"))
 	}
-	nic := container.Args.Nics[args.Index]
+	nic := config.Nics[args.Index]
 	if nic.State != NicStateConfigured {
 		return nil, pm.PreconditionFailedError(fmt.Errorf("nic is in '%s' state", nic.State))
 	}
@@ -311,7 +325,10 @@ func (m *Manager) createContainer(args ContainerCreateArguments) (*container, er
 	}
 
 	id := m.getNextSequence()
-	c := newContainer(m, id, args)
+	c, err := newContainer(m, id, args)
+	if err != nil {
+		return nil, err
+	}
 	m.setContainer(id, c)
 
 	if _, err := c.Start(); err != nil {
@@ -359,7 +376,9 @@ func (m *Manager) create(ctx pm.Context) (interface{}, error) {
 
 type ContainerInfo struct {
 	pm.ProcessStats
-	Container Container `json:"container"`
+	ID        uint16                   `json:"id"`
+	Root      string                   `json:"root"`
+	Container ContainerCreateArguments `json:"container"`
 }
 
 func (m *Manager) getByName(name string) *container {
@@ -367,7 +386,8 @@ func (m *Manager) getByName(name string) *container {
 	defer m.conM.RUnlock()
 
 	for _, c := range m.containers {
-		if strings.EqualFold(c.Args.Name, name) {
+		arguments, _ := c.Arguments()
+		if strings.EqualFold(arguments.Name, name) {
 			return c
 		}
 	}
@@ -416,9 +436,13 @@ func (m *Manager) get(ctx pm.Context) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	arguments, err := cont.Arguments()
+	if err != nil {
+		return nil, err
+	}
 
-	cont.Args.Port = ports
-	return cont, nil
+	arguments.Port = ports
+	return arguments, nil
 }
 
 func (m *Manager) list(ctx pm.Context) (interface{}, error) {
@@ -432,7 +456,13 @@ func (m *Manager) list(ctx pm.Context) (interface{}, error) {
 	m.conM.RLock()
 	defer m.conM.RUnlock()
 	for id, c := range m.containers {
-		c.Args.Port, _ = rules[c.forwardId()]
+		arguments, err := c.Arguments()
+		if err != nil {
+			log.Errorf("failed to load container info %d: %s", id, err)
+			continue
+		}
+
+		arguments.Port, _ = rules[c.forwardId()]
 		name := fmt.Sprintf("core-%d", id)
 		job, ok := m.api.JobOf(name)
 		if !ok {
@@ -447,7 +477,9 @@ func (m *Manager) list(ctx pm.Context) (interface{}, error) {
 		}
 		containers[id] = ContainerInfo{
 			ProcessStats: state,
-			Container:    c,
+			ID:           c.ID(),
+			Root:         c.root(),
+			Container:    arguments,
 		}
 	}
 
@@ -560,25 +592,28 @@ func (m *Manager) find(ctx pm.Context) (interface{}, error) {
 				state = *(stater.Stats())
 			}
 		}
-
+		arguments, _ := c.Arguments()
 		result[c.ID()] = ContainerInfo{
 			ProcessStats: state,
-			Container:    c,
+			ID:           c.ID(),
+			Root:         c.root(),
+			Container:    arguments,
 		}
 	}
 
 	return result, nil
 }
 
-func (m *Manager) GetWithTags(tags ...string) []Container {
+func (m *Manager) GetWithTags(tags ...string) []*container {
 	m.conM.RLock()
 	defer m.conM.RUnlock()
 
-	var result []Container
+	var result []*container
 loop:
 	for _, c := range m.containers {
+		arguments, _ := c.Arguments()
 		for _, tag := range tags {
-			if !utils.InString(c.Args.Tags, tag) {
+			if !utils.InString(arguments.Tags, tag) {
 				continue loop
 			}
 		}
@@ -618,8 +653,14 @@ func (m *Manager) portforwardAdd(ctx pm.Context) (interface{}, error) {
 	if !ok {
 		return nil, pm.NotFoundError(fmt.Errorf("container does not exist"))
 	}
+
+	arguments, err := container.Arguments()
+	if err != nil {
+		return nil, err
+	}
+
 	var defaultNic bool
-	for _, nic := range container.Args.Nics {
+	for _, nic := range arguments.Nics {
 		if nic.Type == "default" {
 			defaultNic = true
 			break

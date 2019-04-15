@@ -43,18 +43,17 @@ func (c *container) flistConfigOverride(target string, cfg map[string]string) er
 //mergeFList layers one (and only one) flist on top of the container root flist
 //usually used for debugging
 func (c *container) mergeFList(src string) error {
+	arguments, err := c.Arguments()
+	if err != nil {
+		return err
+	}
 	namespace := fmt.Sprintf("containers/%s", c.name())
-	return c.mgr.filesystem().MergeFList(namespace, c.root(), c.Args.Root, src)
+	return c.mgr.filesystem().MergeFList(namespace, c.root(), arguments.Root, src)
 }
 
-func (c *container) mountFList(src string, target string, cfg map[string]string, hooks ...pm.RunnerHook) error {
+func (c *container) mountFList(storage, src string, target string, cfg map[string]string, hooks ...pm.RunnerHook) error {
 	//check
 	namespace := fmt.Sprintf("containers/%s/fs", c.name())
-	storage := c.Args.Storage
-	if storage == "" {
-		storage = settings.Settings.Globals.Get("storage", "zdb://hub.grid.tf:9900")
-		c.Args.Storage = storage
-	}
 
 	err := c.mgr.filesystem().MountFList(namespace, storage, src, target, hooks...)
 	if err != nil {
@@ -66,6 +65,10 @@ func (c *container) mountFList(src string, target string, cfg map[string]string,
 	}
 
 	return nil
+}
+
+func (c *container) configFile() string {
+	return path.Join(c.workingDir(), "config.json")
 }
 
 func (c *container) workingDir() string {
@@ -144,7 +147,7 @@ func (c *container) touch(p string) error {
 	return f.Close()
 }
 
-func (c *container) sandbox() error {
+func (c *container) sandbox(args *ContainerCreateArguments) error {
 	//mount root flist.
 	//prepare root folder.
 	//make sure we remove the directory
@@ -172,13 +175,19 @@ func (c *container) sandbox() error {
 		},
 	}
 
-	if err := c.mountFList(c.Args.Root, root, c.Args.Config, onSBExit); err != nil {
+	storage := args.Storage
+	if storage == "" {
+		storage = settings.Settings.Globals.Get("storage", "zdb://hub.grid.tf:9900")
+		args.Storage = storage
+	}
+
+	if err := c.mountFList(storage, args.Root, root, args.Config, onSBExit); err != nil {
 		return fmt.Errorf("mount-root-flist(%s)", err)
 	}
 
 	os.MkdirAll(path.Join(root, "etc"), 0755)
 
-	for src, dst := range c.Args.Mount {
+	for src, dst := range args.Mount {
 		target := path.Join(root, dst)
 
 		//src can either be a location on HD, or another flist
@@ -208,7 +217,7 @@ func (c *container) sandbox() error {
 				return err
 			}
 			//assume a flist
-			if err := c.mountFList(src, target, nil); err != nil {
+			if err := c.mountFList(storage, src, target, nil); err != nil {
 				return fmt.Errorf("mount-bind-flist(%s)", err)
 			}
 		}

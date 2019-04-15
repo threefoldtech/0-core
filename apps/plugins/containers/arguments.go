@@ -173,6 +173,7 @@ func NewConfig(path string, args ContainerCreateArguments) (*ContainerConfig, er
 
 	config.ContainerCreateArguments = args
 	if err := config.Write(); err != nil {
+		config.Release()
 		return nil, err
 	}
 
@@ -208,6 +209,11 @@ func (a *ContainerConfig) Write() error {
 	return enc.Encode(&a.ContainerCreateArguments)
 }
 
+//WriteRelease write and release. the release is performed even if the write fails
+func (a *ContainerConfig) WriteRelease() error {
+	defer a.Release()
+	return a.Write()
+}
 func (a *ContainerConfig) load() error {
 	if _, err := a.file.Seek(0, 0); err != nil {
 		return err
