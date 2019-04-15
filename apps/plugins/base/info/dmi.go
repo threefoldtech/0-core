@@ -12,7 +12,7 @@ import (
 )
 
 // DMIDecoderVersion is the information about the decoder in this package
-const DMIDecoderVersion = `0-core Go dmi decoder v0.1.0`
+const DMIDecoderVersion = `0-core Go dmi decoder v0.2.0`
 
 //DMIType (allowed types 0 -> 42)
 type DMIType int
