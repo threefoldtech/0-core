@@ -204,9 +204,13 @@ func (a *ContainerConfig) Write() error {
 		return err
 	}
 	enc := json.NewEncoder(a.file)
-	enc.SetIndent("", "")
+	enc.SetIndent("", " ")
 
-	return enc.Encode(&a.ContainerCreateArguments)
+	if err := enc.Encode(a.ContainerCreateArguments); err != nil {
+		return err
+	}
+
+	return a.file.Sync()
 }
 
 //WriteRelease write and release. the release is performed even if the write fails

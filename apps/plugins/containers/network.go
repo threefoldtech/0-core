@@ -27,7 +27,7 @@ const (
 )
 
 func (c *container) preStartHostNetworking() error {
-	p := path.Join(c.root(), "etc", "resolv.conf")
+	p := path.Join(c.Root(), "etc", "resolv.conf")
 	os.Remove(p)
 	ioutil.WriteFile(p, []byte{}, 0644) //touch the file.
 	return syscall.Mount("/etc/resolv.conf", p, "", syscall.MS_BIND, "")
@@ -118,17 +118,21 @@ func (c *container) watchZerotier(job pm.Job) {
 }
 
 func (c *container) zerotierDaemon() error {
+	arguments, err := c.Arguments()
+	if err != nil {
+		return err
+	}
 	c.zto.Do(func() {
 		home := c.zerotierHome()
 		os.RemoveAll(home)
 		os.MkdirAll(home, 0755)
 
-		if len(c.Args.Identity) > 0 {
+		if len(arguments.Identity) > 0 {
 			//set zt identity
-			if err := ioutil.WriteFile(path.Join(c.zerotierHome(), "identity.secret"), []byte(c.Args.Identity), 0600); err != nil {
+			if err := ioutil.WriteFile(path.Join(c.zerotierHome(), "identity.secret"), []byte(arguments.Identity), 0600); err != nil {
 				log.Errorf("failed to write zerotier secret identity: %v", err)
 			}
-			parts := strings.Split(c.Args.Identity, ":")
+			parts := strings.Split(arguments.Identity, ":")
 			public := strings.Join(parts[:len(parts)-1], ":")
 			if err := ioutil.WriteFile(path.Join(c.zerotierHome(), "identity.public"), []byte(public), 0644); err != nil {
 				log.Errorf("failed to write zerotier public identity: %v", err)
@@ -210,7 +214,7 @@ func (c *container) setupLink(src, target string, index int, n *Nic) error {
 						"udhcpc", "-q", "-i", target, "-s", "/usr/share/udhcp/simple.script",
 					},
 					Env: map[string]string{
-						"ROOT": c.root(),
+						"ROOT": c.Root(),
 					},
 				},
 			),
@@ -430,8 +434,8 @@ func (c *container) getDefaultIP() net.IP {
 }
 
 func (c *container) setDNS(dns string) error {
-	os.MkdirAll(path.Join(c.root(), "etc"), 0755)
-	file, err := os.OpenFile(path.Join(c.root(), "etc", "resolv.conf"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	os.MkdirAll(path.Join(c.Root(), "etc"), 0755)
+	file, err := os.OpenFile(path.Join(c.Root(), "etc", "resolv.conf"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
@@ -451,8 +455,8 @@ func (c *container) setPortForward(host string, dest int) error {
 	return c.mgr.socat().SetPortForward(c.forwardId(), ip, host, dest)
 }
 
-func (c *container) setPortForwards() error {
-	for host, dest := range c.Args.Port {
+func (c *container) setPortForwards(args *ContainerCreateArguments) error {
+	for host, dest := range args.Port {
 		if err := c.setPortForward(host, dest); err != nil {
 			return err
 		}
@@ -490,7 +494,7 @@ func (c *container) postDefaultNetwork(name string, idx int, net *Nic) error {
 	return nil
 }
 
-func (c *container) preDefaultNetwork(i int, net *Nic) error {
+func (c *container) preDefaultNetwork(config *ContainerConfig, i int, net *Nic) error {
 	//Add to the default bridge
 
 	defnet := &Nic{
@@ -505,7 +509,7 @@ func (c *container) preDefaultNetwork(i int, net *Nic) error {
 		return err
 	}
 
-	if err := c.setPortForwards(); err != nil {
+	if err := c.setPortForwards(&config.ContainerCreateArguments); err != nil {
 		return err
 	}
 
@@ -601,7 +605,7 @@ func (c *container) postVlanNetwork(name string, idx int, net *Nic) error {
 	return c.postBridge(name, idx, net)
 }
 
-func (c *container) postStartNetwork(idx int, network *Nic) (err error) {
+func (c *container) postStartNetwork(config *ContainerConfig, idx int, network *Nic) (err error) {
 	var name string
 	name = fmt.Sprintf("eth%d", idx)
 	if network.Name != "" {
@@ -653,13 +657,13 @@ func (c *container) setupLO() error {
 	}
 
 	return ioutil.WriteFile(
-		path.Join(c.root(), "etc", "hosts"),
+		path.Join(c.Root(), "etc", "hosts"),
 		[]byte(hostsFile),
 		0644,
 	)
 }
 
-func (c *container) postStartIsolatedNetworking() error {
+func (c *container) postStartIsolatedNetworking(config *ContainerConfig) error {
 	if err := c.namespace(); err != nil {
 		return err
 	}
@@ -668,8 +672,8 @@ func (c *container) postStartIsolatedNetworking() error {
 		return err
 	}
 
-	for idx, network := range c.Args.Nics {
-		if err := c.postStartNetwork(idx, network); err != nil {
+	for idx, network := range config.Nics {
+		if err := c.postStartNetwork(config, idx, network); err != nil {
 			log.Errorf("failed to initialize network '%v': %s", network, err)
 		}
 	}
@@ -677,7 +681,7 @@ func (c *container) postStartIsolatedNetworking() error {
 	return nil
 }
 
-func (c *container) preStartNetwork(idx int, network *Nic) (err error) {
+func (c *container) preStartNetwork(config *ContainerConfig, idx int, network *Nic) (err error) {
 	network.State = NicStateUnknown
 	switch network.Type {
 	case "vxlan":
@@ -685,7 +689,7 @@ func (c *container) preStartNetwork(idx int, network *Nic) (err error) {
 	case "vlan":
 		err = c.preVlanNetwork(idx, network)
 	case "default":
-		err = c.preDefaultNetwork(idx, network)
+		err = c.preDefaultNetwork(config, idx, network)
 	case "bridge":
 		err = c.preBridge(idx, network.ID, network, nil)
 	case "macvlan":
@@ -704,9 +708,9 @@ func (c *container) preStartNetwork(idx int, network *Nic) (err error) {
 	return
 }
 
-func (c *container) preStartIsolatedNetworking() error {
-	for idx, network := range c.Args.Nics {
-		if err := c.preStartNetwork(idx, network); err != nil {
+func (c *container) preStartIsolatedNetworking(config *ContainerConfig) error {
+	for idx, network := range config.Nics {
+		if err := c.preStartNetwork(config, idx, network); err != nil {
 			return err
 		}
 	}
@@ -788,14 +792,14 @@ func (c *container) destroyPassthroughNetwork(n *Nic) error {
 	return netlink.LinkSetName(link, n.ID)
 }
 
-func (c *container) destroyNetwork() {
+func (c *container) destroyNetwork(args *ContainerCreateArguments) {
 	log.Debugf("destroying networking for container: %s", c.id)
-	if c.Args.HostNetwork {
+	if args.HostNetwork {
 		//nothing to do.
 		return
 	}
 
-	for idx, network := range c.Args.Nics {
+	for idx, network := range args.Nics {
 		switch network.Type {
 		case "vxlan":
 			fallthrough
@@ -827,7 +831,7 @@ func (c *container) destroyNetwork() {
 		}
 		os.RemoveAll(targetNs)
 	}
-	for _, network := range c.Args.Nics {
+	for _, network := range args.Nics {
 		switch network.Type {
 		case "passthrough":
 			if err := c.destroyPassthroughNetwork(network); err != nil {

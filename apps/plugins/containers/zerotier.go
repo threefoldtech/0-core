@@ -17,12 +17,7 @@ func (m *Manager) ztInfo(ctx pm.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	m.conM.RLock()
-	cont, ok := m.containers[args.Container]
-	m.conM.RUnlock()
-	if !ok {
-		return nil, fmt.Errorf("container does not exist")
-	}
+	cont := loadContainer(m, args.Container)
 
 	job, err := m.api.System(
 		"ip", "netns", "exec", fmt.Sprintf("%d", args.Container),
@@ -52,12 +47,7 @@ func (m *Manager) ztList(ctx pm.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	m.conM.RLock()
-	cont, ok := m.containers[args.Container]
-	m.conM.RUnlock()
-	if !ok {
-		return nil, fmt.Errorf("container does not exist")
-	}
+	cont := loadContainer(m, args.Container)
 
 	job, err := m.api.System(
 		"ip", "netns", "exec", fmt.Sprintf("%d", args.Container),

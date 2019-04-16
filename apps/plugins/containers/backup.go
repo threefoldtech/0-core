@@ -37,13 +37,7 @@ func (m *Manager) backup(ctx pm.Context) (interface{}, error) {
 		return nil, fmt.Errorf("invalid container id")
 	}
 
-	m.conM.RLock()
-	cont, ok := m.containers[args.Container]
-	m.conM.RUnlock()
-
-	if !ok {
-		return nil, fmt.Errorf("container does not exist")
-	}
+	cont := loadContainer(m, args.Container)
 
 	//pause container
 	//TODO: avoid race if cont has just started and pid is not set yet!
@@ -73,8 +67,11 @@ func (m *Manager) backup(ctx pm.Context) (interface{}, error) {
 		"--exclude", "dev/**",
 		"--exclude", "sys/**",
 	}
-
-	for _, tag := range cont.Args.Tags {
+	arguments, err := cont.Arguments()
+	if err != nil {
+		return nil, err
+	}
+	for _, tag := range arguments.Tags {
 		restic = append(restic, "--tag", tag)
 	}
 
@@ -82,19 +79,18 @@ func (m *Manager) backup(ctx pm.Context) (interface{}, error) {
 		restic = append(restic, "--tag", tag)
 	}
 
-	root := cont.root()
+	root := cont.Root()
 
 	//write meta
-	cargs := cont.Args
 	var nics []*Nic
-	for _, n := range cargs.Nics {
+	for _, n := range arguments.Nics {
 		if n.State == NicStateConfigured {
 			nics = append(nics, n)
 		}
 	}
-	cargs.Nics = nics
+	arguments.Nics = nics
 	mf := path.Join(root, backupMetaName)
-	meta, err := json.Marshal(cargs)
+	meta, err := json.Marshal(arguments)
 	if err != nil {
 		return nil, err
 	}

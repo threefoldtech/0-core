@@ -22,7 +22,7 @@ func (m *Manager) zflist(args ...string) (*pm.JobResult, error) {
 }
 
 func containerPath(container *container, path string) string {
-	return filepath.Join(container.Root, path)
+	return filepath.Join(container.Root(), path)
 }
 
 type createArgs struct {
@@ -70,13 +70,7 @@ func (m *Manager) flistCreate(ctx pm.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	m.conM.RLock()
-	cont, ok := m.containers[args.Container]
-	m.conM.RUnlock()
-
-	if !ok {
-		return nil, fmt.Errorf("container does not exist")
-	}
+	cont := loadContainer(m, args.Container)
 
 	//pause container
 	//TODO: avoid race if cont has just started and pid is not set yet!

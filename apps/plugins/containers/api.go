@@ -5,7 +5,8 @@ import "github.com/threefoldtech/0-core/base/pm"
 //Container api
 type Container interface {
 	ID() uint16
-	//Arguments() ContainerCreateArguments
+	Arguments() (ContainerCreateArguments, error)
+	Root() string
 }
 
 //API defines container plugin api

@@ -3,13 +3,15 @@ package containers
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"net"
+	"os"
+	"path"
 	"strings"
 	"sync"
 
 	"github.com/pborman/uuid"
-	"github.com/threefoldtech/0-core/apps/core0/screen"
 	"github.com/threefoldtech/0-core/apps/plugins/cgroup"
 	"github.com/threefoldtech/0-core/apps/plugins/protocol"
 	"github.com/threefoldtech/0-core/apps/plugins/socat"
@@ -92,9 +94,6 @@ type Manager struct {
 
 	sequence uint16
 	seqM     sync.Mutex
-
-	containers map[uint16]*container
-	conM       sync.RWMutex
 }
 
 func (m *Manager) cgroup() cgroup.API {
@@ -172,34 +171,30 @@ func (m *Manager) setUpDefaultBridge() error {
 func (m *Manager) getNextSequence() uint16 {
 	m.seqM.Lock()
 	defer m.seqM.Unlock()
-	//get a read lock on the container dict as well
-	m.conM.RLock()
-	defer m.conM.RUnlock()
 
 	for {
 		m.sequence += 1
-		if m.sequence != 0 && m.sequence < math.MaxUint16 {
-			if _, ok := m.containers[m.sequence]; !ok {
-				break
-			}
+		_, err := os.Stat(path.Join(BackendBaseDir, fmt.Sprint(m.sequence)))
+		if os.IsNotExist(err) {
+			return m.sequence
 		}
 	}
 	return m.sequence
 }
 
 func (m *Manager) setContainer(id uint16, c *container) {
-	m.conM.Lock()
-	defer m.conM.Unlock()
-	m.containers[id] = c
-	screen.Refresh()
+	// m.conM.Lock()
+	// defer m.conM.Unlock()
+	// m.containers[id] = c
+	// screen.Refresh()
 }
 
 //cleanup is called when a container terminates.
 func (m *Manager) unsetContainer(id uint16) {
-	m.conM.Lock()
-	defer m.conM.Unlock()
-	delete(m.containers, id)
-	screen.Refresh()
+	// m.conM.Lock()
+	// defer m.conM.Unlock()
+	// delete(m.containers, id)
+	// screen.Refresh()
 }
 
 func (m *Manager) nicAdd(ctx pm.Context) (interface{}, error) {
@@ -212,12 +207,7 @@ func (m *Manager) nicAdd(ctx pm.Context) (interface{}, error) {
 		return nil, pm.BadRequestError(err)
 	}
 
-	m.conM.RLock()
-	defer m.conM.RUnlock()
-	container, ok := m.containers[args.Container]
-	if !ok {
-		return nil, pm.NotFoundError(fmt.Errorf("container does not exist"))
-	}
+	container := loadContainer(m, args.Container)
 
 	config, err := container.config()
 	if err != nil {
@@ -241,11 +231,11 @@ func (m *Manager) nicAdd(ctx pm.Context) (interface{}, error) {
 		return nil, pm.BadRequestError(err)
 	}
 
-	if err := container.preStartNetwork(idx, &args.Nic); err != nil {
+	if err := container.preStartNetwork(config, idx, &args.Nic); err != nil {
 		return nil, err
 	}
 
-	if err := container.postStartNetwork(idx, &args.Nic); err != nil {
+	if err := container.postStartNetwork(config, idx, &args.Nic); err != nil {
 		return nil, err
 	}
 
@@ -262,12 +252,7 @@ func (m *Manager) nicRemove(ctx pm.Context) (interface{}, error) {
 		return nil, pm.BadRequestError(err)
 	}
 
-	m.conM.RLock()
-	defer m.conM.RUnlock()
-	container, ok := m.containers[args.Container]
-	if !ok {
-		return nil, pm.NotFoundError(fmt.Errorf("container does not exist"))
-	}
+	container := loadContainer(m, args.Container)
 
 	config, err := container.config()
 	if err != nil {
@@ -312,9 +297,11 @@ func (m *Manager) createContainer(args ContainerCreateArguments) (*container, er
 		return nil, err
 	}
 
-	m.conM.RLock()
-	count := len(m.containers)
-	m.conM.RUnlock()
+	containers, err := m.getContainers()
+	if err != nil {
+		return nil, err
+	}
+	count := len(containers)
 	limit := settings.Settings.Containers.MaxCount
 	if limit == 0 {
 		limit = ContainersHardLimit
@@ -329,7 +316,7 @@ func (m *Manager) createContainer(args ContainerCreateArguments) (*container, er
 	if err != nil {
 		return nil, err
 	}
-	m.setContainer(id, c)
+	//m.setContainer(id, c)
 
 	if _, err := c.Start(); err != nil {
 		return nil, err
@@ -382,10 +369,9 @@ type ContainerInfo struct {
 }
 
 func (m *Manager) getByName(name string) *container {
-	m.conM.RLock()
-	defer m.conM.RUnlock()
+	containers, _ := m.getContainers()
 
-	for _, c := range m.containers {
+	for _, c := range containers {
 		arguments, _ := c.Arguments()
 		if strings.EqualFold(arguments.Name, name) {
 			return c
@@ -396,12 +382,7 @@ func (m *Manager) getByName(name string) *container {
 }
 
 func (m *Manager) getByID(id uint16) *container {
-	m.conM.RLock()
-	defer m.conM.RUnlock()
-
-	c, _ := m.containers[id]
-
-	return c
+	return loadContainer(m, id)
 }
 
 func (m *Manager) get(ctx pm.Context) (interface{}, error) {
@@ -453,9 +434,8 @@ func (m *Manager) list(ctx pm.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	m.conM.RLock()
-	defer m.conM.RUnlock()
-	for id, c := range m.containers {
+	source, _ := m.getContainers()
+	for id, c := range source {
 		arguments, err := c.Arguments()
 		if err != nil {
 			log.Errorf("failed to load container info %d: %s", id, err)
@@ -478,7 +458,7 @@ func (m *Manager) list(ctx pm.Context) (interface{}, error) {
 		containers[id] = ContainerInfo{
 			ProcessStats: state,
 			ID:           c.ID(),
-			Root:         c.root(),
+			Root:         c.Root(),
 			Container:    arguments,
 		}
 	}
@@ -506,13 +486,7 @@ func (m *Manager) dispatch(ctx pm.Context) (interface{}, error) {
 		return nil, fmt.Errorf("invalid container id")
 	}
 
-	m.conM.RLock()
-	cont, ok := m.containers[args.Container]
-	m.conM.RUnlock()
-
-	if !ok {
-		return nil, fmt.Errorf("container does not exist")
-	}
+	cont := loadContainer(m, args.Container)
 
 	if args.Command.ID == "" {
 		args.Command.ID = uuid.New()
@@ -529,13 +503,7 @@ func (m *Manager) dispatch(ctx pm.Context) (interface{}, error) {
 func (m *Manager) Dispatch(id uint16, cmd *pm.Command) (*pm.JobResult, error) {
 	cmd.ID = uuid.New()
 
-	m.conM.RLock()
-	cont, ok := m.containers[id]
-	m.conM.RUnlock()
-
-	if !ok {
-		return nil, fmt.Errorf("container does not exist")
-	}
+	cont := loadContainer(m, id)
 
 	if err := m.pushToContainer(cont, cmd); err != nil {
 		return nil, err
@@ -555,14 +523,8 @@ func (m *Manager) terminate(ctx pm.Context) (interface{}, error) {
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, err
 	}
-	m.conM.RLock()
-	container, ok := m.containers[args.Container]
-	m.conM.RUnlock()
 
-	if !ok {
-		return nil, fmt.Errorf("no container with id '%d'", args.Container)
-	}
-
+	container := loadContainer(m, args.Container)
 	return nil, container.Terminate()
 }
 
@@ -592,11 +554,12 @@ func (m *Manager) find(ctx pm.Context) (interface{}, error) {
 				state = *(stater.Stats())
 			}
 		}
+
 		arguments, _ := c.Arguments()
 		result[c.ID()] = ContainerInfo{
 			ProcessStats: state,
 			ID:           c.ID(),
-			Root:         c.root(),
+			Root:         c.Root(),
 			Container:    arguments,
 		}
 	}
@@ -604,13 +567,36 @@ func (m *Manager) find(ctx pm.Context) (interface{}, error) {
 	return result, nil
 }
 
-func (m *Manager) GetWithTags(tags ...string) []*container {
-	m.conM.RLock()
-	defer m.conM.RUnlock()
+func (m *Manager) getContainers() (map[uint16]*container, error) {
+	dirs, err := ioutil.ReadDir(BackendBaseDir)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[uint16]*container)
+	for _, dir := range dirs {
+		if !dir.IsDir() {
+			continue
+		}
 
-	var result []*container
+		var id uint16
+		if _, err := fmt.Sscanf(dir.Name(), "%d", &id); err != nil {
+			log.Warningf("invalid container id found (%s)", dir.Name())
+			continue
+		}
+
+		container := loadContainer(m, id)
+		result[id] = container
+	}
+
+	return result, nil
+}
+
+func (m *Manager) GetWithTags(tags ...string) []Container {
+	containers, _ := m.getContainers()
+
+	var result []Container
 loop:
-	for _, c := range m.containers {
+	for _, c := range containers {
 		arguments, _ := c.Arguments()
 		for _, tag := range tags {
 			if !utils.InString(arguments.Tags, tag) {
@@ -633,10 +619,7 @@ func (m *Manager) GetOneWithTags(tags ...string) Container {
 }
 
 func (m *Manager) Of(id uint16) Container {
-	m.conM.RLock()
-	defer m.conM.RUnlock()
-	cont, _ := m.containers[id]
-	return cont
+	return loadContainer(m, id)
 }
 
 func (m *Manager) portforwardAdd(ctx pm.Context) (interface{}, error) {
@@ -646,13 +629,7 @@ func (m *Manager) portforwardAdd(ctx pm.Context) (interface{}, error) {
 		return nil, pm.BadRequestError(err)
 	}
 
-	m.conM.RLock()
-	defer m.conM.RUnlock()
-
-	container, ok := m.containers[args.Container]
-	if !ok {
-		return nil, pm.NotFoundError(fmt.Errorf("container does not exist"))
-	}
+	container := loadContainer(m, args.Container)
 
 	arguments, err := container.Arguments()
 	if err != nil {
@@ -683,15 +660,7 @@ func (m *Manager) portforwardRemove(ctx pm.Context) (interface{}, error) {
 	if err := json.Unmarshal(*cmd.Arguments, &args); err != nil {
 		return nil, pm.BadRequestError(err)
 	}
-
-	m.conM.RLock()
-	defer m.conM.RUnlock()
-
-	container, ok := m.containers[args.Container]
-	if !ok {
-		return nil, pm.NotFoundError(fmt.Errorf("container does not exist"))
-	}
-
+	container := loadContainer(m, args.Container)
 	if err := m.socat().RemovePortForward(container.forwardId(), args.HostPort, args.ContainerPort); err != nil {
 		return nil, err
 	}
@@ -709,13 +678,7 @@ func (m *Manager) flistLayer(ctx pm.Context) (interface{}, error) {
 		return nil, pm.BadRequestError(err)
 	}
 
-	m.conM.RLock()
-	defer m.conM.RUnlock()
-
-	container, ok := m.containers[args.Container]
-	if !ok {
-		return nil, pm.NotFoundError(fmt.Errorf("container does not exist"))
-	}
+	container := loadContainer(m, args.Container)
 
 	return nil, container.mergeFList(args.FList)
 }

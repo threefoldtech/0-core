@@ -58,8 +58,6 @@ func main() {}
 
 func iniManager(mgr *Manager, api plugin.API) error {
 	mgr.api = api
-
-	mgr.containers = make(map[uint16]*container)
 	log.Debugf("setting up containers cgroups")
 	if err := mgr.setUpCGroups(); err != nil {
 		return err

@@ -48,7 +48,7 @@ func (c *container) mergeFList(src string) error {
 		return err
 	}
 	namespace := fmt.Sprintf("containers/%s", c.name())
-	return c.mgr.filesystem().MergeFList(namespace, c.root(), arguments.Root, src)
+	return c.mgr.filesystem().MergeFList(namespace, c.Root(), arguments.Root, src)
 }
 
 func (c *container) mountFList(storage, src string, target string, cfg map[string]string, hooks ...pm.RunnerHook) error {
@@ -79,7 +79,7 @@ func (c *container) fsDir() string {
 	return path.Join(c.workingDir(), "fs")
 }
 
-func (c *container) root() string {
+func (c *container) Root() string {
 	return path.Join(ContainerBaseRootDir, c.name())
 }
 
@@ -164,7 +164,7 @@ func (c *container) sandbox(args *ContainerCreateArguments) error {
 		c.mgr.api.System("btrfs", "subvolume", "create", workDir)
 	}
 
-	root := c.root()
+	root := c.Root()
 	log.Debugf("Container root: %s", root)
 	os.RemoveAll(root)
 
@@ -237,6 +237,8 @@ func (c *container) sandbox(args *ContainerCreateArguments) error {
 }
 
 func (c *container) cleanSandbox() {
+	return
+
 	c.unMountAll()
 
 	if c.getFSType(BackendBaseDir) == "btrfs" {
@@ -245,7 +247,7 @@ func (c *container) cleanSandbox() {
 		os.RemoveAll(path.Join(BackendBaseDir, c.name()))
 	}
 
-	os.RemoveAll(c.root())
+	os.RemoveAll(c.Root())
 }
 
 func (c *container) unMountAll() error {
@@ -253,7 +255,7 @@ func (c *container) unMountAll() error {
 	if err != nil {
 		return err
 	}
-	root := c.root()
+	root := c.Root()
 	var targets []string
 	for _, line := range strings.Split(string(mnts), "\n") {
 		fields := strings.Fields(line)

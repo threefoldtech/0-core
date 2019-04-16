@@ -26,9 +26,7 @@ type container struct {
 	mgr *Manager
 
 	runner pm.Job
-	//Args   ContainerCreateArguments `json:"arguments"`
-	Root string `json:"root"`
-	PID  int    `json:"pid"`
+	PID    int `json:"pid"`
 
 	zterr       error
 	zto         sync.Once
@@ -56,6 +54,14 @@ func newContainer(mgr *Manager, id uint16, args ContainerCreateArguments) (*cont
 	return c, nil
 }
 
+func loadContainer(mgr *Manager, id uint16) *container {
+	c := &container{
+		mgr: mgr,
+		id:  id,
+	}
+	return c
+}
+
 func (c *container) config() (*ContainerConfig, error) {
 	return LoadConfig(c.configFile())
 }
@@ -78,7 +84,7 @@ func (c *container) dispatch(cmd *pm.Command) error {
 func (c *container) Arguments() (args ContainerCreateArguments, err error) {
 	conf, err := c.config()
 	if err != nil {
-		return args, err
+		return args, fmt.Errorf("failed to get arguments: %s", err)
 	}
 
 	defer conf.Release()
@@ -99,12 +105,12 @@ func (c *container) Start() (runner pm.Job, err error) {
 		return nil, err
 	}
 
+	log.Info("Container Config: %s", config)
+
 	defer func() {
-		if err := config.Write(); err != nil {
+		if err := config.WriteRelease(); err != nil {
 			log.Errorf("failed to write container config: %s", err)
 		}
-
-		config.Release()
 	}()
 
 	if err = c.sandbox(&config.ContainerCreateArguments); err != nil {
@@ -119,7 +125,7 @@ func (c *container) Start() (runner pm.Job, err error) {
 	}
 
 	//if err := syscall.Mkfifo()
-	if err = c.preStart(); err != nil {
+	if err = c.preStart(config); err != nil {
 		log.Errorf("error in container prestart: %s", err)
 		return
 	}
@@ -149,7 +155,7 @@ func (c *container) Start() (runner pm.Job, err error) {
 		Arguments: pm.MustArguments(
 			pm.ContainerCommandArguments{
 				Name:        "/coreX",
-				Chroot:      c.root(),
+				Chroot:      c.Root(),
 				Dir:         "/",
 				HostNetwork: arguments.HostNetwork,
 				Args:        args,
@@ -187,17 +193,12 @@ func (c *container) Terminate() error {
 	return nil
 }
 
-func (c *container) preStart() error {
-	arguments, err := c.Arguments()
-	if err != nil {
-		return err
-	}
-
-	if arguments.HostNetwork {
+func (c *container) preStart(config *ContainerConfig) error {
+	if config.HostNetwork {
 		return c.preStartHostNetworking()
 	}
 
-	if err := c.preStartIsolatedNetworking(); err != nil {
+	if err := c.preStartIsolatedNetworking(config); err != nil {
 		return err
 	}
 
@@ -205,17 +206,17 @@ func (c *container) preStart() error {
 }
 
 func (c *container) onStart(pid int) {
-	arguments, err := c.Arguments()
+	config, err := c.config()
 	if err != nil {
 		log.Error("failed to load container (%d) arguments: %s", c.id, err)
 		return
 	}
 	c.PID = pid
-	if !arguments.Privileged {
-		arguments.CGroups = append(arguments.CGroups, DevicesCGroup)
+	if !config.Privileged {
+		config.CGroups = append(config.CGroups, DevicesCGroup)
 	}
 
-	for _, cgroup := range arguments.CGroups {
+	for _, cgroup := range config.CGroups {
 		group, err := c.mgr.cgroup().Get(cgroup.Subsystem(), cgroup.Name())
 		if err != nil {
 			log.Errorf("can't find cgroup %s", err)
@@ -225,7 +226,7 @@ func (c *container) onStart(pid int) {
 		group.Task(pid)
 	}
 
-	if err := c.postStart(arguments); err != nil {
+	if err := c.postStart(config); err != nil {
 		log.Errorf("container post start error: %s", err)
 		//TODO. Should we shut the container down?
 	}
@@ -247,8 +248,8 @@ func (c *container) onExit(state bool) {
 func (c *container) cleanup() {
 	log.Debugf("cleaning up container-%d", c.id)
 	defer c.mgr.unsetContainer(c.id)
-
-	c.destroyNetwork()
+	args, _ := c.Arguments()
+	c.destroyNetwork(&args)
 
 	if err := c.unMountAll(); err != nil {
 		log.Errorf("unmounting container-%d was not clean", err)
@@ -271,12 +272,12 @@ func (c *container) namespace() error {
 	return nil
 }
 
-func (c *container) postStart(arguments ContainerCreateArguments) error {
-	if arguments.HostNetwork {
+func (c *container) postStart(config *ContainerConfig) error {
+	if config.HostNetwork {
 		return nil
 	}
 
-	if err := c.postStartIsolatedNetworking(); err != nil {
+	if err := c.postStartIsolatedNetworking(config); err != nil {
 		log.Errorf("isolated networking error: %s", err)
 		return err
 	}
