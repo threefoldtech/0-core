@@ -12,7 +12,7 @@ import (
 )
 
 // DMIDecoderVersion is the information about the decoder in this package
-const DMIDecoderVersion = `0-core Go dmi decoder v0.1.0`
+const DMIDecoderVersion = `0-core Go dmi decoder v0.2.0`
 
 //DMIType (allowed types 0 -> 42)
 type DMIType int
@@ -30,8 +30,8 @@ k: [v]
 	]
 */
 type DMI struct {
-	Tooling  DMITooling            `json:"tooling"`
-	Sections map[string]DMISection `json:"sections"`
+	Tooling  DMITooling   `json:"tooling"`
+	Sections []DMISection `json:"sections"`
 }
 
 type DMITooling struct {
@@ -237,19 +237,20 @@ type PropertyData struct {
 
 // DMISection represents a complete section like BIOS or Baseboard
 type DMISection struct {
-	HandleLine  string                   `json:"handleline"`
-	TypeStr     string                   `json:"typestr,omitempty"`
-	Type        DMIType                  `json:"typenum"`
-	SubSections map[string]DMISubSection `json:"subsections"`
+	HandleLine  string          `json:"handleline"`
+	TypeStr     string          `json:"typestr,omitempty"`
+	Type        DMIType         `json:"typenum"`
+	SubSections []DMISubSection `json:"subsections"`
 }
 
 // DMISubSection represents part of a section, identified by a title
-type DMISubSection map[string]PropertyData
+type DMISubSection struct {
+	Title      string                  `json:"title"`
+	Properties map[string]PropertyData `json:"properties,omitempty"`
+}
 
 func newSection() DMISection {
-	return DMISection{
-		SubSections: make(map[string]DMISubSection),
-	}
+	return DMISection{}
 }
 
 func readSection(section *DMISection, lines []string, start int) (int, error) {
@@ -268,20 +269,24 @@ func readSection(section *DMISection, lines []string, start int) (int, error) {
 	section.Type = dmitype
 	section.TypeStr = DMITypeToString(dmitype)
 
-	subSection := make(DMISubSection)
-	subSectionTitle := lines[start]
+	subSection := DMISubSection{
+		Title:      lines[start],
+		Properties: make(map[string]PropertyData),
+	}
 	start++
 
 	for start < len(lines) {
 		line := lines[start]
 		if strings.TrimSpace(line) == "" {
-			section.SubSections[subSectionTitle] = subSection
+			section.SubSections = append(section.SubSections, subSection)
 			return start, nil
 		}
 		if !unicode.IsSpace([]rune(line)[0]) {
-			section.SubSections[subSectionTitle] = subSection
-			subSection = make(DMISubSection)
-			subSectionTitle = line
+			section.SubSections = append(section.SubSections, subSection)
+			subSection = DMISubSection{
+				Title:      line,
+				Properties: make(map[string]PropertyData),
+			}
 			start++
 			continue
 		}
@@ -300,9 +305,9 @@ func readSection(section *DMISection, lines []string, start int) (int, error) {
 		}
 
 		start++
-		subSection[key] = propertyData
+		subSection.Properties[key] = propertyData
 	}
-	section.SubSections[subSectionTitle] = subSection
+	section.SubSections = append(section.SubSections, subSection)
 	return start, nil
 }
 
@@ -325,7 +330,7 @@ func readList(propertyData *PropertyData, lines []string, start int) int {
 // ParseDMI Parses dmidecode output into DMI structure
 func ParseDMI(input string) (DMI, error) {
 	lines := strings.Split(input, "\n")
-	secs := make(map[string]DMISection)
+	secs := []DMISection{}
 
 	var (
 		start   int
@@ -358,7 +363,7 @@ func ParseDMI(input string) (DMI, error) {
 			if err != nil {
 				return DMI{}, err
 			}
-			secs[section.TypeStr] = section
+			secs = append(secs, section)
 		}
 	}
 
