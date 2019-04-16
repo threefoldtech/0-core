@@ -245,6 +245,61 @@ OEM-specific Type
 		Chassis Firmware
 			1.3.19
 `
+
+	sample7 = `
+# dmidecode 3.1
+Getting SMBIOS data from sysfs.
+SMBIOS 3.0.0 present.
+Table at 0x7AEAA000.
+
+Handle 0x0036, DMI type 17, 40 bytes
+Memory Device
+	Array Handle: 0x0035
+	Error Information Handle: Not Provided
+	Total Width: 64 bits
+	Data Width: 64 bits
+	Size: 8192 MB
+	Form Factor: SODIMM
+	Set: None
+	Locator: ChannelA-DIMM0
+	Bank Locator: BANK 0
+	Type: DDR4
+	Type Detail: Synchronous Unbuffered (Unregistered)
+	Speed: 2400 MT/s
+	Manufacturer: 859B
+	Serial Number: E0AD159C
+	Asset Tag: 9876543210
+	Part Number: CT8G4SFD824A.M16FB  
+	Rank: 2
+	Configured Clock Speed: 2133 MT/s
+	Minimum Voltage: 1.2 V
+	Maximum Voltage: 1.2 V
+	Configured Voltage: 1.2 V
+
+Handle 0x0037, DMI type 17, 40 bytes
+Memory Device
+	Array Handle: 0x0035
+	Error Information Handle: Not Provided
+	Total Width: 64 bits
+	Data Width: 64 bits
+	Size: 8192 MB
+	Form Factor: SODIMM
+	Set: None
+	Locator: ChannelB-DIMM0
+	Bank Locator: BANK 2
+	Type: DDR4
+	Type Detail: Synchronous Unbuffered (Unregistered)
+	Speed: 2400 MT/s
+	Manufacturer: 859B
+	Serial Number: E0AD159D
+	Asset Tag: 9876543210
+	Part Number: CT8G4SFD824A.M16FB  
+	Rank: 2
+	Configured Clock Speed: 2133 MT/s
+	Minimum Voltage: 1.2 V
+	Maximum Voltage: 1.2 V
+	Configured Voltage: 1.2 V
+`
 )
 
 var biosInfoTests = map[string]string{
@@ -322,112 +377,210 @@ var processorTests = map[string]string{
 	"Characteristics":    "",
 }
 
-var onBoardDevicesTests = map[string]DMISubSection{
-	"On Board Device 1 Information": {
-		"Description": PropertyData{
-			Val: "Intel(R) HD Graphics Device",
-		},
-		"Status": PropertyData{
-			Val: "Enabled",
-		},
-		"Type": PropertyData{
-			Val: "Video",
-		},
-	},
-	"On Board Device 2 Information": {
-		"Description": PropertyData{
-			Val: "Intel(R) I219-V Gigabit Network Device",
-		},
-		"Status": PropertyData{
-			Val: "Enabled",
-		},
-		"Type": PropertyData{
-			Val: "Ethernet",
+var onBoardDevicesTests = []DMISubSection{
+	{
+		Title: "On Board Device 1 Information",
+		Properties: map[string]PropertyData{
+			"Description": PropertyData{
+				Val: "Intel(R) HD Graphics Device",
+			},
+			"Status": PropertyData{
+				Val: "Enabled",
+			},
+			"Type": PropertyData{
+				Val: "Video",
+			},
 		},
 	},
-	"On Board Device 3 Information": {
-		"Description": PropertyData{
-			Val: "Realtek High Definition Audio Device",
+	{
+		Title: "On Board Device 2 Information",
+		Properties: map[string]PropertyData{
+			"Description": PropertyData{
+				Val: "Intel(R) I219-V Gigabit Network Device",
+			},
+			"Status": PropertyData{
+				Val: "Enabled",
+			},
+			"Type": PropertyData{
+				Val: "Ethernet",
+			},
 		},
-		"Status": PropertyData{
-			Val: "Enabled",
+	}, {
+		Title: "On Board Device 3 Information",
+		Properties: map[string]PropertyData{
+			"Description": PropertyData{
+				Val: "Realtek High Definition Audio Device",
+			},
+			"Status": PropertyData{
+				Val: "Enabled",
+			},
+			"Type": PropertyData{
+				Val: "Sound",
+			},
 		},
-		"Type": PropertyData{
-			Val: "Sound",
+	}, {
+		Title: "On Board Device 4 Information",
+		Properties: map[string]PropertyData{
+			"Description": PropertyData{
+				Val: "CIR Device",
+			},
+			"Status": PropertyData{
+				Val: "Enabled",
+			},
+			"Type": PropertyData{
+				Val: "Other",
+			},
 		},
-	},
-	"On Board Device 4 Information": {
-		"Description": PropertyData{
-			Val: "CIR Device",
+	}, {
+		Title: "On Board Device 5 Information",
+		Properties: map[string]PropertyData{
+			"Description": PropertyData{
+				Val: "SD",
+			},
+			"Status": PropertyData{
+				Val: "Enabled",
+			},
+			"Type": PropertyData{
+				Val: "Other",
+			},
 		},
-		"Status": PropertyData{
-			Val: "Enabled",
+	}, {
+		Title: "On Board Device 6 Information",
+		Properties: map[string]PropertyData{
+			"Description": PropertyData{
+				Val: "Intel Dual Band Wireless-AC 8265",
+			},
+			"Status": PropertyData{
+				Val: "Enabled",
+			},
+			"Type": PropertyData{
+				Val: "Other",
+			},
 		},
-		"Type": PropertyData{
-			Val: "Other",
+	}, {
+		Title: "On Board Device 7 Information",
+		Properties: map[string]PropertyData{
+			"Description": PropertyData{
+				Val: "Bluetooth",
+			},
+			"Status": PropertyData{
+				Val: "Enabled",
+			},
+			"Type": PropertyData{
+				Val: "Other",
+			},
 		},
-	},
-	"On Board Device 5 Information": {
-		"Description": PropertyData{
-			Val: "SD",
-		},
-		"Status": PropertyData{
-			Val: "Enabled",
-		},
-		"Type": PropertyData{
-			Val: "Other",
-		},
-	},
-	"On Board Device 6 Information": {
-		"Description": PropertyData{
-			Val: "Intel Dual Band Wireless-AC 8265",
-		},
-		"Status": PropertyData{
-			Val: "Enabled",
-		},
-		"Type": PropertyData{
-			Val: "Other",
-		},
-	},
-	"On Board Device 7 Information": {
-		"Description": PropertyData{
-			Val: "Bluetooth",
-		},
-		"Status": PropertyData{
-			Val: "Enabled",
-		},
-		"Type": PropertyData{
-			Val: "Other",
-		},
-	},
-	"On Board Device 8 Information": {
-		"Description": PropertyData{
-			Val: "Thunderbolt",
-		},
-		"Status": PropertyData{
-			Val: "Disabled",
-		},
-		"Type": PropertyData{
-			Val: "Other",
+	}, {
+		Title: "On Board Device 8 Information",
+		Properties: map[string]PropertyData{
+			"Description": PropertyData{
+				Val: "Thunderbolt",
+			},
+			"Status": PropertyData{
+				Val: "Disabled",
+			},
+			"Type": PropertyData{
+				Val: "Other",
+			},
 		},
 	},
 }
 
 var oemSpecificTypeWithIndentedListItems = DMISubSection{
-	"Header and Data": PropertyData{
-		Val: "",
-		Items: []string{
-			"D8 17 76 00 06 00 01 02 05 20 31 2E 33 2E 31 39",
-			"00 00 00 00 00 00 00",
+	Title: "OEM-specific Type",
+	Properties: map[string]PropertyData{
+		"Header and Data": PropertyData{
+			Val: "",
+			Items: []string{
+				"D8 17 76 00 06 00 01 02 05 20 31 2E 33 2E 31 39",
+				"00 00 00 00 00 00 00",
+			},
+		},
+		"Strings": PropertyData{
+			Val: "",
+			Items: []string{
+				"Chassis Firmware",
+				"1.3.19",
+			},
 		},
 	},
-	"Strings": PropertyData{
-		Val: "",
-		Items: []string{
-			"Chassis Firmware",
-			"1.3.19",
+}
+
+var multpleSectionsWithSameTypeStr = []DMISubSection{
+	{
+		Title: "Memory Device",
+		Properties: map[string]PropertyData{
+			"Array Handle":             PropertyData{Val: "0x0035"},
+			"Error Information Handle": PropertyData{Val: "Not Provided"},
+			"Total Width":              PropertyData{Val: "64 bits"},
+			"Data Width":               PropertyData{Val: "64 bits"},
+			"Size":                     PropertyData{Val: "8192 MB"},
+			"Form Factor":              PropertyData{Val: "SODIMM"},
+			"Set":                      PropertyData{Val: "None"},
+			"Locator":                  PropertyData{Val: "ChannelA-DIMM0"},
+			"Bank Locator":             PropertyData{Val: "BANK 0"},
+			"Type":                     PropertyData{Val: "DDR4"},
+			"Type Detail":              PropertyData{Val: "Synchronous Unbuffered (Unregistered)"},
+			"Speed":                    PropertyData{Val: "2400 MT/s"},
+			"Manufacturer":             PropertyData{Val: "859B"},
+			"Serial Number":            PropertyData{Val: "E0AD159C"},
+			"Asset Tag":                PropertyData{Val: "9876543210"},
+			"Part Number":              PropertyData{Val: "CT8G4SFD824A.M16FB"},
+			"Rank":                     PropertyData{Val: "2"},
+			"Configured Clock Speed":   PropertyData{Val: "2133 MT/s"},
+			"Minimum Voltage":          PropertyData{Val: "1.2 V"},
+			"Maximum Voltage":          PropertyData{Val: "1.2 V"},
+			"Configured Voltage":       PropertyData{Val: "1.2 V"},
 		},
 	},
+	{
+		Title: "Memory Device",
+		Properties: map[string]PropertyData{
+			"Array Handle":             PropertyData{Val: "0x0035"},
+			"Error Information Handle": PropertyData{Val: "Not Provided"},
+			"Total Width":              PropertyData{Val: "64 bits"},
+			"Data Width":               PropertyData{Val: "64 bits"},
+			"Size":                     PropertyData{Val: "8192 MB"},
+			"Form Factor":              PropertyData{Val: "SODIMM"},
+			"Set":                      PropertyData{Val: "None"},
+			"Locator":                  PropertyData{Val: "ChannelB-DIMM0"},
+			"Bank Locator":             PropertyData{Val: "BANK 2"},
+			"Type":                     PropertyData{Val: "DDR4"},
+			"Type Detail":              PropertyData{Val: "Synchronous Unbuffered (Unregistered)"},
+			"Speed":                    PropertyData{Val: "2400 MT/s"},
+			"Manufacturer":             PropertyData{Val: "859B"},
+			"Serial Number":            PropertyData{Val: "E0AD159D"},
+			"Asset Tag":                PropertyData{Val: "9876543210"},
+			"Part Number":              PropertyData{Val: "CT8G4SFD824A.M16FB"},
+			"Rank":                     PropertyData{Val: "2"},
+			"Configured Clock Speed":   PropertyData{Val: "2133 MT/s"},
+			"Minimum Voltage":          PropertyData{Val: "1.2 V"},
+			"Maximum Voltage":          PropertyData{Val: "1.2 V"},
+			"Configured Voltage":       PropertyData{Val: "1.2 V"},
+		},
+	},
+}
+
+// util functions to make it easier to fetch (sub) section(s)
+func sectionsFromDMI(dmi DMI, sectionTypeStr string) (sections []DMISection) {
+	for _, section := range dmi.Sections {
+		if section.TypeStr == sectionTypeStr {
+			sections = append(sections, section)
+		}
+	}
+	return
+}
+func subSectionsFromDMI(dmi DMI, sectionTypeStr, subSectionTitle string) (subSections []DMISubSection) {
+	for _, section := range dmi.Sections {
+		if section.TypeStr == sectionTypeStr {
+			for _, subSection := range section.SubSections {
+				if subSection.Title == subSectionTitle {
+					subSections = append(subSections, subSection)
+				}
+			}
+		}
+	}
+	return
 }
 
 func TestParseSectionSimple(t *testing.T) {
@@ -444,11 +597,11 @@ func TestParseSectionSimple(t *testing.T) {
 	if ok := assert.Equal(t, dmi.Tooling.Decoder, DMIDecoderVersion); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Len(t, dmi.Sections["System"].SubSections["System Information"], 8); !ok {
+	if ok := assert.Len(t, subSectionsFromDMI(dmi, "System", "System Information")[0].Properties, 8); !ok {
 		t.Fatal()
 	}
 	for k, v := range sysInfoTests {
-		if ok := assert.Equal(t, v, dmi.Sections["System"].SubSections["System Information"][k].Val); !ok {
+		if ok := assert.Equal(t, v, subSectionsFromDMI(dmi, "System", "System Information")[0].Properties[k].Val); !ok {
 			t.Fatal()
 		}
 	}
@@ -469,15 +622,15 @@ func TestParseSectionWithListProperty(t *testing.T) {
 	if ok := assert.Len(t, dmi.Sections, 1); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Len(t, dmi.Sections["BIOS"].SubSections["BIOS Information"], 6); !ok {
+	if ok := assert.Len(t, subSectionsFromDMI(dmi, "BIOS", "BIOS Information")[0].Properties, 6); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Len(t, dmi.Sections["BIOS"].SubSections["BIOS Information"]["Characteristics"].Items, 18); !ok {
+	if ok := assert.Len(t, subSectionsFromDMI(dmi, "BIOS", "BIOS Information")[0].Properties["Characteristics"].Items, 18); !ok {
 		t.Fatal()
 	}
 
 	for k, v := range biosInfoTests {
-		if ok := assert.Equal(t, v, dmi.Sections["BIOS"].SubSections["BIOS Information"][k].Val); !ok {
+		if ok := assert.Equal(t, v, subSectionsFromDMI(dmi, "BIOS", "BIOS Information")[0].Properties[k].Val); !ok {
 			t.Fatal()
 		}
 	}
@@ -499,33 +652,33 @@ func TestParseMultipleSectionsSimple(t *testing.T) {
 		t.Fatal()
 	}
 
-	if ok := assert.Len(t, dmi.Sections["System"].SubSections["System Information"], 8); !ok {
+	if ok := assert.Len(t, subSectionsFromDMI(dmi, "System", "System Information")[0].Properties, 8); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Len(t, dmi.Sections["SystemEventLog"].SubSections["System Event Log"], 15); !ok {
+	if ok := assert.Len(t, subSectionsFromDMI(dmi, "SystemEventLog", "System Event Log")[0].Properties, 15); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, DMITypeSystemBoot, dmi.Sections["SystemBoot"].Type); !ok {
+	if ok := assert.Equal(t, DMITypeSystemBoot, sectionsFromDMI(dmi, "SystemBoot")[0].Type); !ok {
 		t.Fatal()
 	}
 
 	for k, v := range sysInfoTests {
-		if ok := assert.Equal(t, v, dmi.Sections["System"].SubSections["System Information"][k].Val); !ok {
+		if ok := assert.Equal(t, v, subSectionsFromDMI(dmi, "System", "System Information")[0].Properties[k].Val); !ok {
 			t.Fatal()
 		}
 	}
 	for k, v := range sysConfigurationTests {
-		if ok := assert.Equal(t, v, dmi.Sections["SystemConfigurationOptions"].SubSections["System Configuration Options"][k].Val); !ok {
+		if ok := assert.Equal(t, v, subSectionsFromDMI(dmi, "SystemConfigurationOptions", "System Configuration Options")[0].Properties[k].Val); !ok {
 			t.Fatal()
 		}
 	}
 	for k, v := range sysEventLogTests {
-		if ok := assert.Equal(t, v, dmi.Sections["SystemEventLog"].SubSections["System Event Log"][k].Val); !ok {
+		if ok := assert.Equal(t, v, subSectionsFromDMI(dmi, "SystemEventLog", "System Event Log")[0].Properties[k].Val); !ok {
 			t.Fatal()
 		}
 	}
 	for k, v := range sysBootTests {
-		if ok := assert.Equal(t, v, dmi.Sections["SystemBoot"].SubSections["System Boot Information"][k].Val); !ok {
+		if ok := assert.Equal(t, v, subSectionsFromDMI(dmi, "SystemBoot", "System Boot Information")[0].Properties[k].Val); !ok {
 			t.Fatal()
 		}
 	}
@@ -546,32 +699,32 @@ func TestParseMultipleSectionsWithListProperties(t *testing.T) {
 		t.Fatal()
 	}
 
-	if ok := assert.Len(t, dmi.Sections["BIOS"].SubSections["BIOS Information"], 6); !ok {
+	if ok := assert.Len(t, subSectionsFromDMI(dmi, "BIOS", "BIOS Information")[0].Properties, 6); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Len(t, dmi.Sections["BIOS"].SubSections["BIOS Information"]["Characteristics"].Items, 18); !ok {
-		t.Fatal()
-	}
-
-	if ok := assert.Len(t, dmi.Sections["Processor"].SubSections["Processor Information"], 24); !ok {
+	if ok := assert.Len(t, subSectionsFromDMI(dmi, "BIOS", "BIOS Information")[0].Properties["Characteristics"].Items, 18); !ok {
 		t.Fatal()
 	}
 
-	if ok := assert.Len(t, dmi.Sections["Processor"].SubSections["Processor Information"]["Flags"].Items, 28); !ok {
+	if ok := assert.Len(t, subSectionsFromDMI(dmi, "Processor", "Processor Information")[0].Properties, 24); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, "FPU (Floating-point unit on-chip)", dmi.Sections["Processor"].SubSections["Processor Information"]["Flags"].Items[0]); !ok {
+
+	if ok := assert.Len(t, subSectionsFromDMI(dmi, "Processor", "Processor Information")[0].Properties["Flags"].Items, 28); !ok {
+		t.Fatal()
+	}
+	if ok := assert.Equal(t, "FPU (Floating-point unit on-chip)", subSectionsFromDMI(dmi, "Processor", "Processor Information")[0].Properties["Flags"].Items[0]); !ok {
 		t.Fatal()
 	}
 
 	for k, v := range biosInfoTests {
-		if ok := assert.Equal(t, v, dmi.Sections["BIOS"].SubSections["BIOS Information"][k].Val); !ok {
+		if ok := assert.Equal(t, v, subSectionsFromDMI(dmi, "BIOS", "BIOS Information")[0].Properties[k].Val); !ok {
 			t.Fatal()
 		}
 	}
 
 	for k, v := range processorTests {
-		if ok := assert.Equal(t, v, dmi.Sections["Processor"].SubSections["Processor Information"][k].Val); !ok {
+		if ok := assert.Equal(t, v, subSectionsFromDMI(dmi, "Processor", "Processor Information")[0].Properties[k].Val); !ok {
 			t.Fatal()
 		}
 	}
@@ -594,19 +747,16 @@ func TestParseTestOnBoardDevices(t *testing.T) {
 	if ok := assert.Len(t, onBoardDevicesTests, 8); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Len(t, dmi.Sections["OnBoardDevices"].SubSections, 8); !ok {
+	if ok := assert.Len(t, sectionsFromDMI(dmi, "OnBoardDevices")[0].SubSections, 8); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Sections["OnBoardDevices"].Type, DMITypeOnBoardDevices); !ok {
+	if ok := assert.Equal(t, sectionsFromDMI(dmi, "OnBoardDevices")[0].Type, DMITypeOnBoardDevices); !ok {
 		t.Fatal()
 	}
-	for k, v := range onBoardDevicesTests {
-		subSection, ok := dmi.Sections["OnBoardDevices"].SubSections[k]
-		if !ok {
-			t.Fatal()
-		}
-		for propertyName, property := range v {
-			foundProperty, ok := subSection[propertyName]
+	for _, v := range onBoardDevicesTests {
+		subSection := subSectionsFromDMI(dmi, "OnBoardDevices", v.Title)[0]
+		for propertyName, property := range v.Properties {
+			foundProperty, ok := subSection.Properties[propertyName]
 			if !ok {
 				t.Fatal()
 			}
@@ -639,20 +789,20 @@ func TestParseTestOEMSpecificTypeWithIndentedListItem(t *testing.T) {
 	if ok := assert.Len(t, dmi.Sections, 1); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Len(t, dmi.Sections["Custom Type 216"].SubSections, 1); !ok {
+	if ok := assert.Len(t, sectionsFromDMI(dmi, "Custom Type 216")[0].SubSections, 1); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Equal(t, dmi.Sections["Custom Type 216"].Type, DMIType(216)); !ok {
+	if ok := assert.Equal(t, sectionsFromDMI(dmi, "Custom Type 216")[0].Type, DMIType(216)); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Len(t, oemSpecificTypeWithIndentedListItems, 2); !ok {
+	if ok := assert.Len(t, oemSpecificTypeWithIndentedListItems.Properties, 2); !ok {
 		t.Fatal()
 	}
-	if ok := assert.Len(t, dmi.Sections["Custom Type 216"].SubSections["OEM-specific Type"], 2); !ok {
+	if ok := assert.Len(t, subSectionsFromDMI(dmi, "Custom Type 216", "OEM-specific Type")[0].Properties, 2); !ok {
 		t.Fatal()
 	}
-	for k, property := range oemSpecificTypeWithIndentedListItems {
-		foundProperty, ok := dmi.Sections["Custom Type 216"].SubSections["OEM-specific Type"][k]
+	for k, property := range oemSpecificTypeWithIndentedListItems.Properties {
+		foundProperty, ok := subSectionsFromDMI(dmi, "Custom Type 216", "OEM-specific Type")[0].Properties[k]
 		if !ok {
 			t.Fatal()
 		}
@@ -665,6 +815,58 @@ func TestParseTestOEMSpecificTypeWithIndentedListItem(t *testing.T) {
 		for index := range property.Items {
 			if ok := assert.Equal(t, property.Items[index], foundProperty.Items[index]); !ok {
 				t.Fatal()
+			}
+		}
+	}
+}
+
+func TestParseTestMultpleSectionsWithSameTypeStr(t *testing.T) {
+	dmi, err := ParseDMI(sample7)
+	if ok := assert.NoError(t, err); !ok {
+		t.Fatal()
+	}
+	if ok := assert.Equal(t, dmi.Tooling.Aggregator, "dmidecode 3.1"); !ok {
+		t.Fatal()
+	}
+	if ok := assert.Equal(t, dmi.Tooling.Decoder, DMIDecoderVersion); !ok {
+		t.Fatal()
+	}
+	if ok := assert.Len(t, dmi.Sections, 2); !ok {
+		t.Fatal()
+	}
+	subSections := subSectionsFromDMI(dmi, "MemoryDevice", "Memory Device")
+	if ok := assert.Len(t, subSections, 2); !ok {
+		t.Fatal()
+	}
+	if ok := assert.Len(t, multpleSectionsWithSameTypeStr, 2); !ok {
+		t.Fatal()
+	}
+	for index, subSection := range subSections {
+		expectedSubSection := multpleSectionsWithSameTypeStr[index]
+		if ok := assert.Equal(t, subSection.Title, expectedSubSection.Title); !ok {
+			t.Fatal()
+		}
+		if ok := assert.Equal(t, subSection.Title, "Memory Device"); !ok {
+			t.Fatal()
+		}
+		if ok := assert.Equal(t, len(subSection.Properties), len(expectedSubSection.Properties)); !ok {
+			t.Fatal()
+		}
+		for k, property := range subSection.Properties {
+			expectedProperty, ok := expectedSubSection.Properties[k]
+			if !ok {
+				t.Fatal()
+			}
+			if ok := assert.Equal(t, expectedProperty.Val, property.Val); !ok {
+				t.Fatal()
+			}
+			if ok := assert.Equal(t, len(expectedProperty.Items), len(property.Items)); !ok {
+				t.Fatal()
+			}
+			for index := range expectedProperty.Items {
+				if ok := assert.Equal(t, expectedProperty.Items[index], property.Items[index]); !ok {
+					t.Fatal()
+				}
 			}
 		}
 	}
