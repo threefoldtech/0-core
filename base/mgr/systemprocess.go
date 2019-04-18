@@ -179,12 +179,16 @@ func (p *systemProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 	args = append(args, p.args.Args...)
 	_, err = p.table.RegisterPID(func() (int, error) {
 		ps, err = os.StartProcess(name, args, &attrs)
+		defer func() {
+			for _, f := range toClose {
+				f.Close()
+			}
+		}()
+
 		if err != nil {
 			return 0, err
 		}
-		for _, f := range toClose {
-			f.Close()
-		}
+
 		return ps.Pid, nil
 	})
 
@@ -205,6 +209,7 @@ func (p *systemProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 	go func(channel chan *stream.Message) {
 		//make sure all outputs are closed before waiting for the p
 		defer close(channel)
+
 		state := p.table.WaitPID(p.pid)
 		//wait for all streams to finish copying
 		wg.Wait()

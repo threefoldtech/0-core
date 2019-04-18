@@ -19,7 +19,6 @@ const (
 
 var (
 	log           = logging.MustGetLogger("stream")
-	pmMsgPattern  = regexp.MustCompile("^(\\d+)(:{2,3})(.*)$")
 	headerPattern = regexp.MustCompile(`^(\d+)(:{2,3})`)
 
 	multiLineTerm = "\n:::\n"
@@ -57,11 +56,11 @@ func Consume(wg *sync.WaitGroup, source io.ReadCloser, level uint16, handler Mes
 			defer wg.Done()
 		}
 
+		defer source.Close()
+
 		if err := c.consume(); err != nil {
 			log.Errorf("failed to read stream: %s", err)
 		}
-
-		source.Close()
 	}()
 }
 
@@ -80,8 +79,8 @@ func (c *consumerImpl) getHeaderFromMatch(m [][]byte) *header {
 //newLineOrEOF will return index of the next \n or EOF (end of file or string)
 func (c *consumerImpl) newLineOrEOF(b []byte) int {
 	var i int
-	var x rune
-	for i, x = range string(b) {
+	var x byte
+	for i, x = range b {
 		if x == '\n' {
 			break
 		}
