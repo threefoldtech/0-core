@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/codegangsta/cli"
-	"github.com/zero-os/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 func statistics(t Transport, c *cli.Context) {

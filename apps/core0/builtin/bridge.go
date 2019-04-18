@@ -12,9 +12,9 @@ import (
 	"syscall"
 
 	"github.com/vishvananda/netlink"
-	"github.com/zero-os/0-core/base/nft"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/utils"
+	"github.com/threefoldtech/0-core/base/nft"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/utils"
 )
 
 type bridgeMgr struct {

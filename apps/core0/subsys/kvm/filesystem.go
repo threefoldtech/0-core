@@ -7,10 +7,10 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/zero-os/0-core/apps/core0/helper/filesystem"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/settings"
-	"github.com/zero-os/0-core/base/utils"
+	"github.com/threefoldtech/0-core/apps/core0/helper/filesystem"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/settings"
+	"github.com/threefoldtech/0-core/base/utils"
 	yaml "gopkg.in/yaml.v2"
 )
 

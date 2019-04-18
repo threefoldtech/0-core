@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/zero-os/0-core/base/pm/stream"
-	"github.com/zero-os/0-core/base/utils"
+	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/utils"
 )
 
 type extensionProcess struct {

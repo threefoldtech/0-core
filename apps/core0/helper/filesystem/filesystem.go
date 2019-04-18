@@ -14,9 +14,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/pm/stream"
-	"github.com/zero-os/0-core/base/settings"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/settings"
 )
 
 const (

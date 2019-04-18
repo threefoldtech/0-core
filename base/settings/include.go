@@ -6,7 +6,7 @@ import (
 	"path"
 	"sync"
 
-	"github.com/zero-os/0-core/base/utils"
+	"github.com/threefoldtech/0-core/base/utils"
 )
 
 type After string
