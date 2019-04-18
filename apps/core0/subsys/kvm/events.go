@@ -9,9 +9,9 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/libvirt/libvirt-go"
-	"github.com/zero-os/0-core/apps/core0/helper/socat"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/pm/stream"
 )
 
 func (m *kvmManager) deviceRemovedFailedHandler(c *libvirt.Connect, d *libvirt.Domain, event *libvirt.DomainEventDeviceRemovalFailed) {

@@ -2,8 +2,8 @@ package builtin
 
 import (
 	"fmt"
-	base "github.com/zero-os/0-core/base"
-	"github.com/zero-os/0-core/base/pm"
+	base "github.com/threefoldtech/0-core/base"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 const (

@@ -3,8 +3,8 @@ package containers
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/apps/core0/helper/filesystem"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/apps/core0/helper/filesystem"
 	"io/ioutil"
 	"net/url"
 	"os"

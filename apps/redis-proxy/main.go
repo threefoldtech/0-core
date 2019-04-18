@@ -5,7 +5,7 @@ import (
 
 	"github.com/codegangsta/cli"
 	logging "github.com/op/go-logging"
-	"github.com/zero-os/0-core/base/utils"
+	"github.com/threefoldtech/0-core/base/utils"
 )
 
 var (

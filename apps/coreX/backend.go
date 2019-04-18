@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/pm/stream"
 	"os"
 	"sync"
 )

@@ -14,7 +14,7 @@ import (
 
 	"github.com/patrickmn/go-cache"
 	"github.com/pborman/uuid"
-	"github.com/zero-os/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/pm"
 )
 
 const (

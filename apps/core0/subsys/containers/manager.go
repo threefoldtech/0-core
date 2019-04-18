@@ -14,13 +14,13 @@ import (
 	"github.com/op/go-logging"
 	"github.com/pborman/uuid"
 	"github.com/vishvananda/netlink"
-	"github.com/zero-os/0-core/apps/core0/helper/socat"
-	"github.com/zero-os/0-core/apps/core0/screen"
-	"github.com/zero-os/0-core/apps/core0/subsys/cgroups"
-	"github.com/zero-os/0-core/apps/core0/transport"
-	"github.com/zero-os/0-core/base/pm"
-	"github.com/zero-os/0-core/base/settings"
-	"github.com/zero-os/0-core/base/utils"
+	"github.com/threefoldtech/0-core/apps/core0/helper/socat"
+	"github.com/threefoldtech/0-core/apps/core0/screen"
+	"github.com/threefoldtech/0-core/apps/core0/subsys/cgroups"
+	"github.com/threefoldtech/0-core/apps/core0/transport"
+	"github.com/threefoldtech/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/settings"
+	"github.com/threefoldtech/0-core/base/utils"
 )
 
 const (

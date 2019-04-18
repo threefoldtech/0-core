@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/zero-os/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/pm"
 	"gopkg.in/yaml.v2"
 	"io"
 	"os"

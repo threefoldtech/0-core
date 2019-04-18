@@ -2,7 +2,7 @@ package builtin
 
 import (
 	psutil "github.com/shirou/gopsutil/process"
-	"github.com/zero-os/0-core/base/pm"
+	"github.com/threefoldtech/0-core/base/pm"
 	"os"
 )
 

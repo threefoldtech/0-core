@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	psutils "github.com/shirou/gopsutil/process"
-	"github.com/zero-os/0-core/base/pm/stream"
+	"github.com/threefoldtech/0-core/base/pm/stream"
 )
 
 type SystemCommandArguments struct {
@@ -183,12 +183,16 @@ func (p *systemProcessImpl) Run() (ch <-chan *stream.Message, err error) {
 	args = append(args, p.args.Args...)
 	_, err = p.table.RegisterPID(func() (int, error) {
 		ps, err = os.StartProcess(name, args, &attrs)
+		defer func() {
+			for _, f := range toClose {
+				f.Close()
+			}
+		}()
+
 		if err != nil {
 			return 0, err
 		}
-		for _, f := range toClose {
-			f.Close()
-		}
+
 		return ps.Pid, nil
 	})
 
