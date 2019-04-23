@@ -24,6 +24,12 @@ The `.startup.toml` file must exist at the `/` (root) of the flist and it has th
 An example [startup file](https://github.com/zero-os/openvswitch-plugin/blob/master/startup.toml) here is used to auto start ovs services once the container
 is created.
 
+## protected flag
+A protected service will get auto restarted if it exited, A `job.kill` call will just send a signal to the process to terminate (similar to unix `kill`)
+but the job itself will restart the process again.
+
+If you want to kill a protected service, a call to `job.unschedul` must be done first to remove the job from the scheduler.
+
 # Container Plugins
 A container flist can also define a more complex feature called `plugins` (optional) where the flist creator defines an `extension` to the known container commands. They
 work as wrapper arround some binaries that are built in the flist
