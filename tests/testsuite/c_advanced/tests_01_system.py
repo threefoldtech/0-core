@@ -47,8 +47,11 @@ class SystemTests(BaseTest):
         self.client.json('bridge.host-add', {'bridge': bridge, 'ip': vm_zos_ip, 'mac': vm_zos_mac})
         nics = [{'type': 'bridge', 'id': bridge, 'hwaddr': vm_zos_mac}]
         pub_port = randint(4000,5000)
-        vm_uuid = self.create_vm(name=vm_name, flist=self.zos_flist,
-                                 memory=2048, nics=nics)
+
+        self.client.bash('qemu-img create -f qcow2 /var/cache/{}.qcow2 5G'.format(pub_port)).get()
+
+        vm_uuid = self.create_vm(name=vm_name, flist=self.zos_flist, media=[{'url': '/var/cache/{}.qcow2'.format(pub_port)}],
+                                 memory=2048, nics=nics, cmdline='development')
         res = self.client.system('nft add rule ip nat pre ip daddr @host tcp dport {} mark set 0xff000000 dnat to {}:6379'.format(pub_port, vm_zos_ip)).get() 
 
         self.assertEqual(res.state, 'SUCCESS')
