@@ -97,27 +97,21 @@ func main() {
 
 	app.Action = func(ctx *cli.Context) error {
 		var organizations []string
-		/*
-			if we are running in development mode, we should accept all connections
-			with no jwt validation required.
-		*/
-		if !utils.GetKernelOptions().Is("development") {
-			/*
-				otherwise, we only accept connections from the given organization
-				either the one given via command line, if not given we use the ones
-				given to the kernel
-			*/
-			organizations = ctx.StringSlice("organization")
-			if len(organizations) == 0 {
-				if orgs, ok := utils.GetKernelOptions().Get("organization"); ok {
-					organizations = orgs
-				}
-			}
 
-			if utils.GetKernelOptions().Is("support") {
-				//and finally we add our spiderman orgnaization
-				organizations = append(organizations, SupportOrganization)
+		/*
+			Add configured organizations to the list of organizations
+			that we need to verify against
+		*/
+		organizations = ctx.StringSlice("organization")
+		if len(organizations) == 0 {
+			if orgs, ok := utils.GetKernelOptions().Get("organization"); ok {
+				organizations = orgs
 			}
+		}
+
+		if utils.GetKernelOptions().Is("support") {
+			//and finally we add our spiderman orgnaization
+			organizations = append(organizations, SupportOrganization)
 		}
 
 		return Proxy(ctx.String("listen"), ctx.String("redis"), organizations)
