@@ -1,3 +1,5 @@
+# This repository is not longer maintain. For the latest version of 0-OS, head to https://github.com/threefoldtech/zos
+
 
 [![Build Status](https://travis-ci.com/threefoldtech/0-core.svg?branch=master)](https://travis-ci.com/threefoldtech/0-core)
 [![codecov](https://codecov.io/gh/threefoldtech/0-core/branch/master/graph/badge.svg)](https://codecov.io/gh/threefoldtech/0-core)
