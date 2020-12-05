@@ -209,7 +209,7 @@ func (b *Bootstrap) setupNetworking() error {
 		<-time.After(3 * time.Second)
 	}
 
-	log.Warning("can not reach interent, continue booting anyway")
+	log.Warning("can not reach internet, continue booting anyway")
 	return nil
 }
 

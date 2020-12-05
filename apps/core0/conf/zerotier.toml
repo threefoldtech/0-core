@@ -4,11 +4,10 @@
 [startup."zerotier-init"]
 name = "bash"
 running_delay = -1
-after = ["init"]
 
 [startup."zerotier-init".args]
 "not(ztid)|script" = """
-ztid -out /tmp/zt
+ztid -debug -out /tmp/zt
 """
 
 "ztid|script" = """
@@ -21,7 +20,7 @@ chmod 0400 /tmp/zt/identity.secret
 
 [startup.zerotier]
 name = "core.system"
-after = ["net", "zerotier-init"]
+after = ["zerotier-init"]
 protected = true
 
 [startup.zerotier.args]
