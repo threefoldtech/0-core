@@ -45,7 +45,8 @@ function preparedisk {
     partprobe
     udevadm settle
 
-    mkfs.btrfs ${DISK}1 -f -L ${LABEL}
+    PART=`lsblk -e 2 -e 11 -pln  -o NAME,TYPE ${DISK}|grep " part"|cut -d " " -f 1|head -1`
+    mkfs.btrfs ${PART} -f -L ${LABEL}
 
     sync
     partprobe
